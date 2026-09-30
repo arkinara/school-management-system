@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Beranda Siswa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="tw-config.js"></script>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="app.js"></script>
+</head>
+<body class="min-h-dvh">
+  <div id="appbar"></div>
+  <div class="flex">
+    <div id="navrail"></div>
+    <main class="min-w-0 flex-1 pb-24 md:pb-8">
+      <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <h1 class="text-2xl font-semibold">Hai, Andi</h1>
+        <p class="mt-1 text-sm text-muted-foreground">Kelas 6A · SDN Menteng 01 · Senin, 30 September 2026</p>
+
+        <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <!-- Today's schedule -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5 lg:col-span-2">
+            <h2 class="text-base font-semibold">Jadwal Hari Ini</h2>
+            <div class="mt-4 space-y-2.5">
+              <div class="flex items-center gap-4 rounded-md bg-primary-container/40 p-3">
+                <span class="w-14 shrink-0 text-sm font-medium tabular-nums">07.00</span>
+                <span class="flex h-9 w-9 items-center justify-center rounded-md bg-primary-container text-primary-container-foreground"><span data-icon="book-open" class="h-4.5 w-4.5"></span></span>
+                <div class="flex-1"><p class="text-sm font-medium">Matematika</p><p class="text-xs text-muted-foreground">Ibu Siti · Ruang 6A</p></div>
+                <span class="rounded-full bg-success-container px-2.5 py-1 text-xs font-medium text-success">sekarang</span>
+              </div>
+              <div class="flex items-center gap-4 rounded-md bg-surface-container p-3">
+                <span class="w-14 shrink-0 text-sm font-medium tabular-nums">09.00</span>
+                <span class="flex h-9 w-9 items-center justify-center rounded-md bg-surface-container-highest text-muted-foreground"><span data-icon="book-open" class="h-4.5 w-4.5"></span></span>
+                <div class="flex-1"><p class="text-sm font-medium">Bahasa Indonesia</p><p class="text-xs text-muted-foreground">Bapak Andi · Ruang 6A</p></div>
+              </div>
+              <div class="flex items-center gap-4 rounded-md bg-surface-container p-3">
+                <span class="w-14 shrink-0 text-sm font-medium tabular-nums">10.30</span>
+                <span class="flex h-9 w-9 items-center justify-center rounded-md bg-surface-container-highest text-muted-foreground"><span data-icon="book-open" class="h-4.5 w-4.5"></span></span>
+                <div class="flex-1"><p class="text-sm font-medium">IPA</p><p class="text-xs text-muted-foreground">Ibu Dewi · Lab IPA</p></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Upcoming assignments -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <h2 class="text-base font-semibold">Tugas Mendatang</h2>
+            <ul class="mt-4 space-y-2.5">
+              <li class="rounded-md border-l-4 border-destructive bg-surface-container p-3">
+                <div class="flex items-center justify-between"><p class="text-sm font-medium">PR Matematika Bab 3</p><span class="text-xs font-medium text-destructive">besok</span></div>
+                <p class="mt-0.5 text-xs text-muted-foreground">Kumpulkan 1 Okt · Ibu Siti</p>
+              </li>
+              <li class="rounded-md border-l-4 border-warning bg-surface-container p-3">
+                <div class="flex items-center justify-between"><p class="text-sm font-medium">Proyek IPA: Ekosistem</p><span class="text-xs font-medium text-warning">3 hari</span></div>
+                <p class="mt-0.5 text-xs text-muted-foreground">Kumpulkan 3 Okt · Ibu Dewi</p>
+              </li>
+              <li class="rounded-md border-l-4 border-outline bg-surface-container p-3">
+                <div class="flex items-center justify-between"><p class="text-sm font-medium">Karangan B. Indonesia</p><span class="text-xs text-muted-foreground">5 hari</span></div>
+                <p class="mt-0.5 text-xs text-muted-foreground">Kumpulkan 5 Okt · Bapak Andi</p>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <!-- Latest rapor summary -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5 lg:col-span-2">
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-semibold">Ringkasan Rapor Terakhir</h2>
+              <a href="rapor-view.html" class="inline-flex min-h-[40px] items-center gap-1.5 text-sm font-medium text-primary">Lihat rapor <span data-icon="arrow-right" class="h-4 w-4"></span></a>
+            </div>
+            <p class="mt-1 text-xs text-muted-foreground">Semester Genap 2025/2026 · Fase C</p>
+            <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div class="rounded-md bg-surface-container p-3 text-center"><p class="text-xs text-muted-foreground">Matematika</p><p class="mt-1 text-2xl font-semibold tabular-nums text-success">88</p></div>
+              <div class="rounded-md bg-surface-container p-3 text-center"><p class="text-xs text-muted-foreground">B. Indonesia</p><p class="mt-1 text-2xl font-semibold tabular-nums text-success">85</p></div>
+              <div class="rounded-md bg-surface-container p-3 text-center"><p class="text-xs text-muted-foreground">IPA</p><p class="mt-1 text-2xl font-semibold tabular-nums text-success">90</p></div>
+              <div class="rounded-md bg-surface-container p-3 text-center"><p class="text-xs text-muted-foreground">IPS</p><p class="mt-1 text-2xl font-semibold tabular-nums text-warning">78</p></div>
+            </div>
+          </div>
+
+          <!-- Announcement feed -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <h2 class="text-base font-semibold">Pengumuman</h2>
+            <ul class="mt-4 space-y-3">
+              <li class="flex gap-3">
+                <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-tertiary-container text-tertiary-container-foreground"><span data-icon="megaphone" class="h-4 w-4"></span></span>
+                <div><p class="text-sm font-medium">Libur Maulid Nabi</p><p class="text-xs text-muted-foreground">Sekolah libur 4 Okt · 2 jam lalu</p></div>
+              </li>
+              <li class="flex gap-3">
+                <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-tertiary-container text-tertiary-container-foreground"><span data-icon="megaphone" class="h-4 w-4"></span></span>
+                <div><p class="text-sm font-medium">Jadwal UTS</p><p class="text-xs text-muted-foreground">Mulai 14 Okt · kemarin</p></div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="bottomnav"></div>
+  <script>
+    SMS.shell({ role: "siswa", active: "home", title: "SDN Menteng 01", subtitle: "Siswa · Kelas 6A", user: "Andi Wijaya", notif: 2 });
+  </script>
+</body>
+</html>

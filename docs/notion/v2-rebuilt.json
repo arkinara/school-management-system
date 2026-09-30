@@ -1,0 +1,17 @@
+{
+  "page_id": "3eb8f6b0-a7a5-81db-9834-d74fe641de37",
+  "page_url": "https://app.notion.com/p/School-Management-System-PRD-3eb8f6b0a7a581db9834d74fe641de37",
+  "version": 3,
+  "core_features_section": true,
+  "user_flows_section": true,
+  "feature_specifications_banner": true,
+  "feature_headings": 10,
+  "subfeature_headings": 26,
+  "todo_blocks": 113,
+  "total_blocks": 393,
+  "verification_passed": true,
+  "recovery_action": "orchestrator-added-sequence-and-er-diagrams-to-match-spendflow",
+  "code_blocks": 3,
+  "paragraphs": 55,
+  "notes": "Added mermaid sequenceDiagram in Architecture and mermaid erDiagram + intro paragraph in Database Schema to mirror SpendFlow shape."
+}

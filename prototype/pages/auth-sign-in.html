@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Masuk — School Management System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="tw-config.js"></script>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="app.js"></script>
+</head>
+<body class="min-h-dvh">
+  <div class="flex min-h-dvh flex-col">
+    <div class="flex justify-end p-4">
+      <button id="theme-toggle" class="flex h-12 w-12 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-container-high" aria-label="Ganti mode gelap"><span data-icon="moon" class="h-5 w-5" data-theme-icon></span></button>
+    </div>
+    <div class="flex flex-1 items-center justify-center px-4 pb-16">
+      <div class="w-full max-w-[420px]">
+        <div class="mb-6 flex flex-col items-center text-center">
+          <span class="flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-primary-foreground"><span data-icon="graduation-cap" class="h-7 w-7"></span></span>
+          <h1 class="mt-4 text-xl font-semibold">Selamat datang kembali</h1>
+          <p class="mt-1 text-sm text-muted-foreground">Masuk ke School Management System</p>
+        </div>
+
+        <div class="rounded-xl border border-outline-variant bg-surface-container-low p-6">
+          <!-- Tenant hint (multi-tenant per-jenjang) -->
+          <div class="mb-5">
+            <label for="tenant" class="mb-1.5 block text-sm font-medium">Sekolah / Jenjang</label>
+            <div class="relative">
+              <select id="tenant" class="min-h-[48px] w-full appearance-none rounded-sm border border-outline bg-background px-3 pr-10 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <option>SDN Menteng 01 (SD)</option>
+                <option>SMP Nusantara (SMP)</option>
+                <option>SMA Bhakti (SMA)</option>
+                <option>TK Menteng Ceria (TK)</option>
+              </select>
+              <span data-icon="chevron-down" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"></span>
+            </div>
+            <p class="mt-1 text-xs text-muted-foreground">Tiap jenjang adalah tenant terpisah dengan kurikulumnya sendiri.</p>
+          </div>
+
+          <div class="mb-4">
+            <label for="email" class="mb-1.5 block text-sm font-medium">Email</label>
+            <input id="email" type="email" autocomplete="email" placeholder="nama@sekolah.sch.id" class="min-h-[48px] w-full rounded-sm border border-outline bg-background px-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+          </div>
+
+          <div class="mb-2">
+            <div class="mb-1.5 flex items-center justify-between">
+              <label for="password" class="text-sm font-medium">Kata sandi</label>
+              <a href="#" class="text-xs font-medium text-primary hover:underline">Lupa sandi?</a>
+            </div>
+            <div class="relative">
+              <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" class="min-h-[48px] w-full rounded-sm border border-outline bg-background px-3 pr-12 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+              <button type="button" aria-label="Tampilkan kata sandi" class="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-container-high"><span data-icon="user" class="h-4 w-4"></span></button>
+            </div>
+          </div>
+
+          <label class="mb-5 mt-3 flex items-center gap-2 text-sm">
+            <input type="checkbox" class="h-4 w-4 rounded-xs border-outline text-primary focus:ring-ring" /> Ingat saya
+          </label>
+
+          <button class="min-h-[48px] w-full rounded-full bg-primary text-sm font-medium text-primary-foreground transition-all duration-short hover:opacity-90 active:scale-[0.99]">Masuk</button>
+
+          <div class="my-5 flex items-center gap-3 text-xs text-muted-foreground">
+            <span class="h-px flex-1 bg-outline-variant"></span>atau<span class="h-px flex-1 bg-outline-variant"></span>
+          </div>
+
+          <button class="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full border border-outline text-sm font-medium hover:bg-surface-container-high">
+            <span data-icon="school" class="h-4 w-4"></span>Masuk dengan SSO Yayasan
+          </button>
+        </div>
+
+        <p class="mt-5 text-center text-sm text-muted-foreground">Belum punya akun? <a href="#" class="font-medium text-primary hover:underline">Hubungi Tata Usaha</a></p>
+      </div>
+    </div>
+  </div>
+  <script>
+    SMS.hydrate(document);
+    document.getElementById("theme-toggle").addEventListener("click", function () {
+      SMS.applyTheme(!document.documentElement.classList.contains("dark"));
+    });
+  </script>
+</body>
+</html>

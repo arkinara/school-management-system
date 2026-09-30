@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Beranda Orang Tua</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="tw-config.js"></script>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="app.js"></script>
+</head>
+<body class="min-h-dvh">
+  <div id="appbar"></div>
+  <div class="flex">
+    <div id="navrail"></div>
+    <main class="min-w-0 flex-1 pb-24 md:pb-8">
+      <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 class="text-2xl font-semibold">Selamat datang, Ibu Dewi</h1>
+            <p class="mt-1 text-sm text-muted-foreground">Pantau perkembangan anak Anda</p>
+          </div>
+          <!-- Child picker (sibling logic) -->
+          <div>
+            <label class="mb-1.5 block text-xs font-medium text-muted-foreground">Pilih anak</label>
+            <div class="inline-flex gap-2">
+              <button class="inline-flex min-h-[48px] items-center gap-2 rounded-full border border-primary bg-primary-container px-3 pr-4 text-sm font-medium text-primary-container-foreground">
+                <span class="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">AW</span>Andi Wijaya <span class="text-xs opacity-70">· 6A</span>
+              </button>
+              <button class="inline-flex min-h-[48px] items-center gap-2 rounded-full border border-outline px-3 pr-4 text-sm font-medium hover:bg-surface-container-high">
+                <span class="flex h-7 w-7 items-center justify-center rounded-full bg-surface-container-highest text-xs">DW</span>Dinda Wijaya <span class="text-xs text-muted-foreground">· 3B</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overdue payment alert -->
+        <div class="mt-6 flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive-container px-4 py-3.5 text-destructive-container-foreground">
+          <span data-icon="alert-triangle" class="mt-0.5 h-5 w-5 shrink-0"></span>
+          <div class="flex-1">
+            <p class="text-sm font-semibold">SPP September belum dibayar</p>
+            <p class="text-sm">Tagihan Rp 350.000 jatuh tempo 25 September 2026 (5 hari lewat).</p>
+          </div>
+          <button class="min-h-[44px] shrink-0 rounded-full bg-destructive px-4 text-sm font-medium text-destructive-foreground hover:opacity-90">Bayar</button>
+        </div>
+
+        <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <!-- Rapor progress -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5 lg:col-span-2">
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-semibold">Perkembangan Nilai — Andi</h2>
+              <a href="rapor-view.html" class="inline-flex min-h-[40px] items-center gap-1.5 text-sm font-medium text-primary">Rapor lengkap <span data-icon="arrow-right" class="h-4 w-4"></span></a>
+            </div>
+            <div class="mt-5 space-y-4">
+              <div>
+                <div class="flex justify-between text-sm"><span>Matematika</span><span class="font-medium tabular-nums">88</span></div>
+                <div class="mt-1.5 h-2 rounded-full bg-surface-container-highest"><div class="h-2 rounded-full bg-success" style="width:88%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm"><span>Bahasa Indonesia</span><span class="font-medium tabular-nums">85</span></div>
+                <div class="mt-1.5 h-2 rounded-full bg-surface-container-highest"><div class="h-2 rounded-full bg-success" style="width:85%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm"><span>IPA</span><span class="font-medium tabular-nums">90</span></div>
+                <div class="mt-1.5 h-2 rounded-full bg-surface-container-highest"><div class="h-2 rounded-full bg-success" style="width:90%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm"><span>IPS</span><span class="font-medium tabular-nums">78</span></div>
+                <div class="mt-1.5 h-2 rounded-full bg-surface-container-highest"><div class="h-2 rounded-full bg-warning" style="width:78%"></div></div>
+              </div>
+            </div>
+            <div class="mt-5 flex items-center gap-6 border-t border-outline-variant pt-4 text-sm">
+              <div><p class="text-xs text-muted-foreground">Rata-rata</p><p class="font-semibold tabular-nums">85.3</p></div>
+              <div><p class="text-xs text-muted-foreground">Kehadiran</p><p class="font-semibold tabular-nums text-success">96%</p></div>
+              <div><p class="text-xs text-muted-foreground">Peringkat kelas</p><p class="font-semibold tabular-nums">4 / 32</p></div>
+            </div>
+          </div>
+
+          <!-- Payment status -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <h2 class="text-base font-semibold">Status Pembayaran</h2>
+            <ul class="mt-4 space-y-2.5">
+              <li class="flex items-center justify-between rounded-md bg-destructive-container p-3 text-destructive-container-foreground">
+                <div><p class="text-sm font-medium">SPP September</p><p class="text-xs">Rp 350.000</p></div>
+                <span class="rounded-full bg-destructive px-2.5 py-1 text-xs font-medium text-destructive-foreground">menunggak</span>
+              </li>
+              <li class="flex items-center justify-between rounded-md bg-surface-container p-3">
+                <div><p class="text-sm font-medium">SPP Agustus</p><p class="text-xs text-muted-foreground">Rp 350.000</p></div>
+                <span class="rounded-full bg-success-container px-2.5 py-1 text-xs font-medium text-success">lunas</span>
+              </li>
+              <li class="flex items-center justify-between rounded-md bg-surface-container p-3">
+                <div><p class="text-sm font-medium">Uang Kegiatan</p><p class="text-xs text-muted-foreground">Rp 150.000</p></div>
+                <span class="rounded-full bg-success-container px-2.5 py-1 text-xs font-medium text-success">lunas</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Announcement feed -->
+        <div class="mt-6 rounded-lg border border-outline-variant bg-surface-container-low p-5">
+          <h2 class="text-base font-semibold">Pengumuman Sekolah</h2>
+          <ul class="mt-4 divide-y divide-outline-variant">
+            <li class="flex items-center gap-4 py-3">
+              <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-tertiary-container text-tertiary-container-foreground"><span data-icon="megaphone" class="h-5 w-5"></span></span>
+              <div class="flex-1"><p class="text-sm font-medium">Pembagian Rapor Tengah Semester</p><p class="text-xs text-muted-foreground">Sabtu 18 Okt, pukul 08.00 · orang tua diharap hadir</p></div>
+              <span class="text-xs text-muted-foreground">1 jam lalu</span>
+            </li>
+            <li class="flex items-center gap-4 py-3">
+              <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-tertiary-container text-tertiary-container-foreground"><span data-icon="megaphone" class="h-5 w-5"></span></span>
+              <div class="flex-1"><p class="text-sm font-medium">Libur Maulid Nabi 1448 H</p><p class="text-xs text-muted-foreground">Sekolah libur 4 Oktober 2026</p></div>
+              <span class="text-xs text-muted-foreground">2 jam lalu</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="bottomnav"></div>
+  <script>
+    SMS.shell({ role: "orang_tua", active: "home", title: "SDN Menteng 01", subtitle: "Orang Tua", user: "Dewi Lestari", notif: 4 });
+  </script>
+</body>
+</html>

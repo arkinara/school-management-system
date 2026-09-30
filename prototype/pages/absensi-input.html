@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Input Absensi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="tw-config.js"></script>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="app.js"></script>
+</head>
+<body class="min-h-dvh">
+  <div id="appbar"></div>
+  <div class="flex">
+    <div id="navrail"></div>
+    <main class="min-w-0 flex-1 pb-28 md:pb-8">
+      <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <h1 class="text-2xl font-semibold">Input Absensi</h1>
+        <p class="mt-1 text-sm text-muted-foreground">SMP Nusantara · Kelas 6A · Matematika</p>
+
+        <!-- Class + date picker -->
+        <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label class="mb-1.5 block text-sm font-medium">Kelas</label>
+            <div class="relative">
+              <select class="min-h-[48px] w-full appearance-none rounded-sm border border-outline bg-background px-3 pr-10 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <option>Kelas 6A</option><option>Kelas 6B</option><option>Kelas 5A</option>
+              </select>
+              <span data-icon="chevron-down" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"></span>
+            </div>
+          </div>
+          <div>
+            <label class="mb-1.5 block text-sm font-medium">Mata pelajaran</label>
+            <div class="relative">
+              <select class="min-h-[48px] w-full appearance-none rounded-sm border border-outline bg-background px-3 pr-10 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <option>Matematika</option><option>IPA</option><option>Bahasa Indonesia</option>
+              </select>
+              <span data-icon="chevron-down" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"></span>
+            </div>
+          </div>
+          <div>
+            <label class="mb-1.5 block text-sm font-medium">Tanggal</label>
+            <input type="date" value="2026-09-30" class="min-h-[48px] w-full rounded-sm border border-outline bg-background px-3 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+          </div>
+        </div>
+
+        <!-- Quick summary + bulk -->
+        <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-container px-4 py-3">
+          <div id="summary" class="flex flex-wrap items-center gap-4 text-sm"></div>
+          <button id="all-present" class="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-outline px-4 text-sm font-medium hover:bg-surface-container-high"><span data-icon="check" class="h-4 w-4"></span>Tandai semua hadir</button>
+        </div>
+
+        <!-- Roster -->
+        <div class="mt-5 overflow-hidden rounded-lg border border-outline-variant bg-surface-container-low">
+          <div class="hidden grid-cols-[2rem_1fr_auto] items-center gap-4 border-b border-outline-variant bg-surface-container px-5 py-3 text-xs font-semibold text-muted-foreground sm:grid">
+            <span>No</span><span>Nama Siswa</span><span>Status Kehadiran</span>
+          </div>
+          <ul id="roster" class="divide-y divide-outline-variant"></ul>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Sticky save bar -->
+  <div class="fixed inset-x-0 bottom-16 z-30 border-t border-outline-variant bg-surface-container-low px-4 py-3 md:bottom-0 md:pl-24">
+    <div class="mx-auto flex max-w-7xl items-center justify-between gap-3 sm:px-6 lg:px-8">
+      <p class="text-sm text-muted-foreground"><span id="save-hint">6 dari 6 siswa telah ditandai</span></p>
+      <div class="flex gap-2">
+        <button class="min-h-[48px] rounded-full border border-outline px-5 text-sm font-medium hover:bg-surface-container-high">Batal</button>
+        <button class="inline-flex min-h-[48px] items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90"><span data-icon="check" class="h-5 w-5"></span>Simpan Absensi</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bottomnav"></div>
+  <script>
+    SMS.shell({ role: "guru", active: "absensi", title: "SMP Nusantara", subtitle: "Guru · Wali Kelas 6A", user: "Siti Aminah", notif: 5 });
+
+    var STUDENTS = [
+      { n: "Andi Wijaya", s: "hadir" },
+      { n: "Budi Santoso", s: "hadir" },
+      { n: "Dewi Lestari", s: "izin" },
+      { n: "Siti Aminah", s: "sakit" },
+      { n: "Rangga Pratama", s: "hadir" },
+      { n: "Nabila Putri", s: "alpa" },
+    ];
+    var OPTS = [
+      { v: "hadir", l: "Hadir", tone: "success" },
+      { v: "izin", l: "Izin", tone: "warning" },
+      { v: "sakit", l: "Sakit", tone: "info" },
+      { v: "alpa", l: "Alpa", tone: "danger" },
+    ];
+    var toneCls = {
+      success: "bg-success-container text-success",
+      warning: "bg-warning-container text-warning",
+      info: "bg-info-container text-info",
+      danger: "bg-destructive-container text-destructive-container-foreground",
+    };
+
+    function initials(n) { var p = n.split(" "); return (p[0][0] + (p[1] ? p[1][0] : "")).toUpperCase(); }
+
+    function render() {
+      var ul = document.getElementById("roster");
+      ul.innerHTML = STUDENTS.map(function (st, i) {
+        var seg = OPTS.map(function (o) {
+          var on = st.s === o.v;
+          return '<button data-i="' + i + '" data-v="' + o.v + '" class="seg min-h-[44px] flex-1 border-l border-outline px-3 text-sm font-medium transition-colors ' +
+            (on ? toneCls[o.tone] : "text-foreground hover:bg-surface-container-high") + '">' + o.l + "</button>";
+        }).join("");
+        return (
+          '<li class="grid grid-cols-1 items-center gap-3 px-5 py-3 sm:grid-cols-[2rem_1fr_auto] sm:gap-4">' +
+          '<span class="hidden text-sm text-muted-foreground tabular-nums sm:block">' + (i + 1) + "</span>" +
+          '<div class="flex items-center gap-3"><span class="flex h-9 w-9 items-center justify-center rounded-full bg-primary-container text-xs font-medium text-primary-container-foreground">' + initials(st.n) + '</span><span class="text-sm font-medium">' + st.n + "</span></div>" +
+          '<div class="inline-flex overflow-hidden rounded-full border border-outline">' + seg + "</div></li>"
+        );
+      }).join("");
+      ul.querySelectorAll(".seg").forEach(function (b) {
+        b.addEventListener("click", function () {
+          STUDENTS[+b.dataset.i].s = b.dataset.v;
+          render();
+        });
+      });
+      var counts = { hadir: 0, izin: 0, sakit: 0, alpa: 0 };
+      STUDENTS.forEach(function (s) { counts[s.s]++; });
+      document.getElementById("summary").innerHTML =
+        '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-success"></span>Hadir <b class="tabular-nums">' + counts.hadir + "</b></span>" +
+        '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-warning"></span>Izin <b class="tabular-nums">' + counts.izin + "</b></span>" +
+        '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-info"></span>Sakit <b class="tabular-nums">' + counts.sakit + "</b></span>" +
+        '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-destructive"></span>Alpa <b class="tabular-nums">' + counts.alpa + "</b></span>";
+    }
+
+    document.getElementById("all-present").addEventListener("click", function () {
+      STUDENTS.forEach(function (s) { s.s = "hadir"; });
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>

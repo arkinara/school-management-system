@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Generate Tagihan SPP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="tw-config.js"></script>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="app.js"></script>
+</head>
+<body class="min-h-dvh">
+  <div id="appbar"></div>
+  <div class="flex">
+    <div id="navrail"></div>
+    <main class="min-w-0 flex-1 pb-24 md:pb-8">
+      <div class="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+        <nav class="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
+          <a href="tu-dashboard.html" class="hover:text-foreground">Beranda</a><span data-icon="chevron-right" class="h-3.5 w-3.5"></span><span>SPP</span><span data-icon="chevron-right" class="h-3.5 w-3.5"></span><span class="text-foreground">Generate Tagihan</span>
+        </nav>
+        <h1 class="text-2xl font-semibold">Generate Tagihan SPP</h1>
+        <p class="mt-1 text-sm text-muted-foreground">SMA Bhakti · buat tagihan bulanan per rombel</p>
+
+        <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <!-- Form -->
+          <div class="lg:col-span-2">
+            <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+              <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div>
+                  <label class="mb-1.5 block text-sm font-medium">Rombel / Kelas <span class="text-destructive">*</span></label>
+                  <div class="relative">
+                    <select class="min-h-[48px] w-full appearance-none rounded-sm border border-outline bg-background px-3 pr-10 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <option>Semua kelas (18 rombel)</option><option>X-IPA-1</option><option>XI-IPA-1</option><option>XII-IPS-2</option>
+                    </select>
+                    <span data-icon="chevron-down" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"></span>
+                  </div>
+                  <p class="mt-1 text-xs text-muted-foreground">Tagihan dibuat untuk semua siswa aktif pada rombel terpilih.</p>
+                </div>
+                <div>
+                  <label class="mb-1.5 block text-sm font-medium">Periode <span class="text-destructive">*</span></label>
+                  <div class="relative">
+                    <select class="min-h-[48px] w-full appearance-none rounded-sm border border-outline bg-background px-3 pr-10 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <option>Oktober 2026</option><option>November 2026</option><option>Desember 2026</option>
+                    </select>
+                    <span data-icon="chevron-down" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"></span>
+                  </div>
+                </div>
+                <div>
+                  <label class="mb-1.5 block text-sm font-medium">Template nominal</label>
+                  <div class="relative">
+                    <select class="min-h-[48px] w-full appearance-none rounded-sm border border-outline bg-background px-3 pr-10 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <option>SPP Reguler — Rp 350.000</option><option>SPP + Ekskul — Rp 425.000</option><option>Nominal khusus…</option>
+                    </select>
+                    <span data-icon="chevron-down" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"></span>
+                  </div>
+                </div>
+                <div>
+                  <label class="mb-1.5 block text-sm font-medium">Jatuh tempo</label>
+                  <input type="date" value="2026-10-10" class="min-h-[48px] w-full rounded-sm border border-outline bg-background px-3 text-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+                </div>
+              </div>
+
+              <label class="mt-5 flex items-center gap-2 text-sm">
+                <input type="checkbox" checked class="h-4 w-4 rounded-xs border-outline text-primary focus:ring-ring" /> Kirim notifikasi ke orang tua setelah tagihan dibuat
+              </label>
+            </div>
+          </div>
+
+          <!-- Live preview -->
+          <div>
+            <div class="rounded-lg border border-outline-variant bg-surface-container p-5">
+              <p class="text-sm font-semibold">Ringkasan</p>
+              <dl class="mt-4 space-y-3 text-sm">
+                <div class="flex justify-between"><dt class="text-muted-foreground">Rombel</dt><dd class="font-medium">18</dd></div>
+                <div class="flex justify-between"><dt class="text-muted-foreground">Siswa aktif</dt><dd class="font-medium tabular-nums">648</dd></div>
+                <div class="flex justify-between"><dt class="text-muted-foreground">Nominal / siswa</dt><dd class="font-medium tabular-nums">Rp 350.000</dd></div>
+                <div class="flex justify-between border-t border-outline-variant pt-3"><dt class="font-medium">Total tagihan</dt><dd class="text-lg font-semibold tabular-nums text-primary">Rp 226,8jt</dd></div>
+              </dl>
+              <button class="mt-5 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-medium text-primary-foreground hover:opacity-90"><span data-icon="receipt" class="h-5 w-5"></span>Generate Tagihan</button>
+              <button class="mt-2 min-h-[48px] w-full rounded-full border border-outline text-sm font-medium hover:bg-surface-container-high">Pratinjau daftar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent generated batches -->
+        <div class="mt-6 overflow-hidden rounded-lg border border-outline-variant bg-surface-container-low">
+          <div class="border-b border-outline-variant px-5 py-4"><h2 class="text-base font-semibold">Riwayat Pembuatan Tagihan</h2></div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-surface-container text-left text-muted-foreground">
+                <tr><th class="px-5 py-3 font-semibold">Periode</th><th class="px-5 py-3 font-semibold">Rombel</th><th class="px-5 py-3 text-right font-semibold">Tagihan</th><th class="px-5 py-3 text-right font-semibold">Terkumpul</th><th class="px-5 py-3 font-semibold">Status</th></tr>
+              </thead>
+              <tbody>
+                <tr class="border-t border-outline-variant"><td class="px-5 py-3 font-medium">September 2026</td><td class="px-5 py-3">18 rombel</td><td class="px-5 py-3 text-right tabular-nums">648</td><td class="px-5 py-3 text-right tabular-nums">562</td><td class="px-5 py-3"><span class="rounded-full bg-warning-container px-2.5 py-1 text-xs font-medium text-warning">berjalan</span></td></tr>
+                <tr class="border-t border-outline-variant"><td class="px-5 py-3 font-medium">Agustus 2026</td><td class="px-5 py-3">18 rombel</td><td class="px-5 py-3 text-right tabular-nums">644</td><td class="px-5 py-3 text-right tabular-nums">644</td><td class="px-5 py-3"><span class="rounded-full bg-success-container px-2.5 py-1 text-xs font-medium text-success">selesai</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="bottomnav"></div>
+  <script>
+    SMS.shell({ role: "tu", active: "spp", title: "SMA Bhakti", subtitle: "Tata Usaha", user: "Dewi Lestari", notif: 7 });
+  </script>
+</body>
+</html>

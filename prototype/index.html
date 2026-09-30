@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>School Management System — Prototype Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="pages/tw-config.js"></script>
+  <link rel="stylesheet" href="pages/theme.css" />
+  <script src="pages/app.js"></script>
+</head>
+<body class="min-h-dvh">
+  <div class="flex min-h-dvh flex-col">
+    <!-- Header -->
+    <header class="flex h-14 items-center gap-3 border-b border-outline-variant bg-surface-container-low px-4">
+      <span class="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground"><span data-icon="graduation-cap" class="h-4 w-4"></span></span>
+      <div class="leading-tight">
+        <p class="text-sm font-semibold">School Management System</p>
+        <p class="text-xs text-muted-foreground">Prototype Viewer · Indonesia K-12</p>
+      </div>
+      <div class="ml-auto flex items-center gap-2">
+        <button id="viewer-theme" class="flex min-h-[40px] items-center gap-1.5 rounded-full border border-outline px-3 text-sm font-medium hover:bg-surface-container-high">
+          <span data-icon="moon" class="h-4 w-4" id="viewer-theme-icon"></span><span id="viewer-theme-label">Dark</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Primary tabs -->
+    <nav id="tabs" class="flex flex-wrap items-center gap-1 border-b border-outline-variant bg-surface-container-low px-3 py-2" aria-label="Halaman"></nav>
+
+    <!-- Secondary: key page-level views + viewport toggle -->
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant bg-background px-3 py-2">
+      <div id="subtabs" class="flex flex-wrap items-center gap-1.5" aria-label="Halaman kunci"></div>
+      <div class="flex items-center gap-1.5">
+        <span class="mr-1 text-xs font-medium text-muted-foreground">Viewport</span>
+        <div id="viewport" class="inline-flex overflow-hidden rounded-full border border-outline"></div>
+      </div>
+    </div>
+
+    <!-- Page info -->
+    <div class="border-b border-outline-variant bg-background px-3 py-2.5">
+      <div class="mx-auto flex max-w-4xl items-center gap-3 rounded-md bg-surface-container px-4 py-2.5">
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-container text-primary-container-foreground"><span id="info-icon" data-icon="layout-dashboard" class="h-5 w-5"></span></span>
+        <div class="min-w-0">
+          <p class="text-sm font-semibold"><span id="info-title">Principal Dashboard</span> <span id="info-role" class="ml-1 rounded-full bg-primary-container px-2 py-0.5 text-[11px] font-medium text-primary-container-foreground">Principal</span></p>
+          <p id="info-desc" class="truncate text-xs text-muted-foreground">School-wide KPIs, attendance, grade completion, SPP collection.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Frame -->
+    <main class="flex flex-1 justify-center overflow-auto bg-surface-container p-4">
+      <div id="frame-wrap" class="h-full w-full max-w-full transition-all duration-short">
+        <iframe id="frame" title="Page preview" class="h-full min-h-[600px] w-full rounded-lg border border-outline-variant bg-background shadow-sm"></iframe>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    var PAGES = [
+      { id: "principal", label: "Principal", role: "Principal", icon: "layout-dashboard", file: "pages/principal-dashboard.html", desc: "School-wide KPIs, attendance ring, grade completion, SPP collection rate." },
+      { id: "guru", label: "Guru", role: "Guru", icon: "calendar-check", file: "pages/guru-dashboard.html", desc: "Today's classes timeline, pending grade entry, attendance queue, rapor drafts." },
+      { id: "siswa", label: "Siswa", role: "Siswa", icon: "book-open", file: "pages/siswa-dashboard.html", desc: "Today's schedule, upcoming assignments, latest rapor, announcements." },
+      { id: "orang-tua", label: "Orang Tua", role: "Orang Tua", icon: "users", file: "pages/orang-tua-dashboard.html", desc: "Child picker, rapor progress, payment status with overdue alert, announcements." },
+      { id: "tu", label: "TU", role: "Tata Usaha", icon: "wallet", file: "pages/tu-dashboard.html", desc: "Operations queue, overdue SPP list, billing shortcut, attendance exceptions." },
+      { id: "yayasan", label: "Yayasan", role: "Yayasan", icon: "building-2", file: "pages/yayasan-dashboard.html", desc: "Multi-tenant overview, school comparison, user counts, system health." },
+      { id: "auth", label: "Auth", role: "All", icon: "user", file: "pages/auth-sign-in.html", desc: "Sign-in card with email/password, SSO, and multi-tenant hint." },
+      { id: "form", label: "Form Patterns", role: "All", icon: "clipboard-list", file: "pages/form-patterns.html", desc: "Text field, select, wizard, validation, error, and loading states." },
+    ];
+    var SUBPAGES = [
+      { id: "absensi", label: "Absensi Input", role: "Guru", icon: "calendar-check", file: "pages/absensi-input.html", desc: "Class + date picker, roster with status segmented buttons, save action." },
+      { id: "rapor", label: "Rapor View", role: "Parent/Student", icon: "file-text", file: "pages/rapor-view.html", desc: "Semester picker, narasi + angka rapor per Kurikulum Merdeka fase, print/download." },
+      { id: "spp", label: "SPP Bills", role: "TU", icon: "receipt", file: "pages/spp-bills.html", desc: "Monthly bill generation: class, period, amount template, generate action." },
+    ];
+    var ALL = PAGES.concat(SUBPAGES);
+    var VIEWPORTS = [
+      { id: "m", label: "Mobile 375", w: "375px" },
+      { id: "t", label: "Tablet 768", w: "768px" },
+      { id: "d", label: "Desktop 1440", w: "1440px" },
+      { id: "f", label: "Full", w: "100%" },
+    ];
+
+    var current = "principal", dark = false, vp = "f";
+
+    function load(id) {
+      var p = null;
+      for (var i = 0; i < ALL.length; i++) if (ALL[i].id === id) p = ALL[i];
+      if (!p) return;
+      current = id;
+      var src = p.file + (dark ? "?theme=dark" : "");
+      document.getElementById("frame").src = src;
+      document.getElementById("info-title").textContent = p.label;
+      document.getElementById("info-role").textContent = p.role;
+      document.getElementById("info-desc").textContent = p.desc;
+      var ic = document.getElementById("info-icon");
+      ic.setAttribute("data-icon", p.icon); ic.dataset.hydrated = ""; SMS.hydrate(document);
+      renderTabs();
+    }
+
+    function tabBtn(p, primary) {
+      var on = p.id === current;
+      var cls = primary
+        ? "min-h-[40px] rounded-full px-3.5 text-sm font-medium transition-colors " + (on ? "bg-secondary-container text-secondary-container-foreground" : "text-foreground hover:bg-surface-container-high")
+        : "inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors " + (on ? "border-primary bg-primary-container text-primary-container-foreground" : "border-outline text-muted-foreground hover:bg-surface-container-high");
+      var b = document.createElement("button");
+      b.className = cls;
+      if (primary) b.textContent = p.label;
+      else b.innerHTML = '<span data-icon="' + p.icon + '" class="h-4 w-4"></span>' + p.label;
+      b.onclick = function () { load(p.id); };
+      return b;
+    }
+
+    function renderTabs() {
+      var t = document.getElementById("tabs"); t.innerHTML = "";
+      PAGES.forEach(function (p) { t.appendChild(tabBtn(p, true)); });
+      var s = document.getElementById("subtabs"); s.innerHTML = "";
+      var lbl = document.createElement("span"); lbl.className = "mr-1 text-xs font-medium text-muted-foreground"; lbl.textContent = "Halaman kunci:"; s.appendChild(lbl);
+      SUBPAGES.forEach(function (p) { s.appendChild(tabBtn(p, false)); });
+      SMS.hydrate(document);
+    }
+
+    function renderViewport() {
+      var v = document.getElementById("viewport"); v.innerHTML = "";
+      VIEWPORTS.forEach(function (o, i) {
+        var on = o.id === vp;
+        var b = document.createElement("button");
+        b.className = "min-h-[40px] px-3 text-xs font-medium transition-colors " + (i > 0 ? "border-l border-outline " : "") + (on ? "bg-secondary-container text-secondary-container-foreground" : "hover:bg-surface-container-high");
+        b.textContent = o.label;
+        b.onclick = function () {
+          vp = o.id;
+          var wrap = document.getElementById("frame-wrap");
+          wrap.style.width = o.w; wrap.style.maxWidth = "100%";
+          renderViewport();
+        };
+        v.appendChild(b);
+      });
+    }
+
+    document.getElementById("viewer-theme").onclick = function () {
+      dark = !dark;
+      document.documentElement.classList.toggle("dark", dark);
+      document.getElementById("viewer-theme-label").textContent = dark ? "Light" : "Dark";
+      var ti = document.getElementById("viewer-theme-icon");
+      ti.setAttribute("data-icon", dark ? "sun" : "moon"); ti.dataset.hydrated = ""; SMS.hydrate(document);
+      load(current); // reload iframe with theme param
+    };
+
+    renderTabs();
+    renderViewport();
+    load("principal");
+  </script>
+</body>
+</html>

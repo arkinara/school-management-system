@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Beranda Tata Usaha</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="tw-config.js"></script>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="app.js"></script>
+</head>
+<body class="min-h-dvh">
+  <div id="appbar"></div>
+  <div class="flex">
+    <div id="navrail"></div>
+    <main class="min-w-0 flex-1 pb-24 md:pb-8">
+      <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 class="text-2xl font-semibold">Operasional Hari Ini</h1>
+            <p class="mt-1 text-sm text-muted-foreground">SMA Bhakti · Tata Usaha · Senin, 30 September 2026</p>
+          </div>
+          <a href="spp-bills.html" class="inline-flex min-h-[48px] items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90"><span data-icon="plus" class="h-5 w-5"></span>Generate Tagihan SPP</a>
+        </div>
+
+        <!-- KPI row -->
+        <div class="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <span class="text-sm font-medium text-muted-foreground">Tugas Antrean</span>
+            <p class="mt-2 text-3xl font-semibold tabular-nums">7</p>
+          </div>
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <span class="text-sm font-medium text-muted-foreground">SPP Menunggak</span>
+            <p class="mt-2 text-3xl font-semibold tabular-nums text-destructive">86</p>
+          </div>
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <span class="text-sm font-medium text-muted-foreground">Pembayaran Hari Ini</span>
+            <p class="mt-2 text-3xl font-semibold tabular-nums">Rp 12jt</p>
+          </div>
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <span class="text-sm font-medium text-muted-foreground">Absensi Anomali</span>
+            <p class="mt-2 text-3xl font-semibold tabular-nums text-warning">4</p>
+          </div>
+        </div>
+
+        <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <!-- Operations queue -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <h2 class="text-base font-semibold">Antrean Operasional</h2>
+            <ul class="mt-4 space-y-2.5">
+              <li class="flex items-center gap-3 rounded-md bg-surface-container p-3">
+                <span class="flex h-9 w-9 items-center justify-center rounded-md bg-primary-container text-primary-container-foreground"><span data-icon="receipt" class="h-4.5 w-4.5"></span></span>
+                <div class="flex-1"><p class="text-sm font-medium">Generate tagihan SPP Oktober</p><p class="text-xs text-muted-foreground">18 rombel · belum dibuat</p></div>
+                <button class="min-h-[40px] rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground">Proses</button>
+              </li>
+              <li class="flex items-center gap-3 rounded-md bg-surface-container p-3">
+                <span class="flex h-9 w-9 items-center justify-center rounded-md bg-surface-container-highest text-muted-foreground"><span data-icon="user" class="h-4.5 w-4.5"></span></span>
+                <div class="flex-1"><p class="text-sm font-medium">Verifikasi siswa baru</p><p class="text-xs text-muted-foreground">3 pendaftaran menunggu</p></div>
+                <button class="min-h-[40px] rounded-full border border-outline px-4 text-sm font-medium hover:bg-surface-container-high">Tinjau</button>
+              </li>
+              <li class="flex items-center gap-3 rounded-md bg-surface-container p-3">
+                <span class="flex h-9 w-9 items-center justify-center rounded-md bg-surface-container-highest text-muted-foreground"><span data-icon="calendar-days" class="h-4.5 w-4.5"></span></span>
+                <div class="flex-1"><p class="text-sm font-medium">Konflik jadwal Kelas XI-IPA-2</p><p class="text-xs text-muted-foreground">2 mapel bentrok Rabu</p></div>
+                <button class="min-h-[40px] rounded-full border border-outline px-4 text-sm font-medium hover:bg-surface-container-high">Perbaiki</button>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Attendance exception report -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <h2 class="text-base font-semibold">Laporan Anomali Absensi</h2>
+            <p class="mt-1 text-xs text-muted-foreground">Kelas belum mengisi absensi hari ini</p>
+            <ul class="mt-4 space-y-2.5">
+              <li class="flex items-center justify-between rounded-md bg-warning-container p-3 text-warning">
+                <span class="text-sm font-medium">Kelas X-IPS-1 · 07.00</span>
+                <span class="text-xs font-medium">belum diisi</span>
+              </li>
+              <li class="flex items-center justify-between rounded-md bg-warning-container p-3 text-warning">
+                <span class="text-sm font-medium">Kelas XI-IPA-3 · 07.00</span>
+                <span class="text-xs font-medium">belum diisi</span>
+              </li>
+              <li class="flex items-center justify-between rounded-md bg-surface-container p-3">
+                <span class="text-sm font-medium">Kelas XII-IPA-1 · 10 alpa</span>
+                <span class="text-xs text-destructive font-medium">tinggi</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Overdue SPP list -->
+        <div class="mt-6 overflow-hidden rounded-lg border border-outline-variant bg-surface-container-low">
+          <div class="flex items-center justify-between border-b border-outline-variant px-5 py-4">
+            <h2 class="text-base font-semibold">Daftar SPP Menunggak</h2>
+            <button class="inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-outline px-3 text-sm font-medium hover:bg-surface-container-high"><span data-icon="download" class="h-4 w-4"></span>Ekspor</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-surface-container text-left text-muted-foreground">
+                <tr>
+                  <th class="px-5 py-3 font-semibold">Nama Siswa</th>
+                  <th class="px-5 py-3 font-semibold">Kelas</th>
+                  <th class="px-5 py-3 font-semibold">Periode</th>
+                  <th class="px-5 py-3 text-right font-semibold">Nominal</th>
+                  <th class="px-5 py-3 font-semibold">Status</th>
+                  <th class="px-5 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-t border-outline-variant hover:bg-surface-container-low">
+                  <td class="px-5 py-3 font-medium">Andi Wijaya</td><td class="px-5 py-3">XI-IPA-1</td><td class="px-5 py-3">September</td><td class="px-5 py-3 text-right tabular-nums">Rp 350.000</td>
+                  <td class="px-5 py-3"><span class="rounded-full bg-destructive-container px-2.5 py-1 text-xs font-medium text-destructive-container-foreground">5 hari lewat</span></td>
+                  <td class="px-5 py-3 text-right"><button class="min-h-[40px] rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground">Catat bayar</button></td>
+                </tr>
+                <tr class="border-t border-outline-variant hover:bg-surface-container-low">
+                  <td class="px-5 py-3 font-medium">Budi Santoso</td><td class="px-5 py-3">X-IPS-2</td><td class="px-5 py-3">September</td><td class="px-5 py-3 text-right tabular-nums">Rp 350.000</td>
+                  <td class="px-5 py-3"><span class="rounded-full bg-warning-container px-2.5 py-1 text-xs font-medium text-warning">3 hari lewat</span></td>
+                  <td class="px-5 py-3 text-right"><button class="min-h-[40px] rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground">Catat bayar</button></td>
+                </tr>
+                <tr class="border-t border-outline-variant hover:bg-surface-container-low">
+                  <td class="px-5 py-3 font-medium">Siti Aminah</td><td class="px-5 py-3">XII-IPA-1</td><td class="px-5 py-3">September</td><td class="px-5 py-3 text-right tabular-nums">Rp 350.000</td>
+                  <td class="px-5 py-3"><span class="rounded-full bg-warning-container px-2.5 py-1 text-xs font-medium text-warning">2 hari lewat</span></td>
+                  <td class="px-5 py-3 text-right"><button class="min-h-[40px] rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground">Catat bayar</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="bottomnav"></div>
+  <script>
+    SMS.shell({ role: "tu", active: "home", title: "SMA Bhakti", subtitle: "Tata Usaha", user: "Dewi Lestari", notif: 7 });
+  </script>
+</body>
+</html>

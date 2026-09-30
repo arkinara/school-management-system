@@ -1,0 +1,60 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Secrets / local
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Virtual envs
+.venv/
+venv/
+env/
+backend/.venv/
+
+# uv
+uv.lock.local
+
+# Node / Next.js
+node_modules/
+.pnpm-store/
+
+# Next.js toolchain output (per workflow pitfall #42)
+/frontend/.next/
+/frontend/next-env.d.ts
+/frontend/tsconfig.tsbuildinfo
+
+# Storybook
+/storybook-static/
+
+# Prototype runtime artifacts
+/prototype/.cache/
+
+# OS build outputs
+*.app
+*.dmg

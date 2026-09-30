@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Beranda Kepala Sekolah</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="tw-config.js"></script>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="app.js"></script>
+</head>
+<body class="min-h-dvh">
+  <div id="appbar"></div>
+  <div class="flex">
+    <div id="navrail"></div>
+    <main class="min-w-0 flex-1 pb-24 md:pb-8">
+      <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 class="text-2xl font-semibold">Selamat pagi, Bapak Budi</h1>
+            <p class="mt-1 text-sm text-muted-foreground">Ringkasan SDN Menteng 01 · Senin, 30 September 2026</p>
+          </div>
+          <div class="inline-flex overflow-hidden rounded-full border border-outline text-sm">
+            <button class="min-h-[48px] bg-secondary-container px-4 font-medium text-secondary-container-foreground">Hari ini</button>
+            <button class="min-h-[48px] border-l border-outline px-4 hover:bg-surface-container-high">Minggu ini</button>
+          </div>
+        </div>
+
+        <!-- KPI metric cards -->
+        <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <div class="flex items-center justify-between"><span class="text-sm font-medium text-muted-foreground">Total Siswa</span><span class="flex h-9 w-9 items-center justify-center rounded-md bg-primary-container text-primary-container-foreground"><span data-icon="users" class="h-5 w-5"></span></span></div>
+            <div class="mt-3 flex items-end gap-2"><span class="text-3xl font-semibold tabular-nums">482</span><span class="mb-0.5 inline-flex items-center gap-0.5 text-xs font-medium text-success"><span data-icon="trending-up" class="h-3.5 w-3.5"></span>+12</span></div>
+            <p class="mt-1 text-xs text-muted-foreground">18 rombel aktif</p>
+          </div>
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <div class="flex items-center justify-between"><span class="text-sm font-medium text-muted-foreground">Kehadiran Hari Ini</span><span class="flex h-9 w-9 items-center justify-center rounded-md bg-primary-container text-primary-container-foreground"><span data-icon="calendar-check" class="h-5 w-5"></span></span></div>
+            <div class="mt-3 flex items-end gap-2"><span class="text-3xl font-semibold tabular-nums">94%</span><span class="mb-0.5 inline-flex items-center gap-0.5 text-xs font-medium text-destructive"><span data-icon="trending-down" class="h-3.5 w-3.5"></span>-2%</span></div>
+            <p class="mt-1 text-xs text-muted-foreground">452 dari 482 siswa hadir</p>
+          </div>
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <div class="flex items-center justify-between"><span class="text-sm font-medium text-muted-foreground">Guru Aktif</span><span class="flex h-9 w-9 items-center justify-center rounded-md bg-primary-container text-primary-container-foreground"><span data-icon="user" class="h-5 w-5"></span></span></div>
+            <div class="mt-3 flex items-end gap-2"><span class="text-3xl font-semibold tabular-nums">34</span></div>
+            <p class="mt-1 text-xs text-muted-foreground">2 guru izin hari ini</p>
+          </div>
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <div class="flex items-center justify-between"><span class="text-sm font-medium text-muted-foreground">SPP Terkumpul</span><span class="flex h-9 w-9 items-center justify-center rounded-md bg-primary-container text-primary-container-foreground"><span data-icon="wallet" class="h-5 w-5"></span></span></div>
+            <div class="mt-3 flex items-end gap-2"><span class="text-3xl font-semibold tabular-nums">Rp 128jt</span><span class="mb-0.5 inline-flex items-center gap-0.5 text-xs font-medium text-success"><span data-icon="trending-up" class="h-3.5 w-3.5"></span>+8%</span></div>
+            <p class="mt-1 text-xs text-muted-foreground">82% dari target bulan ini</p>
+          </div>
+        </div>
+
+        <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <!-- Attendance ring -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <h2 class="text-base font-semibold">Kehadiran Hari Ini</h2>
+            <div class="mt-4 flex items-center gap-5">
+              <div class="relative h-32 w-32 shrink-0">
+                <svg viewBox="0 0 120 120" class="h-32 w-32 -rotate-90">
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="hsl(var(--surface-container-highest))" stroke-width="14" />
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="hsl(var(--success))" stroke-width="14" stroke-linecap="round" stroke-dasharray="307 327" />
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                  <span class="text-2xl font-semibold tabular-nums">94%</span>
+                  <span class="text-[11px] text-muted-foreground">hadir</span>
+                </div>
+              </div>
+              <ul class="flex-1 space-y-2 text-sm">
+                <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-success"></span>Hadir</span><span class="font-medium tabular-nums">452</span></li>
+                <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-warning"></span>Izin</span><span class="font-medium tabular-nums">12</span></li>
+                <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-info"></span>Sakit</span><span class="font-medium tabular-nums">10</span></li>
+                <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-destructive"></span>Alpa</span><span class="font-medium tabular-nums">8</span></li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Grade entry completion -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <h2 class="text-base font-semibold">Penginputan Nilai</h2>
+            <p class="mt-1 text-xs text-muted-foreground">Semester Ganjil 2026/2027</p>
+            <div class="mt-4 space-y-4">
+              <div>
+                <div class="flex justify-between text-sm"><span>Kelas 6</span><span class="font-medium tabular-nums">92%</span></div>
+                <div class="mt-1.5 h-2 rounded-full bg-surface-container-highest"><div class="h-2 rounded-full bg-primary" style="width:92%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm"><span>Kelas 5</span><span class="font-medium tabular-nums">78%</span></div>
+                <div class="mt-1.5 h-2 rounded-full bg-surface-container-highest"><div class="h-2 rounded-full bg-primary" style="width:78%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm"><span>Kelas 4</span><span class="font-medium tabular-nums">64%</span></div>
+                <div class="mt-1.5 h-2 rounded-full bg-surface-container-highest"><div class="h-2 rounded-full bg-warning" style="width:64%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm"><span>Kelas 1–3</span><span class="font-medium tabular-nums">41%</span></div>
+                <div class="mt-1.5 h-2 rounded-full bg-surface-container-highest"><div class="h-2 rounded-full bg-destructive" style="width:41%"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SPP collection rate -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <h2 class="text-base font-semibold">Kolekabilitas SPP</h2>
+            <p class="mt-1 text-xs text-muted-foreground">September 2026</p>
+            <div class="mt-5 flex items-end gap-2">
+              <span class="text-4xl font-semibold tabular-nums">82%</span>
+              <span class="mb-1.5 text-xs text-muted-foreground">terkumpul</span>
+            </div>
+            <div class="mt-2 h-2.5 rounded-full bg-surface-container-highest"><div class="h-2.5 rounded-full bg-tertiary" style="width:82%"></div></div>
+            <dl class="mt-5 grid grid-cols-2 gap-3 text-sm">
+              <div class="rounded-md bg-surface-container p-3"><dt class="text-xs text-muted-foreground">Lunas</dt><dd class="mt-0.5 font-semibold tabular-nums">396 siswa</dd></div>
+              <div class="rounded-md bg-destructive-container p-3"><dt class="text-xs text-destructive-container-foreground">Menunggak</dt><dd class="mt-0.5 font-semibold tabular-nums text-destructive-container-foreground">86 siswa</dd></div>
+            </dl>
+          </div>
+        </div>
+
+        <!-- Pending announcements -->
+        <div class="mt-6 rounded-lg border border-outline-variant bg-surface-container-low">
+          <div class="flex items-center justify-between px-5 pt-5">
+            <h2 class="text-base font-semibold">Pengumuman Menunggu Persetujuan</h2>
+            <button class="inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-sm font-medium text-primary hover:bg-surface-container-high">Lihat semua <span data-icon="chevron-right" class="h-4 w-4"></span></button>
+          </div>
+          <ul class="mt-3 divide-y divide-outline-variant">
+            <li class="flex items-center gap-4 px-5 py-3.5">
+              <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-tertiary-container text-tertiary-container-foreground"><span data-icon="megaphone" class="h-5 w-5"></span></span>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-medium">Libur Maulid Nabi 1448 H</p>
+                <p class="truncate text-xs text-muted-foreground">Diajukan oleh Dewi Lestari (TU) · 2 jam lalu</p>
+              </div>
+              <span class="rounded-full bg-warning-container px-2.5 py-1 text-xs font-medium text-warning">menunggu</span>
+              <button class="min-h-[40px] rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">Setujui</button>
+            </li>
+            <li class="flex items-center gap-4 px-5 py-3.5">
+              <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-tertiary-container text-tertiary-container-foreground"><span data-icon="megaphone" class="h-5 w-5"></span></span>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-medium">Jadwal Ujian Tengah Semester</p>
+                <p class="truncate text-xs text-muted-foreground">Diajukan oleh Andi Wijaya (Guru) · kemarin</p>
+              </div>
+              <span class="rounded-full bg-warning-container px-2.5 py-1 text-xs font-medium text-warning">menunggu</span>
+              <button class="min-h-[40px] rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">Setujui</button>
+            </li>
+          </ul>
+          <div class="h-2"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="bottomnav"></div>
+  <script>
+    SMS.shell({ role: "principal", active: "home", title: "SDN Menteng 01", subtitle: "Kepala Sekolah", user: "Budi Santoso", notif: 3 });
+  </script>
+</body>
+</html>

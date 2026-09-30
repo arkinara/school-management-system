@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Beranda Yayasan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="tw-config.js"></script>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="app.js"></script>
+</head>
+<body class="min-h-dvh">
+  <div id="appbar"></div>
+  <div class="flex">
+    <div id="navrail"></div>
+    <main class="min-w-0 flex-1 pb-24 md:pb-8">
+      <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <h1 class="text-2xl font-semibold">Yayasan Arkinara Nusantara</h1>
+        <p class="mt-1 text-sm text-muted-foreground">Ringkasan lintas tenant · 4 jenjang · Senin, 30 September 2026</p>
+
+        <!-- Multi-tenant KPI -->
+        <div class="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <div class="flex items-center justify-between"><span class="text-sm font-medium text-muted-foreground">Total Sekolah</span><span class="flex h-9 w-9 items-center justify-center rounded-md bg-primary-container text-primary-container-foreground"><span data-icon="school" class="h-5 w-5"></span></span></div>
+            <p class="mt-3 text-3xl font-semibold tabular-nums">4</p>
+            <p class="mt-1 text-xs text-muted-foreground">TK · SD · SMP · SMA</p>
+          </div>
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <div class="flex items-center justify-between"><span class="text-sm font-medium text-muted-foreground">Total Siswa</span><span class="flex h-9 w-9 items-center justify-center rounded-md bg-primary-container text-primary-container-foreground"><span data-icon="users" class="h-5 w-5"></span></span></div>
+            <p class="mt-3 text-3xl font-semibold tabular-nums">1.842</p>
+            <p class="mt-1 text-xs font-medium text-success">+124 tahun ini</p>
+          </div>
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <div class="flex items-center justify-between"><span class="text-sm font-medium text-muted-foreground">Total Guru & Staf</span><span class="flex h-9 w-9 items-center justify-center rounded-md bg-primary-container text-primary-container-foreground"><span data-icon="user" class="h-5 w-5"></span></span></div>
+            <p class="mt-3 text-3xl font-semibold tabular-nums">156</p>
+            <p class="mt-1 text-xs text-muted-foreground">128 guru · 28 staf</p>
+          </div>
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <div class="flex items-center justify-between"><span class="text-sm font-medium text-muted-foreground">Kolekabilitas SPP</span><span class="flex h-9 w-9 items-center justify-center rounded-md bg-primary-container text-primary-container-foreground"><span data-icon="wallet" class="h-5 w-5"></span></span></div>
+            <p class="mt-3 text-3xl font-semibold tabular-nums">86%</p>
+            <p class="mt-1 text-xs font-medium text-success">+3% dari Agustus</p>
+          </div>
+        </div>
+
+        <!-- School comparison table -->
+        <div class="mt-6 overflow-hidden rounded-lg border border-outline-variant bg-surface-container-low">
+          <div class="border-b border-outline-variant px-5 py-4">
+            <h2 class="text-base font-semibold">Perbandingan Antar Sekolah</h2>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-surface-container text-left text-muted-foreground">
+                <tr>
+                  <th class="px-5 py-3 font-semibold">Sekolah</th>
+                  <th class="px-5 py-3 font-semibold">Jenjang</th>
+                  <th class="px-5 py-3 text-right font-semibold">Siswa</th>
+                  <th class="px-5 py-3 text-right font-semibold">Kehadiran</th>
+                  <th class="px-5 py-3 text-right font-semibold">SPP</th>
+                  <th class="px-5 py-3 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-t border-outline-variant hover:bg-surface-container-low">
+                  <td class="px-5 py-3 font-medium">TK Menteng Ceria</td><td class="px-5 py-3">TK</td><td class="px-5 py-3 text-right tabular-nums">148</td><td class="px-5 py-3 text-right tabular-nums">97%</td><td class="px-5 py-3 text-right tabular-nums">91%</td>
+                  <td class="px-5 py-3"><span class="rounded-full bg-success-container px-2.5 py-1 text-xs font-medium text-success">sehat</span></td>
+                </tr>
+                <tr class="border-t border-outline-variant hover:bg-surface-container-low">
+                  <td class="px-5 py-3 font-medium">SDN Menteng 01</td><td class="px-5 py-3">SD</td><td class="px-5 py-3 text-right tabular-nums">482</td><td class="px-5 py-3 text-right tabular-nums">94%</td><td class="px-5 py-3 text-right tabular-nums">82%</td>
+                  <td class="px-5 py-3"><span class="rounded-full bg-warning-container px-2.5 py-1 text-xs font-medium text-warning">perhatian</span></td>
+                </tr>
+                <tr class="border-t border-outline-variant hover:bg-surface-container-low">
+                  <td class="px-5 py-3 font-medium">SMP Nusantara</td><td class="px-5 py-3">SMP</td><td class="px-5 py-3 text-right tabular-nums">564</td><td class="px-5 py-3 text-right tabular-nums">92%</td><td class="px-5 py-3 text-right tabular-nums">88%</td>
+                  <td class="px-5 py-3"><span class="rounded-full bg-success-container px-2.5 py-1 text-xs font-medium text-success">sehat</span></td>
+                </tr>
+                <tr class="border-t border-outline-variant hover:bg-surface-container-low">
+                  <td class="px-5 py-3 font-medium">SMA Bhakti</td><td class="px-5 py-3">SMA</td><td class="px-5 py-3 text-right tabular-nums">648</td><td class="px-5 py-3 text-right tabular-nums">90%</td><td class="px-5 py-3 text-right tabular-nums">79%</td>
+                  <td class="px-5 py-3"><span class="rounded-full bg-warning-container px-2.5 py-1 text-xs font-medium text-warning">perhatian</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <!-- User counts per tenant -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <h2 class="text-base font-semibold">Pengguna per Tenant</h2>
+            <div class="mt-4 space-y-3.5">
+              <div>
+                <div class="flex justify-between text-sm"><span>SMA Bhakti</span><span class="font-medium tabular-nums">712</span></div>
+                <div class="mt-1.5 h-2 rounded-full bg-surface-container-highest"><div class="h-2 rounded-full bg-primary" style="width:100%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm"><span>SMP Nusantara</span><span class="font-medium tabular-nums">618</span></div>
+                <div class="mt-1.5 h-2 rounded-full bg-surface-container-highest"><div class="h-2 rounded-full bg-primary" style="width:87%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm"><span>SDN Menteng 01</span><span class="font-medium tabular-nums">531</span></div>
+                <div class="mt-1.5 h-2 rounded-full bg-surface-container-highest"><div class="h-2 rounded-full bg-primary" style="width:75%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm"><span>TK Menteng Ceria</span><span class="font-medium tabular-nums">187</span></div>
+                <div class="mt-1.5 h-2 rounded-full bg-surface-container-highest"><div class="h-2 rounded-full bg-primary" style="width:26%"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- System health -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <h2 class="text-base font-semibold">Kesehatan Sistem</h2>
+            <ul class="mt-4 space-y-2.5">
+              <li class="flex items-center justify-between rounded-md bg-surface-container p-3">
+                <span class="flex items-center gap-2.5 text-sm"><span class="flex h-8 w-8 items-center justify-center rounded-md bg-success-container text-success"><span data-icon="activity" class="h-4 w-4"></span></span>Ketersediaan layanan</span>
+                <span class="rounded-full bg-success-container px-2.5 py-1 text-xs font-medium text-success">99,9%</span>
+              </li>
+              <li class="flex items-center justify-between rounded-md bg-surface-container p-3">
+                <span class="flex items-center gap-2.5 text-sm"><span class="flex h-8 w-8 items-center justify-center rounded-md bg-success-container text-success"><span data-icon="check-circle" class="h-4 w-4"></span></span>Sinkronisasi tenant</span>
+                <span class="rounded-full bg-success-container px-2.5 py-1 text-xs font-medium text-success">normal</span>
+              </li>
+              <li class="flex items-center justify-between rounded-md bg-surface-container p-3">
+                <span class="flex items-center gap-2.5 text-sm"><span class="flex h-8 w-8 items-center justify-center rounded-md bg-warning-container text-warning"><span data-icon="alert-triangle" class="h-4 w-4"></span></span>Backup terakhir</span>
+                <span class="rounded-full bg-warning-container px-2.5 py-1 text-xs font-medium text-warning">26 jam lalu</span>
+              </li>
+              <li class="flex items-center justify-between rounded-md bg-surface-container p-3">
+                <span class="flex items-center gap-2.5 text-sm"><span class="flex h-8 w-8 items-center justify-center rounded-md bg-info-container text-info"><span data-icon="users" class="h-4 w-4"></span></span>Sesi aktif</span>
+                <span class="rounded-full bg-info-container px-2.5 py-1 text-xs font-medium text-info">342</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="bottomnav"></div>
+  <script>
+    SMS.shell({ role: "yayasan", active: "home", title: "Yayasan Arkinara", subtitle: "Super Admin", user: "Budi Santoso", notif: 1 });
+  </script>
+</body>
+</html>

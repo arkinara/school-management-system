@@ -1,0 +1,306 @@
+[
+  {
+    "label": "BE",
+    "title": "Infra: repo monorepo scaffold + tooling \u2014 pnpm workspaces, CI skeleton, lint config (#1)",
+    "number": 1,
+    "node_id": "I_kwDOU1Tssc8AAAABUJt_qg",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rbtg",
+    "verified": true
+  },
+  {
+    "label": "BE",
+    "title": "BE: shared scaffolding \u2014 SQLAlchemy models, Alembic migration, seed data, JWT + Better Auth verification, tenant scoping middleware (#2)",
+    "number": 2,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuAZQ",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rbuA",
+    "verified": true
+  },
+  {
+    "label": "BE",
+    "title": "BE: auth domain \u2014 POST /auth/register, /auth/login, /auth/logout, GET /auth/me, role guards (#3)",
+    "number": 3,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuA8g",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rbvs",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: Better Auth wiring \u2014 sign-in/sign-up pages + tenant-picker onboarding (#4)",
+    "number": 4,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuBmQ",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rbxc",
+    "verified": true
+  },
+  {
+    "label": "BE",
+    "title": "BE: tenants + schools domain \u2014 CRUD scoped to Yayasan/super_admin (#5)",
+    "number": 5,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuCVw",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rbyk",
+    "verified": true
+  },
+  {
+    "label": "BE",
+    "title": "BE: users + roles + classes + subjects domain \u2014 CRUD scoped by role (#6)",
+    "number": 6,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuC6A",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rbz0",
+    "verified": true
+  },
+  {
+    "label": "BE",
+    "title": "BE: students + parents linking domain \u2014 student record, parent assignment, sibling logic (#7)",
+    "number": 7,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuDng",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rb0w",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: principal dashboard \u2014 school-wide KPI widgets + Yayasan school picker (#8)",
+    "number": 8,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuESQ",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rb14",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: guru dashboard \u2014 today's classes, pending grade entry, attendance queue (#9)",
+    "number": 9,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuE9g",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rb2w",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: siswa dashboard \u2014 today's schedule, assignments, rapor summary (#10)",
+    "number": 10,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuFfg",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rb3g",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: orang tua dashboard \u2014 child summary, payment status, recent announcements (#11)",
+    "number": 11,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuGEA",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rb4E",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: TU dashboard \u2014 today's operations queue, overdue SPP, billing tasks (#12)",
+    "number": 12,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuGqQ",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rb5E",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: yayasan dashboard \u2014 multi-tenant overview, school comparison, user counts (#13)",
+    "number": 13,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuHQg",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rb50",
+    "verified": true
+  },
+  {
+    "label": "BE",
+    "title": "BE: absensi domain \u2014 POST /attendances, GET /attendances, parent notification trigger (#14)",
+    "number": 14,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuH4A",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rb6s",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: absensi input page \u2014 teacher UI per class per day (#15)",
+    "number": 15,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuIew",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rb7g",
+    "verified": true
+  },
+  {
+    "label": "BE",
+    "title": "BE: grades domain \u2014 POST /grades, GET /grades, aggregation (#16)",
+    "number": 16,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuJQA",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rb8c",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: grade entry page \u2014 teacher UI per class per subject per category (#17)",
+    "number": 17,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuJ2A",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rb90",
+    "verified": true
+  },
+  {
+    "label": "BE",
+    "title": "BE: rapor domain \u2014 compile grades + narrative, publish workflow, parent visibility (#18)",
+    "number": 18,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuKdQ",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rb_c",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: rapor view page \u2014 parent + student view of published rapor per semester (#19)",
+    "number": 19,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuLKg",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcAQ",
+    "verified": true
+  },
+  {
+    "label": "BE",
+    "title": "BE: schedules domain \u2014 POST /schedules, GET /schedules, conflict detection (#20)",
+    "number": 20,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuLyQ",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcBE",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: jadwal config page \u2014 TU/admin UI for weekly schedule grid (#21)",
+    "number": 21,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuM3g",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcB0",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: jadwal view page \u2014 per-role today's classes/schedule (#22)",
+    "number": 22,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuNbQ",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcCs",
+    "verified": true
+  },
+  {
+    "label": "BE",
+    "title": "BE: SPP domain \u2014 bills CRUD, payments, overdue alerts (#23)",
+    "number": 23,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuOGw",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcEY",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: SPP bill generation page \u2014 TU creates monthly bills per class (#24)",
+    "number": 24,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuOyQ",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcG8",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: SPP payment recording page \u2014 TU records payments against bills (#25)",
+    "number": 25,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuPVQ",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcHs",
+    "verified": true
+  },
+  {
+    "label": "BE",
+    "title": "BE: announcements + message threads domain (#26)",
+    "number": 26,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuP2Q",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcIQ",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: announcement board \u2014 broadcast UI for principal/TU; viewer for everyone (#27)",
+    "number": 27,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuQYQ",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcJI",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: direct message threads \u2014 parent <-> teacher chat-like UI (#28)",
+    "number": 28,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuQ_A",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcKE",
+    "verified": true
+  },
+  {
+    "label": "FE",
+    "title": "FE: notification center \u2014 in-app bell, per-user feed (#29)",
+    "number": 29,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuRhQ",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcLA",
+    "verified": true
+  },
+  {
+    "label": "BE",
+    "title": "BE: audit log + cross-cutting observability \u2014 auth events, data mutations, tenant-boundary attempts (#30)",
+    "number": 30,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuSDQ",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcMU",
+    "verified": true
+  },
+  {
+    "label": "FE Wiring",
+    "title": "FE Wiring: principal dashboard \u2192 real APIs (#31)",
+    "number": 31,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuS2w",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcNY",
+    "verified": true
+  },
+  {
+    "label": "FE Wiring",
+    "title": "FE Wiring: guru dashboard \u2192 real APIs (#32)",
+    "number": 32,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuTjQ",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcOI",
+    "verified": true
+  },
+  {
+    "label": "FE Wiring",
+    "title": "FE Wiring: siswa dashboard \u2192 real APIs (#33)",
+    "number": 33,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuUQg",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcPg",
+    "verified": true
+  },
+  {
+    "label": "FE Wiring",
+    "title": "FE Wiring: orang tua dashboard \u2192 real APIs (#34)",
+    "number": 34,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuU6w",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcQg",
+    "verified": true
+  },
+  {
+    "label": "FE Wiring",
+    "title": "FE Wiring: TU dashboard \u2192 real APIs (#35)",
+    "number": 35,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuVdA",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcR0",
+    "verified": true
+  },
+  {
+    "label": "FE Wiring",
+    "title": "FE Wiring: absensi page \u2192 real APIs (#36)",
+    "number": 36,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuV8A",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcSs",
+    "verified": true
+  },
+  {
+    "label": "FE Wiring",
+    "title": "FE Wiring: rapor view \u2192 real APIs (#37)",
+    "number": 37,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuWoA",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcUI",
+    "verified": true
+  },
+  {
+    "label": "FE Wiring",
+    "title": "FE Wiring: SPP pages \u2192 real APIs (#38)",
+    "number": 38,
+    "node_id": "I_kwDOU1Tssc8AAAABUJuXRg",
+    "project_item_id": "PVTI_lAHOEL4FrM4BlNjTzg9rcVI",
+    "verified": true
+  }
+]

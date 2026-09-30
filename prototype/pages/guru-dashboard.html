@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Beranda Guru</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="tw-config.js"></script>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="app.js"></script>
+</head>
+<body class="min-h-dvh">
+  <div id="appbar"></div>
+  <div class="flex">
+    <div id="navrail"></div>
+    <main class="min-w-0 flex-1 pb-24 md:pb-8">
+      <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <h1 class="text-2xl font-semibold">Halo, Ibu Siti</h1>
+        <p class="mt-1 text-sm text-muted-foreground">Wali Kelas 6A · SMP Nusantara · Senin, 30 September 2026</p>
+
+        <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <!-- Today's classes timeline -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5 lg:col-span-2">
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-semibold">Jadwal Mengajar Hari Ini</h2>
+              <span class="rounded-full bg-primary-container px-2.5 py-1 text-xs font-medium text-primary-container-foreground">4 kelas</span>
+            </div>
+            <ol class="mt-4 space-y-1">
+              <li class="flex gap-4">
+                <div class="w-16 shrink-0 text-right text-sm font-medium tabular-nums text-muted-foreground">07.00</div>
+                <div class="relative flex-1 border-l-2 border-primary pb-5 pl-4">
+                  <span class="absolute -left-[7px] top-1 h-3 w-3 rounded-full bg-primary"></span>
+                  <p class="text-sm font-medium">Matematika · Kelas 6A</p>
+                  <p class="text-xs text-muted-foreground">Ruang 6A · sedang berlangsung</p>
+                </div>
+              </li>
+              <li class="flex gap-4">
+                <div class="w-16 shrink-0 text-right text-sm font-medium tabular-nums text-muted-foreground">09.00</div>
+                <div class="relative flex-1 border-l-2 border-outline-variant pb-5 pl-4">
+                  <span class="absolute -left-[7px] top-1 h-3 w-3 rounded-full bg-outline"></span>
+                  <p class="text-sm font-medium">Matematika · Kelas 6B</p>
+                  <p class="text-xs text-muted-foreground">Ruang 6B</p>
+                </div>
+              </li>
+              <li class="flex gap-4">
+                <div class="w-16 shrink-0 text-right text-sm font-medium tabular-nums text-muted-foreground">10.30</div>
+                <div class="relative flex-1 border-l-2 border-outline-variant pb-5 pl-4">
+                  <span class="absolute -left-[7px] top-1 h-3 w-3 rounded-full bg-outline"></span>
+                  <p class="text-sm font-medium">Matematika · Kelas 5A</p>
+                  <p class="text-xs text-muted-foreground">Ruang 5A</p>
+                </div>
+              </li>
+              <li class="flex gap-4">
+                <div class="w-16 shrink-0 text-right text-sm font-medium tabular-nums text-muted-foreground">13.00</div>
+                <div class="relative flex-1 pl-4">
+                  <span class="absolute -left-[7px] top-1 h-3 w-3 rounded-full bg-outline"></span>
+                  <p class="text-sm font-medium">Bimbingan Wali Kelas · 6A</p>
+                  <p class="text-xs text-muted-foreground">Ruang 6A</p>
+                </div>
+              </li>
+            </ol>
+          </div>
+
+          <!-- Attendance queue -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <h2 class="text-base font-semibold">Absensi Perlu Diisi</h2>
+            <ul class="mt-4 space-y-2">
+              <li class="flex items-center justify-between rounded-md bg-surface-container p-3">
+                <div><p class="text-sm font-medium">Kelas 6A</p><p class="text-xs text-muted-foreground">07.00 · Matematika</p></div>
+                <a href="absensi-input.html" class="inline-flex min-h-[40px] items-center rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">Isi</a>
+              </li>
+              <li class="flex items-center justify-between rounded-md bg-surface-container p-3">
+                <div><p class="text-sm font-medium">Kelas 6B</p><p class="text-xs text-muted-foreground">09.00 · Matematika</p></div>
+                <span class="rounded-full bg-surface-container-highest px-3 py-1.5 text-xs text-muted-foreground">Menunggu</span>
+              </li>
+              <li class="flex items-center justify-between rounded-md bg-surface-container p-3">
+                <div><p class="text-sm font-medium">Kelas 5A</p><p class="text-xs text-muted-foreground">10.30 · Matematika</p></div>
+                <span class="rounded-full bg-surface-container-highest px-3 py-1.5 text-xs text-muted-foreground">Menunggu</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <!-- Pending grade entry -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-semibold">Nilai Belum Diinput</h2>
+              <span class="rounded-full bg-warning-container px-2.5 py-1 text-xs font-medium text-warning">3 tugas</span>
+            </div>
+            <ul class="mt-4 divide-y divide-outline-variant">
+              <li class="flex items-center justify-between py-3">
+                <div class="flex items-center gap-3"><span class="flex h-9 w-9 items-center justify-center rounded-md bg-surface-container text-muted-foreground"><span data-icon="clipboard-list" class="h-4.5 w-4.5"></span></span><div><p class="text-sm font-medium">Ulangan Harian 3 · 6A</p><p class="text-xs text-muted-foreground">Tenggat 2 Okt</p></div></div>
+                <button class="min-h-[40px] rounded-full border border-outline px-4 text-sm font-medium hover:bg-surface-container-high">Input</button>
+              </li>
+              <li class="flex items-center justify-between py-3">
+                <div class="flex items-center gap-3"><span class="flex h-9 w-9 items-center justify-center rounded-md bg-surface-container text-muted-foreground"><span data-icon="clipboard-list" class="h-4.5 w-4.5"></span></span><div><p class="text-sm font-medium">Tugas Proyek · 6B</p><p class="text-xs text-muted-foreground">Tenggat 3 Okt</p></div></div>
+                <button class="min-h-[40px] rounded-full border border-outline px-4 text-sm font-medium hover:bg-surface-container-high">Input</button>
+              </li>
+              <li class="flex items-center justify-between py-3">
+                <div class="flex items-center gap-3"><span class="flex h-9 w-9 items-center justify-center rounded-md bg-surface-container text-muted-foreground"><span data-icon="clipboard-list" class="h-4.5 w-4.5"></span></span><div><p class="text-sm font-medium">UTS Matematika · 5A</p><p class="text-xs text-muted-foreground">Tenggat 5 Okt</p></div></div>
+                <button class="min-h-[40px] rounded-full border border-outline px-4 text-sm font-medium hover:bg-surface-container-high">Input</button>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Rapor draft status -->
+          <div class="rounded-lg border border-outline-variant bg-surface-container-low p-5">
+            <h2 class="text-base font-semibold">Status Draft Rapor</h2>
+            <p class="mt-1 text-xs text-muted-foreground">Kelas 6A · Semester Ganjil</p>
+            <div class="mt-4 space-y-2.5">
+              <div class="flex items-center justify-between rounded-md bg-surface-container p-3">
+                <span class="flex items-center gap-2 text-sm"><span data-icon="file-text" class="h-4 w-4 text-muted-foreground"></span>Budi Santoso</span>
+                <span class="rounded-full bg-success-container px-2.5 py-1 text-xs font-medium text-success">selesai</span>
+              </div>
+              <div class="flex items-center justify-between rounded-md bg-surface-container p-3">
+                <span class="flex items-center gap-2 text-sm"><span data-icon="file-text" class="h-4 w-4 text-muted-foreground"></span>Andi Wijaya</span>
+                <span class="rounded-full bg-surface-container-highest px-2.5 py-1 text-xs font-medium text-muted-foreground">draft</span>
+              </div>
+              <div class="flex items-center justify-between rounded-md bg-surface-container p-3">
+                <span class="flex items-center gap-2 text-sm"><span data-icon="file-text" class="h-4 w-4 text-muted-foreground"></span>Dewi Lestari</span>
+                <span class="rounded-full bg-surface-container-highest px-2.5 py-1 text-xs font-medium text-muted-foreground">draft</span>
+              </div>
+            </div>
+            <a href="rapor-view.html" class="mt-4 inline-flex min-h-[40px] items-center gap-1.5 text-sm font-medium text-primary">Buka semua rapor <span data-icon="arrow-right" class="h-4 w-4"></span></a>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="bottomnav"></div>
+  <script>
+    SMS.shell({ role: "guru", active: "home", title: "SMP Nusantara", subtitle: "Guru · Wali Kelas 6A", user: "Siti Aminah", notif: 5 });
+  </script>
+</body>
+</html>

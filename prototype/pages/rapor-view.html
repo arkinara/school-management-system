@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rapor Siswa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="tw-config.js"></script>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="app.js"></script>
+</head>
+<body class="min-h-dvh">
+  <div id="appbar"></div>
+  <div class="flex">
+    <div id="navrail"></div>
+    <main class="min-w-0 flex-1 pb-24 md:pb-8">
+      <div class="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 class="text-2xl font-semibold">Rapor — Andi Wijaya</h1>
+            <p class="mt-1 text-sm text-muted-foreground">SDN Menteng 01 · Kelas 6A · NISN 0123456789</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="relative">
+              <select class="min-h-[48px] appearance-none rounded-full border border-outline bg-background px-4 pr-10 text-sm font-medium focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <option>Semester Ganjil 2026/2027</option>
+                <option>Semester Genap 2025/2026</option>
+              </select>
+              <span data-icon="chevron-down" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"></span>
+            </div>
+            <button class="inline-flex min-h-[48px] items-center gap-1.5 rounded-full border border-outline px-4 text-sm font-medium hover:bg-surface-container-high"><span data-icon="printer" class="h-4 w-4"></span>Cetak</button>
+            <button class="inline-flex min-h-[48px] items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"><span data-icon="download" class="h-4 w-4"></span>Unduh PDF</button>
+          </div>
+        </div>
+
+        <!-- Header banner -->
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-outline-variant bg-primary-container/50 p-5">
+          <div class="flex items-center gap-4">
+            <span class="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-lg font-semibold text-primary-foreground">AW</span>
+            <div>
+              <p class="text-sm text-muted-foreground">Fase C · Kurikulum Merdeka</p>
+              <p class="text-lg font-semibold">Andi Wijaya</p>
+            </div>
+          </div>
+          <div class="flex gap-6 text-sm">
+            <div><p class="text-xs text-muted-foreground">Rata-rata</p><p class="text-2xl font-semibold tabular-nums">85.3</p></div>
+            <div><p class="text-xs text-muted-foreground">Kehadiran</p><p class="text-2xl font-semibold tabular-nums text-success">96%</p></div>
+            <div><p class="text-xs text-muted-foreground">Peringkat</p><p class="text-2xl font-semibold tabular-nums">4/32</p></div>
+          </div>
+        </div>
+
+        <!-- Angka (numeric) -->
+        <div class="mt-6 overflow-hidden rounded-lg border border-outline-variant bg-surface-container-low">
+          <div class="border-b border-outline-variant px-5 py-4"><h2 class="text-base font-semibold">Nilai Akademik</h2></div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-surface-container text-left text-muted-foreground">
+                <tr>
+                  <th class="px-5 py-3 font-semibold">Mata Pelajaran</th>
+                  <th class="px-5 py-3 text-center font-semibold">Nilai Akhir</th>
+                  <th class="px-5 py-3 text-center font-semibold">KKM</th>
+                  <th class="px-5 py-3 font-semibold">Capaian</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-t border-outline-variant"><td class="px-5 py-3 font-medium">Matematika</td><td class="px-5 py-3 text-center tabular-nums font-semibold text-success">88</td><td class="px-5 py-3 text-center tabular-nums text-muted-foreground">75</td><td class="px-5 py-3"><span class="rounded-full bg-success-container px-2.5 py-1 text-xs font-medium text-success">Tercapai baik</span></td></tr>
+                <tr class="border-t border-outline-variant"><td class="px-5 py-3 font-medium">Bahasa Indonesia</td><td class="px-5 py-3 text-center tabular-nums font-semibold text-success">85</td><td class="px-5 py-3 text-center tabular-nums text-muted-foreground">75</td><td class="px-5 py-3"><span class="rounded-full bg-success-container px-2.5 py-1 text-xs font-medium text-success">Tercapai baik</span></td></tr>
+                <tr class="border-t border-outline-variant"><td class="px-5 py-3 font-medium">IPA</td><td class="px-5 py-3 text-center tabular-nums font-semibold text-success">90</td><td class="px-5 py-3 text-center tabular-nums text-muted-foreground">75</td><td class="px-5 py-3"><span class="rounded-full bg-success-container px-2.5 py-1 text-xs font-medium text-success">Sangat baik</span></td></tr>
+                <tr class="border-t border-outline-variant"><td class="px-5 py-3 font-medium">IPS</td><td class="px-5 py-3 text-center tabular-nums font-semibold text-warning">78</td><td class="px-5 py-3 text-center tabular-nums text-muted-foreground">75</td><td class="px-5 py-3"><span class="rounded-full bg-warning-container px-2.5 py-1 text-xs font-medium text-warning">Cukup</span></td></tr>
+                <tr class="border-t border-outline-variant"><td class="px-5 py-3 font-medium">Pendidikan Pancasila</td><td class="px-5 py-3 text-center tabular-nums font-semibold text-success">86</td><td class="px-5 py-3 text-center tabular-nums text-muted-foreground">75</td><td class="px-5 py-3"><span class="rounded-full bg-success-container px-2.5 py-1 text-xs font-medium text-success">Tercapai baik</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Narasi (Kurikulum Merdeka descriptive) -->
+        <div class="mt-6 rounded-lg border border-outline-variant bg-surface-container-low p-5">
+          <h2 class="text-base font-semibold">Deskripsi Capaian Kompetensi</h2>
+          <div class="mt-4 space-y-4">
+            <div class="rounded-md bg-surface-container p-4">
+              <div class="flex items-center gap-2"><span data-icon="book-open" class="h-4 w-4 text-primary"></span><p class="text-sm font-semibold">IPA</p></div>
+              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">Ananda Andi menunjukkan pemahaman yang sangat baik dalam konsep ekosistem dan rantai makanan. Mampu merancang percobaan sederhana secara mandiri. Perlu ditingkatkan dalam menyusun laporan hasil pengamatan secara sistematis.</p>
+            </div>
+            <div class="rounded-md bg-surface-container p-4">
+              <div class="flex items-center gap-2"><span data-icon="book-open" class="h-4 w-4 text-primary"></span><p class="text-sm font-semibold">Matematika</p></div>
+              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">Ananda menguasai operasi bilangan pecahan dan pengukuran dengan baik. Menunjukkan ketelitian dalam menyelesaikan soal cerita. Disarankan memperbanyak latihan pada materi geometri bangun ruang.</p>
+            </div>
+            <div class="rounded-md bg-surface-container p-4">
+              <div class="flex items-center gap-2"><span data-icon="book-open" class="h-4 w-4 text-primary"></span><p class="text-sm font-semibold">IPS</p></div>
+              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">Ananda cukup memahami materi keragaman budaya Indonesia. Perlu bimbingan lebih lanjut dalam menganalisis peristiwa sejarah dan menghubungkannya dengan konteks kekinian.</p>
+            </div>
+          </div>
+
+          <div class="mt-5 rounded-md border border-outline-variant p-4">
+            <p class="text-sm font-semibold">Catatan Wali Kelas</p>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">Andi adalah siswa yang rajin dan aktif di kelas. Pertahankan semangat belajar dan tingkatkan kepercayaan diri saat presentasi. — Ibu Siti Aminah</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="bottomnav"></div>
+  <script>
+    SMS.shell({ role: "siswa", active: "rapor", title: "SDN Menteng 01", subtitle: "Siswa · Kelas 6A", user: "Andi Wijaya", notif: 2 });
+  </script>
+</body>
+</html>
