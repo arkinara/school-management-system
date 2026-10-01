@@ -16,6 +16,9 @@ Thumbs.db
 secrets/
 *.log
 
+# SQLite dev databases
+*.db
+
 # Python
 __pycache__/
 *.py[cod]

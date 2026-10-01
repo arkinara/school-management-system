@@ -2,138 +2,325 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
- * School Management System — M3 token system.
- * Seed color: warm education teal (#0D9488). Accent: amber (#D97706).
- * All values are HSL channels (no hsl() wrapper) so Tailwind can compose
- * alpha via `hsl(var(--token) / <alpha-value>)`. These are the ONLY hex
- * literals allowed in the codebase, kept here as documentation of the seed.
- */
+/* ============================================================================
+   School Management System — promax design tokens
+   Style: Data-Dense Dashboard · density 8/10 · variance 6/10 · motion 5/10
+   Source of truth: prototype-promax/assets/theme.css
+   Palette: education teal (primary) + amber (accent) + semantic status ramp.
+   All colours are HSL channels so Tailwind alpha modifiers work.
+   Light and dark are independent tonal palettes, not inversions.
+   This file is the only place raw hex literals may appear (as documentation).
+   ========================================================================== */
 
 :root {
-  /* Core roles */
-  --background: 180 25% 99%;
-  --foreground: 185 45% 14%;
+  /* --- surfaces ------------------------------------------------------- */
+  --background: 180 40% 99%;
+  --foreground: 185 48% 12%;
+  --surface-1: 180 30% 97%;
+  --surface-2: 180 24% 94%;
+  --surface-3: 180 20% 91%;
+  --surface-4: 180 18% 87%;
 
-  --primary: 174 84% 29%;
+  /* --- brand ---------------------------------------------------------- */
+  --primary: 174 84% 29%; /* #0D9488 */
   --primary-foreground: 0 0% 100%;
-  --primary-container: 173 58% 89%;
-  --primary-container-foreground: 176 80% 13%;
+  --primary-container: 173 60% 90%;
+  --primary-container-foreground: 176 82% 12%;
+  --secondary: 173 80% 50%; /* #2DD4BF */
+  --secondary-foreground: 176 90% 10%;
+  --accent: 32 95% 44%; /* #D97706 */
+  --accent-foreground: 0 0% 100%;
+  --accent-container: 36 92% 90%;
+  --accent-container-foreground: 28 85% 20%;
 
-  --secondary: 187 30% 40%;
-  --secondary-foreground: 0 0% 100%;
-  --secondary-container: 187 34% 90%;
-  --secondary-container-foreground: 187 50% 18%;
-
-  --tertiary: 32 90% 42%;
-  --tertiary-foreground: 0 0% 100%;
-  --tertiary-container: 36 90% 90%;
-  --tertiary-container-foreground: 28 80% 20%;
-
-  --destructive: 0 72% 46%;
+  /* --- semantic status ------------------------------------------------ */
+  /* success/warning double as small-text colours on light surfaces, so both
+     are darkened until they clear 4.5:1 against --background. */
+  --success: 152 62% 27%;
+  --success-container: 152 56% 90%;
+  --success-container-foreground: 152 70% 16%;
+  --warning: 32 95% 34%;
+  --warning-container: 36 92% 90%;
+  --warning-container-foreground: 28 85% 20%;
+  --destructive: 0 74% 44%;
   --destructive-foreground: 0 0% 100%;
-  --destructive-container: 0 80% 94%;
-  --destructive-container-foreground: 0 65% 30%;
+  --destructive-container: 0 82% 94%;
+  --destructive-container-foreground: 0 68% 28%;
+  --info: 205 78% 40%;
+  --info-container: 205 72% 92%;
+  --info-container-foreground: 205 80% 18%;
 
-  /* Semantic status (chips, alerts) */
-  --success: 152 58% 34%;
-  --success-container: 152 55% 90%;
-  --warning: 32 90% 42%;
-  --warning-container: 36 90% 90%;
-  --info: 205 75% 42%;
-  --info-container: 205 70% 92%;
-
-  /* Tonal surfaces (M3 elevation via tone, not shadow) */
-  --surface-container-low: 180 22% 97%;
-  --surface-container: 180 18% 95%;
-  --surface-container-high: 180 16% 92%;
-  --surface-container-highest: 180 14% 89%;
-
-  --muted: 180 18% 95%;
-  --muted-foreground: 185 12% 38%;
-
-  --outline: 185 12% 52%;
-  --outline-variant: 185 16% 82%;
-  --border: 185 16% 85%;
+  /* --- neutrals ------------------------------------------------------- */
+  --muted: 180 20% 94%;
+  --muted-foreground: 185 10% 36%;
+  --outline: 185 12% 50%;
+  --outline-variant: 185 18% 84%;
+  --border: 185 18% 86%;
   --ring: 174 84% 29%;
 
-  /* M3 motion */
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
-  --duration-short: 200ms;
+  /* --- data-viz ramp (each series also carries a shape/pattern) ------- */
+  --chart-1: 174 84% 29%; /* teal   */
+  --chart-2: 32 95% 44%; /* amber  */
+  --chart-3: 205 78% 42%; /* blue   */
+  --chart-4: 280 50% 50%; /* violet */
+  --chart-5: 0 74% 50%; /* red    */
+  --chart-grid: 185 18% 88%;
+
+  /* --- M3 compatibility aliases (consumed by existing UX components) -- */
+  --secondary-container: 173 60% 90%;
+  --secondary-container-foreground: 176 82% 12%;
+  --tertiary: 32 95% 44%;
+  --tertiary-foreground: 0 0% 100%;
+  --tertiary-container: 36 92% 90%;
+  --tertiary-container-foreground: 28 85% 20%;
+  --surface-container-low: var(--surface-1);
+  --surface-container: var(--surface-2);
+  --surface-container-high: var(--surface-3);
+  --surface-container-highest: var(--surface-4);
+
+  /* --- density 8/10: compact dashboard spacing ------------------------ */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --row-h: 40px;
+
+  /* --- elevation (one consistent scale, never ad-hoc shadows) --------- */
+  --elev-1: 0 1px 2px hsl(185 40% 12% / 0.06);
+  --elev-2: 0 2px 6px hsl(185 40% 12% / 0.08);
+  --elev-3: 0 8px 24px hsl(185 40% 12% / 0.12);
+
+  color-scheme: light;
 }
 
 .dark {
-  --background: 185 40% 8%;
-  --foreground: 180 14% 92%;
+  --background: 188 44% 7%;
+  --foreground: 180 16% 93%;
+  --surface-1: 188 38% 10%;
+  --surface-2: 188 32% 13%;
+  --surface-3: 188 28% 17%;
+  --surface-4: 188 24% 22%;
 
-  --primary: 173 62% 55%;
-  --primary-foreground: 176 90% 11%;
-  --primary-container: 176 52% 22%;
-  --primary-container-foreground: 173 58% 88%;
+  --primary: 173 64% 54%;
+  --primary-foreground: 176 92% 9%;
+  --primary-container: 176 54% 20%;
+  --primary-container-foreground: 173 60% 88%;
+  --secondary: 173 70% 62%;
+  --secondary-foreground: 176 92% 9%;
+  --accent: 35 92% 60%;
+  --accent-foreground: 28 92% 10%;
+  --accent-container: 30 62% 24%;
+  --accent-container-foreground: 36 92% 88%;
 
-  --secondary: 187 28% 66%;
-  --secondary-foreground: 187 60% 12%;
-  --secondary-container: 187 30% 24%;
-  --secondary-container-foreground: 187 40% 88%;
+  --success: 152 54% 58%;
+  --success-container: 152 42% 20%;
+  --success-container-foreground: 152 60% 88%;
+  --warning: 35 92% 60%;
+  --warning-container: 30 62% 24%;
+  --warning-container-foreground: 36 92% 88%;
+  --destructive: 0 70% 63%;
+  --destructive-foreground: 0 62% 10%;
+  --destructive-container: 0 46% 25%;
+  --destructive-container-foreground: 0 82% 90%;
+  --info: 205 72% 66%;
+  --info-container: 205 46% 23%;
+  --info-container-foreground: 205 72% 90%;
 
-  --tertiary: 35 88% 62%;
-  --tertiary-foreground: 28 90% 12%;
-  --tertiary-container: 30 60% 26%;
-  --tertiary-container-foreground: 36 90% 88%;
+  --muted: 188 32% 13%;
+  --muted-foreground: 185 12% 64%;
+  --outline: 185 12% 56%;
+  --outline-variant: 188 20% 28%;
+  --border: 188 22% 25%;
+  --ring: 173 64% 54%;
 
-  --destructive: 0 68% 62%;
-  --destructive-foreground: 0 60% 12%;
-  --destructive-container: 0 45% 26%;
-  --destructive-container-foreground: 0 80% 90%;
+  --chart-1: 173 64% 54%;
+  --chart-2: 35 92% 60%;
+  --chart-3: 205 72% 66%;
+  --chart-4: 280 60% 70%;
+  --chart-5: 0 70% 65%;
+  --chart-grid: 188 20% 24%;
 
-  --success: 152 50% 60%;
-  --success-container: 152 40% 22%;
-  --warning: 35 88% 62%;
-  --warning-container: 30 60% 26%;
-  --info: 205 70% 65%;
-  --info-container: 205 45% 24%;
+  --secondary-container: 176 54% 20%;
+  --secondary-container-foreground: 173 60% 88%;
+  --tertiary: 35 92% 60%;
+  --tertiary-foreground: 28 92% 10%;
+  --tertiary-container: 30 62% 24%;
+  --tertiary-container-foreground: 36 92% 88%;
 
-  --surface-container-low: 185 35% 10%;
-  --surface-container: 185 32% 12%;
-  --surface-container-high: 185 28% 16%;
-  --surface-container-highest: 185 24% 20%;
+  --elev-1: 0 1px 2px hsl(0 0% 0% / 0.35);
+  --elev-2: 0 2px 8px hsl(0 0% 0% / 0.45);
+  --elev-3: 0 10px 28px hsl(0 0% 0% / 0.55);
 
-  --muted: 185 32% 12%;
-  --muted-foreground: 185 12% 62%;
-
-  --outline: 185 12% 55%;
-  --outline-variant: 185 18% 30%;
-  --border: 185 20% 26%;
-  --ring: 173 62% 55%;
+  color-scheme: dark;
 }
 
+/* --- base ------------------------------------------------------------- */
 @layer base {
-  * {
-    border-color: hsl(var(--border));
+  html {
+    -webkit-text-size-adjust: 100%;
   }
   body {
-    background-color: hsl(var(--background));
+    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+    background: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-family: Inter, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+    font-size: 14px;
+    line-height: 1.5;
   }
-  /* Visible focus for keyboard nav (a11y invariant) */
+  /* Tabular, monospaced figures wherever numbers must line up. */
+  .num,
+  td.num,
+  th.num,
+  .metric-value {
+    font-family: var(--font-mono), ui-monospace, "SF Mono", monospace;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: -0.01em;
+  }
+  /* Focus: always visible, never removed. */
   :focus-visible {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
+    border-radius: 4px;
   }
 }
 
-/* M3 state-layer utility: tonal overlay on hover/press */
+/* --- data tables (density 8/10) --------------------------------------- */
 @layer components {
+  table.data {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+  }
+  table.data thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: hsl(var(--surface-2));
+    color: hsl(var(--muted-foreground));
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: left;
+    padding: 8px 12px;
+    white-space: nowrap;
+    border-bottom: 1px solid hsl(var(--outline-variant));
+  }
+  table.data tbody td {
+    padding: 0 12px;
+    height: var(--row-h);
+    border-bottom: 1px solid hsl(var(--outline-variant) / 0.6);
+    vertical-align: middle;
+  }
+  table.data tbody tr:last-child td {
+    border-bottom: 0;
+  }
+  table.data tbody tr {
+    transition: background-color 160ms cubic-bezier(0.2, 0, 0, 1);
+  }
+  table.data tbody tr:hover {
+    background: hsl(var(--surface-2) / 0.7);
+  }
+
+  /* M3 state-layer utility: tonal overlay on hover/press. */
   .state-layer {
     position: relative;
-    transition: background-color var(--duration-short) var(--ease-standard);
+    transition: background-color 180ms cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  /* --- skeleton ----------------------------------------------------- */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--surface-2)) 25%,
+      hsl(var(--surface-3)) 37%,
+      hsl(var(--surface-2)) 63%
+    );
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+    border-radius: 6px;
   }
 }
 
-/* Respect reduced-motion (a11y invariant #10) */
+/* --- skip link -------------------------------------------------------- */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 1000;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  padding: 10px 16px;
+  border-radius: 0 0 8px 0;
+  font-weight: 600;
+}
+.skip-link:focus {
+  left: 0;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+/* Card entrance staggered 40ms apart, capped at 6 so nothing feels slow. */
+.stagger > * {
+  animation: rise 260ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+.stagger > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.stagger > *:nth-child(2) {
+  animation-delay: 40ms;
+}
+.stagger > *:nth-child(3) {
+  animation-delay: 80ms;
+}
+.stagger > *:nth-child(4) {
+  animation-delay: 120ms;
+}
+.stagger > *:nth-child(5) {
+  animation-delay: 160ms;
+}
+.stagger > *:nth-child(6) {
+  animation-delay: 200ms;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- scrollbars: slim, so dense tables keep their width --------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--outline-variant)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--outline-variant));
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+/* --- reduced motion --------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -142,5 +329,20 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* --- print (rapor must print cleanly) --------------------------------- */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
+    font-size: 11pt;
+  }
+  main {
+    padding: 0 !important;
   }
 }
