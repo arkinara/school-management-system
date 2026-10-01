@@ -8,6 +8,11 @@ Ticket #19 built the rapor view page against mock data, showing a static sample 
 - PRD sub-feature(s): Review & Publish Workflow (wiring portion)
 - PRD path: `docs/PRD.md` lines 433-467
 
+## Behavioural Reference
+When wiring real APIs, preserve these interactions from `prototype-promax/pages/rapor-view.html` + `assets/app.js`:
+- Semester picker and Kurikulum Merdeka fase display drive real published-rapor data
+- Print stylesheet (`@media print`) keeps stripping chrome once content is real, not fixture data
+
 ## Sub-feature: API Integration
 Replace the rapor view page's mock report card with real calls to the rapor API (#18), fetching only published rapor scoped to the logged-in parent's/student's linked student(s).
 

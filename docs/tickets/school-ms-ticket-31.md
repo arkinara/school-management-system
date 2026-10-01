@@ -8,6 +8,12 @@ Ticket #8 built the Kepala Sekolah dashboard against mock data for attendance ra
 - PRD sub-feature(s): Principal & Yayasan Overview Widgets (principal portion)
 - PRD path: `docs/PRD.md` lines 307-330
 
+## Behavioural Reference
+When wiring real APIs, preserve these interactions from `prototype-promax/pages/principal-dashboard.html` + `assets/app.js`:
+- Sparkline/donut/bullet-bar widgets re-render against live data without layout shift
+- Sortable table `aria-sort` + `data-value` sync is preserved once real rows replace fixtures
+- `Ctrl/Cmd+K` command palette entry point keeps working against live routes
+
 ## Sub-feature: API Integration
 Replace the principal dashboard's mock KPI data with real calls to the tenants/schools, users/classes, and students APIs, scoped to the logged-in principal's school.
 

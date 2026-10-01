@@ -21,16 +21,24 @@ Kepala Sekolah (Principal), Guru (Teacher / Wali Kelas), Siswa (Student), Orang 
 │   ├── tailwind.config.ts        M3 tokens wired
 │   ├── src/app/globals.css       light + dark + prefers-reduced-motion
 │   └── src/components/ui/        16 M3 components + Button + cn + stories + README
-├── prototype/          Single-file HTML viewer (working mockups)
+├── prototype/          Initial HTML prototype (UX phase 1)
 │   ├── index.html                tab bar + viewport toggle + iframe + dark toggle
 │   └── pages/                    11 pages (auth + 6 role dashboards + 4 paginated)
+├── prototype-promax/    CANONICAL design + behavioural baseline (UX phase 2)
+│   ├── README.md                 design system spec
+│   ├── index.html                viewer shell with role tabs, viewport switcher, deep links
+│   ├── assets/theme.css          design tokens (HSL, Fira Sans/Code, semantic ramp)
+│   ├── assets/tw-config.js       Tailwind CDN config — every colour → token
+│   ├── assets/app.js             runtime: icons, charts, command palette, toasts
+│   └── pages/                    11 pages, denser 8/10 layout, data-dense operations dashboard
 ├── docs/               PRD, brief, tickets, screenshots
 │   ├── BRIEF.md
 │   ├── PRD.md                    matches SpendFlow shape, 393 blocks, 113 ACs
 │   ├── PM-PHASE-SUMMARY.md
 │   ├── notion/                   Notion publish sidecars (v1/v2/v3)
-│   ├── screenshots/              UX prototype screenshots (Desktop 1440)
-│   └── tickets/                  38 ticket bodies + index + audit
+│   ├── screenshots/              UX phase 1 prototype screenshots (Desktop 1440)
+│   ├── screenshots-promax/       UX phase 2 prototype screenshots (Desktop 1440)
+│   └── tickets/                  38 ticket bodies + index + audit + promax-audit
 ├── scripts/            Workflow helpers (move-board, push-via-pat, pipeline, etc.)
 └── README.md           you are here
 ```
@@ -51,17 +59,25 @@ Kepala Sekolah (Principal), Guru (Teacher / Wali Kelas), Siswa (Student), Orang 
 
 ## Prototype Preview
 
-Serve the prototype locally:
+Two prototypes shipped; **promax is the canonical baseline** (data-dense, behaviorally complete).
 
 ```bash
-cd prototype
+# Canonical
+cd prototype-promax
 python3 -m http.server 8765
 # open http://localhost:8765/index.html
+
+# Initial draft (kept for comparison)
+cd prototype
+python3 -m http.server 8766
+# open http://localhost:8766/index.html
 ```
 
 Tabs: Principal · Guru · Siswa · Orang Tua · TU · Yayasan · Auth · Form Patterns
 
 Viewports: Mobile 375 · Tablet 768 · Desktop 1440 · Full
+
+Per-ticket design references live in `docs/tickets/school-ms-ticket-*.md` `## Design Baseline` (FE build tickets) or `## Behavioural Reference` (FE Wiring tickets). All FE tickets point at `prototype-promax/`.
 
 ## Reference PRD (SpendFlow format)
 

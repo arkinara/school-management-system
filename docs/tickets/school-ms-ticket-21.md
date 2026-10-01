@@ -8,6 +8,16 @@ Builds the TU/admin-facing weekly-timetable configuration UI: a grid for creatin
 - PRD sub-feature(s): Schedule Configuration (FE portion)
 - PRD path: `docs/PRD.md` lines 470-505
 
+## Design Baseline
+- Visual: `prototype-promax/pages/form-patterns.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/form-patterns.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Multi-step wizard pattern from `form-patterns.html` drives the weekly schedule grid setup flow
+- Conflict detection errors use `role="alert"` and focus the first invalid field
+- Schedule context cross-checked against the timeline on `principal-dashboard.html`
+
 ## Sub-feature: Weekly Schedule Grid Builder
 Lets TU/admin create and edit schedule entries in a day-by-period grid layout backed by live API calls.
 

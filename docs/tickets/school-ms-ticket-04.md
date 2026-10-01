@@ -8,6 +8,16 @@ This ticket wires Better Auth on the Next.js frontend against the real backend a
 - PRD sub-feature(s): ticket-scoped sub-features "Sign-in / Sign-up Pages" and "Tenant-picker Onboarding" (frontend realization of the PRD's Auth & Multi-tenancy Boundaries feature)
 - PRD path: `docs/PRD.md` lines 591-635
 
+## Design Baseline
+- Visual: `prototype-promax/pages/auth-sign-in.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/auth-sign-in.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Form validation uses `role="alert"` and moves focus to the first invalid field
+- `prefers-reduced-motion` disables the sign-in transition animation
+- Form-field patterns (label, hint, error) match `form-patterns.html`
+
 ## Sub-feature: Sign-in / Sign-up Pages
 Covers the Better Auth client configuration, sign-in and sign-up form pages, client-side validation, and session persistence against the real backend from ticket #3.
 

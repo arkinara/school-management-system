@@ -8,6 +8,16 @@ This ticket builds the Siswa (student) home screen: a today-focused schedule/ass
 - PRD sub-feature(s): `## Sub-feature: Teacher & Student Daily Widgets` (student portion only)
 - PRD path: `docs/PRD.md` lines 307-348
 
+## Design Baseline
+- Visual: `prototype-promax/pages/siswa-dashboard.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/siswa-dashboard.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Today's schedule rendered as the today-schedule list pattern
+- Rapor summary card uses the same bullet-bar grade visualization as parent/principal views
+- Attendance trend shown as inline SVG sparkline
+
 ## Sub-feature: Today's Schedule & Assignments Widget
 Covers rendering the student's today-filtered class schedule (subject, teacher, period/time) and any assignment-like items surfaced for the day, built entirely against typed mock data.
 

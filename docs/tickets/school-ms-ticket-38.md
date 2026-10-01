@@ -8,6 +8,11 @@ Tickets #24 (bill generation) and #25 (payment recording) built their pages agai
 - PRD sub-feature(s): Bill Generation, Payment Recording (wiring portion)
 - PRD path: `docs/PRD.md` lines 507-540
 
+## Behavioural Reference
+When wiring real APIs, preserve these interactions from `prototype-promax/pages/spp-bills.html` + `assets/app.js`:
+- Sortable + bulk-select table behavior is preserved against real bills/payments endpoints
+- Void/record-payment actions surface an undo toast instead of a confirm dialog
+
 ## Sub-feature: Bill Generation API Integration
 Wire ticket #24's bill generation page to the real SPP API (#23) single and bulk bill-generation endpoints.
 

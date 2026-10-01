@@ -8,6 +8,11 @@ Ticket #9 built the Guru dashboard against mock data for today's classes, attend
 - PRD sub-feature(s): Teacher & Student Daily Widgets (teacher portion)
 - PRD path: `docs/PRD.md` lines 307-338
 
+## Behavioural Reference
+When wiring real APIs, preserve these interactions from `prototype-promax/pages/guru-dashboard.html` + `assets/app.js`:
+- Today-timeline and pending grade-entry queue keep their sortable `aria-sort` behavior with real data
+- Real mutations (e.g. marking a grade entry done) surface an undo toast, not a confirm dialog
+
 ## Sub-feature: API Integration
 Replace the guru dashboard's mock widgets with real calls to the absensi API (#14) for attendance-taken status and the grades API (#16) for pending grade-entry counts, scoped to the logged-in teacher.
 

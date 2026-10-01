@@ -8,6 +8,16 @@ Builds the frontend for the announcement channel: a composer for principal/TU/gu
 - PRD sub-feature(s): Announcement Board (FE portion)
 - PRD path: `docs/PRD.md` lines 554-589
 
+## Design Baseline
+- Visual: `prototype-promax/pages/principal-dashboard.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/principal-dashboard.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Announcement feed list pattern matches the pending-announcements block on `principal-dashboard.html`
+- Composer form validation uses `role="alert"` + focus-first-invalid, per `form-patterns.html`
+- Deleting/un-publishing an announcement surfaces an undo toast, not a confirm dialog
+
 ## Sub-feature: Broadcast Composer (Staff)
 Form for principal/TU/guru to create an announcement with title, body, and audience scope (all/class/jenjang), plus edit/retract controls.
 

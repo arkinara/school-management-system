@@ -8,6 +8,16 @@ Builds the 1-1 chat-like UI between orang tua and guru: a thread list with a com
 - PRD sub-feature(s): Direct Message Threads (FE portion)
 - PRD path: `docs/PRD.md` lines 554-589
 
+## Design Baseline
+- Visual: `prototype-promax/pages/form-patterns.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/form-patterns.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Chat input follows the text-entry pattern in `form-patterns.html`
+- `Ctrl/Cmd+K` command palette (focus trap, Esc to close, focus return) is a valid entry point into a thread
+- New-message arrival uses a polite live region, never steals focus from the active input
+
 ## Sub-feature: Thread List & Compose
 List of a user's message threads plus an action to start a new thread tied to a specific student, for orang tua and guru.
 

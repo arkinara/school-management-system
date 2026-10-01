@@ -8,6 +8,16 @@ Builds the TU-facing bill-generation UI, covering both single-bill creation and 
 - PRD sub-feature(s): Bill Generation (FE portion)
 - PRD path: `docs/PRD.md` lines 507-552
 
+## Design Baseline
+- Visual: `prototype-promax/pages/spp-bills.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/spp-bills.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Bill list is a sortable table with `aria-sort` + `data-value` sync
+- Bulk-select with indeterminate header checkbox for generating bills across multiple classes/students
+- Voiding/editing a generated bill surfaces an undo toast, not a confirm dialog
+
 ## Sub-feature: Single Bill Creation UI
 Form for TU to create one bill for a student with period, amount, and due_date, against mock data.
 

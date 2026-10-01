@@ -8,6 +8,16 @@ Builds a cross-cutting in-app notification center: a header bell icon with unrea
 - PRD sub-feature(s): Attendance Notification; Overdue Tracking & Alerts; unread announcement/message indicators
 - PRD path: `docs/PRD.md` lines 351-395, 507-552, 554-589
 
+## Design Baseline
+- Visual: `prototype-promax/pages/principal-dashboard.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/principal-dashboard.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Bell icon + count badge + dropdown feed pattern defined in `assets/app.js`
+- New notifications announce via a polite live region, not a focus-stealing alert
+- Selecting a notification deep-links via URL hash (`#page=<id>`) to its source page
+
 ## Sub-feature: In-app Notification Bell
 Header bell icon showing an aggregated unread count across absensi, SPP, and komunikasi events, with a dropdown preview.
 

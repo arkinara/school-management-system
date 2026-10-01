@@ -8,6 +8,11 @@ Ticket #12 built the Tata Usaha dashboard against mock data for the operational 
 - PRD sub-feature(s): Parent & TU Operational Widgets (TU portion)
 - PRD path: `docs/PRD.md` lines 307-347
 
+## Behavioural Reference
+When wiring real APIs, preserve these interactions from `prototype-promax/pages/tu-dashboard.html` + `assets/app.js`:
+- Bulk-select + indeterminate checkbox state on the overdue-SPP table works against real rows
+- Bulk actions (e.g. mark-reminded) surface an undo toast instead of a confirm dialog
+
 ## Sub-feature: API Integration
 Replace the TU dashboard's mock billing widgets with real calls to the SPP API (#23) for overdue bills and billing task counts, scoped to the TU's assigned school.
 

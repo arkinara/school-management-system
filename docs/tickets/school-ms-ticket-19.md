@@ -8,6 +8,16 @@ Builds the rapor viewing page consumed from both the orang tua and siswa dashboa
 - PRD sub-feature(s): ticket-scoped sub-features for the two viewer contexts (parent, student)
 - PRD path: `docs/PRD.md` lines 433-467
 
+## Design Baseline
+- Visual: `prototype-promax/pages/rapor-view.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/rapor-view.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Semester picker and Kurikulum Merdeka fase display match `rapor-view.html`
+- Per-subject results use the same donut/bullet-bar visualizations as the dashboards
+- Print stylesheet strips chrome (`@media print`) for rapor printing; `prefers-reduced-motion` disables animation
+
 ## Sub-feature: Published Rapor View (Parent)
 Lets a parent select a child and semester and view that child's published rapor with narrative/numeric content rendered per fase, plus a download/print action, against mock data.
 

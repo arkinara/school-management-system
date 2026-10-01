@@ -8,6 +8,16 @@ Builds the TU-facing payment-recording UI: a form to record a payment (method, a
 - PRD sub-feature(s): Payment Recording (FE portion)
 - PRD path: `docs/PRD.md` lines 507-552
 
+## Design Baseline
+- Visual: `prototype-promax/pages/spp-bills.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/spp-bills.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Payment table supports bulk-select with indeterminate header checkbox state
+- Sortable columns use `aria-sort` + `data-value` (numeric vs locale-aware string sort)
+- Recording/reversing a payment surfaces an undo toast (polite live region) instead of a confirm dialog
+
 ## Sub-feature: Payment Recording Form
 Form for TU to record method/amount/receipt_no/paid_at against a selected bill, with partial-payment flagging for TU review, against mock data.
 

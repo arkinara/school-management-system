@@ -8,6 +8,11 @@ Ticket #10 built the Siswa dashboard against mock data for today's schedule, rec
 - PRD sub-feature(s): Teacher & Student Daily Widgets (student portion)
 - PRD path: `docs/PRD.md` lines 307-338
 
+## Behavioural Reference
+When wiring real APIs, preserve these interactions from `prototype-promax/pages/siswa-dashboard.html` + `assets/app.js`:
+- Today-schedule list and rapor-summary bullet bars keep rendering from real API data
+- Attendance sparkline stays an inline SVG, no chart library introduced during wiring
+
 ## Sub-feature: API Integration
 Replace the siswa dashboard's mock widgets with real calls to jadwal (#20) for today's schedule, grades (#16) for recent grades, and rapor (#18) for publish-status, scoped to the logged-in student.
 

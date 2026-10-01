@@ -8,6 +8,15 @@ Builds the teacher-facing attendance-taking UI for marking a full class roster h
 - PRD sub-feature(s): Daily Attendance Entry (FE portion)
 - PRD path: `docs/PRD.md` lines 351-395
 
+## Design Baseline
+- Visual: `prototype-promax/pages/absensi-input.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/absensi-input.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Roster table supports keyboard attendance entry: focus a row, press `H` / `I` / `S` / `A`
+- Corrections surface via an undo toast (polite live region, never steals focus) instead of a confirm dialog
+
 ## Sub-feature: Class Roster Attendance Entry UI
 Renders the full class roster pre-loaded with default hadir status and lets the teacher toggle exceptions (izin/sakit/alpa) before bulk-submitting the whole class in one action.
 

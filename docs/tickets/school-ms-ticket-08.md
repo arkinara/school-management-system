@@ -8,6 +8,18 @@ This ticket builds the principal's home screen per PRD Requirements > Dashboard,
 - PRD sub-feature(s): `## Sub-feature: Principal & Yayasan Overview Widgets` (principal portion only)
 - PRD path: `docs/PRD.md` lines 307-348
 
+## Design Baseline
+- Visual: `prototype-promax/pages/principal-dashboard.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/principal-dashboard.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- KPI cards use inline SVG sparklines + bullet-bar targets (no chart library)
+- Donut ring for attendance rate, ranked bullet bars for grade-entry completion by class
+- 7-day attendance trend as an inline SVG area sparkline
+- Pending-announcements list follows the feed pattern on the same page
+- `Ctrl/Cmd+K` command palette is reachable from this page
+
 ## Sub-feature: Principal School-wide KPIs
 Render attendance rate, grade-entry completion, and SPP collection rate widgets for the principal's own school, against typed mock data matching the eventual API response shape.
 

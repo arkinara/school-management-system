@@ -8,6 +8,15 @@ Builds the read-only personalized schedule view consumed by guru, siswa, and ora
 - PRD sub-feature(s): Personalized Schedule Views
 - PRD path: `docs/PRD.md` lines 470-505
 
+## Design Baseline
+- Visual: `prototype-promax/pages/guru-dashboard.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/guru-dashboard.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Per-role today's classes/schedule reuses the today-timeline (`guru-dashboard.html`) and today-schedule (`siswa-dashboard.html`) patterns
+- Deep linking via URL hash (`#page=jadwal&vp=<role>`)
+
 ## Sub-feature: Teacher Today/Week View
 Shows a guru only the sessions where they are the assigned teacher, defaulting to today with a toggle to the full week.
 

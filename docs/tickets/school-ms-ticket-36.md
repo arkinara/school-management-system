@@ -8,6 +8,11 @@ Ticket #15 built the daily attendance-entry page against mock data, including a 
 - PRD sub-feature(s): Daily Attendance Entry (wiring portion)
 - PRD path: `docs/PRD.md` lines 351-374
 
+## Behavioural Reference
+When wiring real APIs, preserve these interactions from `prototype-promax/pages/absensi-input.html` + `assets/app.js`:
+- Keyboard attendance entry (`H`/`I`/`S`/`A` on a focused roster row) submits to the real attendance endpoint
+- Submission corrections surface via undo toast (polite live region), never a confirm dialog
+
 ## Sub-feature: API Integration
 Replace the absensi page's mock roster and mock submit with real calls to the attendances API (#14) for roster fetch, bulk submit, and same-day edit-window enforcement.
 

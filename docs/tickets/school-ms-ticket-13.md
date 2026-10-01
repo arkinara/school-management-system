@@ -8,6 +8,15 @@ This ticket builds the Yayasan (foundation/super-admin) home screen: a multi-ten
 - PRD sub-feature(s): `## Sub-feature: Principal & Yayasan Overview Widgets` (yayasan portion only)
 - PRD path: `docs/PRD.md` lines 307-348
 
+## Design Baseline
+- Visual: `prototype-promax/pages/yayasan-dashboard.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/yayasan-dashboard.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Multi-tenant table is sortable with `aria-sort` + `data-value` (numeric vs locale-aware string sort)
+- Per-tenant user counts and system health shown via inline donut + sparkline, no chart library
+
 ## Sub-feature: Multi-tenant/School Comparison Overview
 Covers a widget listing all tenants (jenjang) and their schools with a side-by-side comparison of key health metrics, wired directly to the real tenants/schools API from ticket #5.
 

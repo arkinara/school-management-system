@@ -8,6 +8,16 @@ Builds the teacher-facing grade-entry UI for recording scores per class, subject
 - PRD sub-feature(s): Grade Entry by Category (FE portion)
 - PRD path: `docs/PRD.md` lines 397-431
 
+## Design Baseline
+- Visual: `prototype-promax/pages/principal-dashboard.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/principal-dashboard.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Grade-entry table follows the Penginputan Nilai pattern on `principal-dashboard.html` — sortable, `data-value` numeric sort
+- Field-level validation uses `role="alert"` + focus-first-invalid, per `form-patterns.html`
+- Save corrections surface via undo toast, not a confirm dialog
+
 ## Sub-feature: Category-based Grade Entry UI
 Provides a score input (0-100) with a category tag selector (formatif/sumatif/PR/tugas) and a descriptive-note field that is required for TK/SD and optional for SMP/SMA, submitting directly to the live grades API.
 

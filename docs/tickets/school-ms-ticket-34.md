@@ -8,6 +8,11 @@ Ticket #11 built the Orang Tua dashboard against mock data for child summary, SP
 - PRD sub-feature(s): Parent & TU Operational Widgets (parent portion)
 - PRD path: `docs/PRD.md` lines 307-347
 
+## Behavioural Reference
+When wiring real APIs, preserve these interactions from `prototype-promax/pages/orang-tua-dashboard.html` + `assets/app.js`:
+- Sibling picker switches real per-child API data, not just mock fixtures
+- Payment-status sidebar and per-subject grade bars stay live-data-driven with the same visual shape
+
 ## Sub-feature: API Integration
 Replace the orang tua dashboard's mock widgets with real calls to absensi (#14) and rapor (#18) for child summary data, and SPP (#23) for payment status, scoped to the parent's linked student(s).
 

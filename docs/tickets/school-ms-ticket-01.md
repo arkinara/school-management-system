@@ -8,6 +8,12 @@ This ticket bootstraps the repository structure for the School Management System
 - PRD sub-feature(s): N/A — sub-features below are ticket-scoped, not PRD sub-features
 - PRD path: `docs/PRD.md` lines 93-135 (Architecture), 190-197 (Tech Stack)
 
+## Design Baseline
+- Design tokens: `prototype-promax/assets/theme.css` is the design-token source-of-truth — mirror its light/dark HSL variables into `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI, weights 300/400/500/600/700) + Fira Code (tabular numerals, weights 400/500/600), both via Google Fonts CDN — no Inter
+- Tailwind: `frontend/tailwind.config.ts` consumes the token CSS variables; no raw hex in components
+- Density baseline: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm, carried forward to every FE ticket
+
 ## Sub-feature: Monorepo Workspace Setup
 Covers creating the pnpm workspace root, the `frontend/`, `backend/`, and `docs/` top-level directories, and a root `.gitignore` covering both Node and Python build artifacts.
 
@@ -48,6 +54,9 @@ Covers a CI skeleton workflow (install + lint + build-check jobs, no deploy step
 5. Configure ESLint + Prettier for `frontend/` and ruff (or black+isort) for `backend/`, each with a `lint` script.
 6. Write CI workflow skeleton with frontend and backend jobs (install + lint), no deploy/publish steps.
 7. Verify a clean checkout passes CI end to end.
+8. Pin Fira Sans + Fira Code from Google Fonts in `frontend/src/app/layout.tsx`.
+9. Mirror promax design tokens from `prototype-promax/assets/theme.css` into `frontend/src/app/globals.css` (light + dark as independent palettes).
+10. Wire Tailwind config (`frontend/tailwind.config.ts`) to consume the token CSS variables; no raw hex in components.
 
 ## Out of Scope
 - Actual DB models, Alembic migrations, and auth/tenant middleware (ticket #2 covers this).

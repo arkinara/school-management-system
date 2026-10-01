@@ -8,6 +8,16 @@ This ticket builds the Tata Usaha (TU) home screen: a today's operations queue w
 - PRD sub-feature(s): `## Sub-feature: Parent & TU Operational Widgets` (TU portion only)
 - PRD path: `docs/PRD.md` lines 307-348
 
+## Design Baseline
+- Visual: `prototype-promax/pages/tu-dashboard.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/tu-dashboard.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Today's operations queue list pattern
+- Overdue SPP table supports bulk-select with an indeterminate header checkbox state
+- KPI tiles use inline SVG sparklines
+
 ## Sub-feature: Today's Operations Queue Widget
 Covers a task-list style widget showing bills that need to be generated, payments awaiting recording, and pending master-data tasks (e.g. new student/teacher records to finalize), built against typed mock data.
 

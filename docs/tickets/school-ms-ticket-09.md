@@ -8,6 +8,16 @@ This ticket builds the guru's home screen per PRD Requirements > Dashboard, rend
 - PRD sub-feature(s): `## Sub-feature: Teacher & Student Daily Widgets` (teacher portion only)
 - PRD path: `docs/PRD.md` lines 307-348
 
+## Design Baseline
+- Visual: `prototype-promax/pages/guru-dashboard.html` at Desktop 1440 (screenshot at `docs/screenshots-promax/guru-dashboard.png`)
+- Design tokens: `prototype-promax/assets/theme.css` — HSL channels for primary/accent/semantic; resolve via Tailwind tokens in `frontend/tailwind.config.ts` and `frontend/src/app/globals.css`
+- Typography: Fira Sans (UI) + Fira Code (tabular numerals, `font-variant-numeric: tabular-nums`); both via Google Fonts CDN. Replace Inter everywhere.
+- Density: 8/10 — 40px table rows, 13px table text, 4/8px spacing rhythm
+- Behavioural:
+- Today's classes rendered as an inline timeline (see today-timeline block)
+- Pending grade-entry queue is a sortable table with `aria-sort` + `data-value` sync
+- Notification bell + count badge pattern from `assets/app.js`
+
 ## Sub-feature: Today's Classes Widget
 Render the list of the logged-in teacher's teaching sessions scheduled for today, sourced from typed mock data.
 
