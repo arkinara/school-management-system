@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Pola Formulir &amp; State — Referensi Komponen</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="../assets/tw-config.js"></script>
+  <link rel="stylesheet" href="../assets/theme.css" />
+  <script src="../assets/app.js"></script>
+</head>
+<body class="min-h-dvh bg-background">
+  <a href="#main" class="skip-link">Lewati ke konten</a>
+  <div id="appbar"></div>
+
+  <div class="flex">
+    <div id="sidenav"></div>
+
+    <main id="main" class="min-w-0 flex-1 px-3 pb-24 pt-4 sm:px-5 md:pb-8">
+      <div class="mb-4">
+        <h1 class="text-lg font-semibold tracking-tight">Pola Formulir &amp; State</h1>
+        <p class="text-xs text-muted-foreground">Referensi komponen: input, validasi, wizard, pemuatan, kosong, galat, dan visualisasi data.</p>
+      </div>
+
+      <div class="grid gap-3 xl:grid-cols-2">
+        <!-- Input states ---------------------------------------------------- -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <h2 class="mb-3 text-sm font-semibold">Text Field — semua state</h2>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label for="f1" class="mb-1 block text-xs font-semibold">Kosong</label>
+              <input id="f1" placeholder="mis. Budi Santoso" class="h-10 w-full rounded-md border border-outline-variant bg-background px-2.5 text-sm placeholder:text-muted-foreground focus:border-primary" />
+              <p class="mt-1 text-2xs text-muted-foreground">Helper text tetap terlihat, bukan hanya placeholder.</p>
+            </div>
+            <div>
+              <label for="f2" class="mb-1 block text-xs font-semibold">Terisi</label>
+              <input id="f2" value="Siti Aminah" class="h-10 w-full rounded-md border border-outline-variant bg-background px-2.5 text-sm focus:border-primary" />
+              <p class="mt-1 text-2xs text-muted-foreground">Nama lengkap sesuai dokumen.</p>
+            </div>
+            <div>
+              <label for="f3" class="mb-1 block text-xs font-semibold text-muted-foreground">Nonaktif</label>
+              <input id="f3" value="Tidak dapat diubah" disabled class="h-10 w-full cursor-not-allowed rounded-md border border-outline-variant bg-surface-3 px-2.5 text-sm opacity-50" />
+              <p class="mt-1 text-2xs text-muted-foreground">Dikunci oleh Tata Usaha.</p>
+            </div>
+            <div>
+              <label for="f4" class="mb-1 block text-xs font-semibold">Hanya baca</label>
+              <input id="f4" value="0098765432" readonly class="num h-10 w-full rounded-md border-0 bg-surface-2 px-2.5 text-sm" />
+              <p class="mt-1 text-2xs text-muted-foreground">Read-only tampak beda dari disabled: tetap dapat disalin.</p>
+            </div>
+            <div class="sm:col-span-2">
+              <label for="f5" class="mb-1 block text-xs font-semibold">Galat</label>
+              <input id="f5" value="123" aria-invalid="true" aria-describedby="f5-err" class="num h-10 w-full rounded-md border border-destructive bg-background px-2.5 text-sm" />
+              <p id="f5-err" role="alert" class="mt-1 flex items-center gap-1 text-2xs font-medium text-destructive">
+                <span data-icon="alert-circle" class="h-3 w-3"></span>NISN harus 10 digit angka. Saat ini 3 digit.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Feedback banners -------------------------------------------------- -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <h2 class="mb-3 text-sm font-semibold">Umpan Balik Status</h2>
+          <div class="space-y-2">
+            <div class="flex items-start gap-2 rounded-md border border-success/40 bg-success-container px-3 py-2 text-success-container-foreground">
+              <span data-icon="check-circle" class="mt-0.5 h-4 w-4 shrink-0"></span>
+              <div><p class="text-xs font-semibold">Tersimpan otomatis</p><p class="text-2xs">Perubahan terakhir pukul 09.42.</p></div>
+            </div>
+            <div class="flex items-start gap-2 rounded-md border border-warning/40 bg-warning-container px-3 py-2 text-warning-container-foreground">
+              <span data-icon="alert-triangle" class="mt-0.5 h-4 w-4 shrink-0"></span>
+              <div><p class="text-xs font-semibold">Data belum lengkap</p><p class="text-2xs">3 kolom wajib masih kosong pada langkah 2.</p></div>
+            </div>
+            <div class="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive-container px-3 py-2 text-destructive-container-foreground">
+              <span data-icon="alert-circle" class="mt-0.5 h-4 w-4 shrink-0"></span>
+              <div class="min-w-0 flex-1">
+                <p class="text-xs font-semibold">Gagal menyimpan</p>
+                <p class="text-2xs">Koneksi terputus saat mengirim. Data tersimpan sebagai draf lokal.</p>
+              </div>
+              <button type="button" class="shrink-0 rounded-md border border-destructive/50 px-2 py-1 text-2xs font-semibold">Coba lagi</button>
+            </div>
+            <div class="flex items-start gap-2 rounded-md border border-info/40 bg-info-container px-3 py-2 text-info-container-foreground">
+              <span data-icon="activity" class="mt-0.5 h-4 w-4 shrink-0"></span>
+              <div><p class="text-xs font-semibold">Mode luring</p><p class="text-2xs">Perubahan akan disinkronkan saat koneksi kembali.</p></div>
+            </div>
+          </div>
+
+          <h3 class="mb-2 mt-4 text-xs font-semibold">Toast</h3>
+          <div class="flex flex-wrap gap-1.5">
+            <button type="button" data-toast="success" class="min-h-[36px] rounded-md border border-outline-variant px-2.5 text-xs font-medium transition-colors hover:bg-surface-3">Sukses</button>
+            <button type="button" data-toast="warning" class="min-h-[36px] rounded-md border border-outline-variant px-2.5 text-xs font-medium transition-colors hover:bg-surface-3">Peringatan</button>
+            <button type="button" data-toast="danger" class="min-h-[36px] rounded-md border border-outline-variant px-2.5 text-xs font-medium transition-colors hover:bg-surface-3">Galat</button>
+            <button type="button" data-toast="undo" class="min-h-[36px] rounded-md border border-outline-variant px-2.5 text-xs font-medium transition-colors hover:bg-surface-3">Dengan urungkan</button>
+          </div>
+        </section>
+
+        <!-- Wizard --------------------------------------------------------- -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <h2 class="mb-3 text-sm font-semibold">Wizard Multi-langkah</h2>
+          <ol class="mb-4 flex items-center gap-1" aria-label="Progres pendaftaran">
+            <li class="flex flex-1 items-center gap-1.5">
+              <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-2xs font-semibold text-primary-foreground"><span data-icon="check" class="h-3 w-3"></span></span>
+              <span class="truncate text-2xs font-medium">Data Siswa</span>
+              <span class="h-px flex-1 bg-primary"></span>
+            </li>
+            <li class="flex flex-1 items-center gap-1.5">
+              <span class="num flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-2xs font-semibold text-primary-foreground">2</span>
+              <span class="truncate text-2xs font-semibold" aria-current="step">Data Orang Tua</span>
+              <span class="h-px flex-1 bg-outline-variant"></span>
+            </li>
+            <li class="flex items-center gap-1.5">
+              <span class="num flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-3 text-2xs font-semibold text-muted-foreground">3</span>
+              <span class="truncate text-2xs text-muted-foreground">Konfirmasi</span>
+            </li>
+          </ol>
+
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label for="w1" class="mb-1 block text-xs font-semibold">Nama Orang Tua / Wali <span class="text-destructive" aria-hidden="true">*</span></label>
+              <input id="w1" autocomplete="name" class="h-10 w-full rounded-md border border-outline-variant bg-background px-2.5 text-sm focus:border-primary" />
+            </div>
+            <div>
+              <label for="w2" class="mb-1 block text-xs font-semibold">Nomor HP <span class="text-destructive" aria-hidden="true">*</span></label>
+              <input id="w2" type="tel" inputmode="tel" autocomplete="tel" placeholder="08xx-xxxx-xxxx"
+                     class="num h-10 w-full rounded-md border border-outline-variant bg-background px-2.5 text-sm placeholder:text-muted-foreground focus:border-primary" />
+              <p class="mt-1 text-2xs text-muted-foreground">Dipakai untuk notifikasi tagihan dan absensi.</p>
+            </div>
+          </div>
+
+          <div class="mt-4 flex items-center justify-between gap-2">
+            <button type="button" class="min-h-[40px] rounded-md border border-outline-variant px-3 text-xs font-medium transition-colors hover:bg-surface-3">Kembali</button>
+            <button type="button" class="min-h-[40px] rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground transition-colors hover:brightness-110">Lanjut</button>
+          </div>
+        </section>
+
+        <!-- Async states ----------------------------------------------------- -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <h2 class="mb-3 text-sm font-semibold">State Pemuatan, Kosong, dan Galat</h2>
+
+          <div class="mb-3 rounded-md border border-outline-variant p-2.5">
+            <p class="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Memuat — skeleton, bukan spinner</p>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2.5">
+                <div class="skeleton h-8 w-8 rounded-full"></div>
+                <div class="flex-1 space-y-1.5"><div class="skeleton h-3 w-1/3"></div><div class="skeleton h-2.5 w-1/4"></div></div>
+                <div class="skeleton h-6 w-16 rounded-full"></div>
+              </div>
+              <div class="flex items-center gap-2.5">
+                <div class="skeleton h-8 w-8 rounded-full"></div>
+                <div class="flex-1 space-y-1.5"><div class="skeleton h-3 w-2/5"></div><div class="skeleton h-2.5 w-1/5"></div></div>
+                <div class="skeleton h-6 w-16 rounded-full"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-3 rounded-md border border-outline-variant p-2.5">
+            <p class="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Kosong — selalu dengan jalan keluar</p>
+            <div class="flex flex-col items-center gap-2 py-5 text-center">
+              <span data-icon="inbox" class="h-7 w-7 text-muted-foreground"></span>
+              <p class="text-sm font-medium">Belum ada tagihan</p>
+              <p class="max-w-xs text-2xs text-muted-foreground">Tagihan muncul setelah batch SPP periode ini dibuat.</p>
+              <a href="spp-bills.html" class="mt-1 min-h-[36px] rounded-md bg-primary px-3 text-xs font-semibold leading-9 text-primary-foreground">Generate tagihan</a>
+            </div>
+          </div>
+
+          <div class="rounded-md border border-outline-variant p-2.5">
+            <p class="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Galat — sebab dan cara pulih</p>
+            <div class="flex flex-col items-center gap-2 py-5 text-center">
+              <span data-icon="wifi-off" class="h-7 w-7 text-destructive"></span>
+              <p class="text-sm font-medium">Gagal memuat data kelas</p>
+              <p class="max-w-xs text-2xs text-muted-foreground">Permintaan melebihi batas waktu 10 detik. Periksa koneksi lalu muat ulang.</p>
+              <button type="button" class="mt-1 flex min-h-[36px] items-center gap-1.5 rounded-md border border-outline-variant px-3 text-xs font-medium transition-colors hover:bg-surface-3">
+                <span data-icon="refresh-cw" class="h-3.5 w-3.5"></span>Muat ulang
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Status vocabulary ------------------------------------------------- -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <h2 class="mb-1 text-sm font-semibold">Kosakata Status</h2>
+          <p class="mb-3 text-2xs text-muted-foreground">Tiap chip membawa ikon dan kata — warna tidak pernah menjadi satu-satunya penanda.</p>
+          <div id="chips" class="flex flex-wrap gap-1.5"></div>
+
+          <h3 class="mb-2 mt-4 text-xs font-semibold">Target sentuh</h3>
+          <p class="mb-2 text-2xs text-muted-foreground">Semua kontrol minimal 44×44px dengan jarak ≥ 8px.</p>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" class="min-h-[44px] rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground">Primer</button>
+            <button type="button" class="min-h-[44px] rounded-md border border-outline-variant px-4 text-xs font-medium">Sekunder</button>
+            <button type="button" class="min-h-[44px] rounded-md bg-destructive px-4 text-xs font-semibold text-destructive-foreground">Destruktif</button>
+            <button type="button" disabled class="min-h-[44px] cursor-not-allowed rounded-md border border-outline-variant px-4 text-xs font-medium opacity-40">Nonaktif</button>
+          </div>
+        </section>
+
+        <!-- Data viz --------------------------------------------------------- -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1 xl:col-span-2">
+          <h2 class="mb-1 text-sm font-semibold">Visualisasi Data</h2>
+          <p class="mb-3 text-2xs text-muted-foreground">SVG inline, tanpa pustaka eksternal. Setiap grafik menyertakan angka sebagai teks dan <code class="num">aria-label</code>.</p>
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <p class="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Sparkline</p>
+              <div id="d-spark"></div>
+            </div>
+            <div>
+              <p class="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Bullet (nilai vs target)</p>
+              <div id="d-bullet" class="space-y-2"></div>
+            </div>
+            <div>
+              <p class="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Bar peringkat</p>
+              <div id="d-bars"></div>
+            </div>
+            <div>
+              <p class="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Donut</p>
+              <div id="d-donut"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="bottomnav"></div>
+
+  <script>
+    SMS.shell({
+      role: "tu", active: "home", user: "Dewi Lestari", notif: 0,
+      title: "SMA Bhakti", subtitle: "Referensi komponen",
+    });
+
+    document.getElementById("chips").innerHTML = [
+      SMS.chip("hadir", "success"), SMS.chip("izin", "info"), SMS.chip("sakit", "warning"),
+      SMS.chip("alpa", "danger"), SMS.chip("draf", "neutral"), SMS.chip("selesai", "success"),
+      SMS.chip("menunggak", "danger"), SMS.chip("lunas", "success"), SMS.chip("berjalan", "info"),
+      SMS.chip("perhatian", "warning"), SMS.chip("sehat", "success"),
+    ].join("");
+
+    document.getElementById("d-spark").innerHTML = SMS.sparkline([91, 93, 95, 94, 97, 95, 94], { label: "Kehadiran 7 hari", width: 160, height: 48 });
+    document.getElementById("d-bullet").innerHTML =
+      SMS.bullet({ value: 94, target: 95, label: "Kehadiran" }) +
+      SMS.bullet({ value: 82, target: 90, label: "SPP" }) +
+      SMS.bullet({ value: 41, target: 80, label: "Input nilai" });
+    document.getElementById("d-bars").innerHTML = SMS.bars([
+      { label: "Kelas 6", value: 92 }, { label: "Kelas 5", value: 78 }, { label: "Kelas 4", value: 64 },
+    ], { max: 100 });
+    document.getElementById("d-donut").innerHTML = SMS.donut(
+      [{ label: "Hadir", value: 452 }, { label: "Izin", value: 12 }, { label: "Sakit", value: 10 }, { label: "Alpa", value: 8 }],
+      { centerValue: 482, centerLabel: "siswa", size: 110 }
+    );
+
+    document.querySelectorAll("[data-toast]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var k = b.dataset.toast;
+        if (k === "undo") {
+          SMS.toast("5 baris absensi dihapus.", { tone: "warning", undo: function () { SMS.toast("Dipulihkan.", { tone: "success" }); } });
+        } else {
+          var msg = { success: "Data tersimpan.", warning: "Sebagian data dilewati.", danger: "Gagal menyimpan — koneksi terputus." }[k];
+          SMS.toast(msg, { tone: k });
+        }
+      });
+    });
+
+    SMS.hydrate(document);
+  </script>
+</body>
+</html>

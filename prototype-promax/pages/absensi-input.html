@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Input Absensi — Kelas 6A</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="../assets/tw-config.js"></script>
+  <link rel="stylesheet" href="../assets/theme.css" />
+  <script src="../assets/app.js"></script>
+</head>
+<body class="min-h-dvh bg-background">
+  <a href="#main" class="skip-link">Lewati ke konten</a>
+  <div id="appbar"></div>
+
+  <div class="flex">
+    <div id="sidenav"></div>
+
+    <main id="main" class="min-w-0 flex-1 px-3 pb-36 pt-4 sm:px-5">
+      <!-- Breadcrumb: this screen sits two levels deep ------------------- -->
+      <nav aria-label="Breadcrumb" class="mb-3">
+        <ol class="flex items-center gap-1.5 text-2xs text-muted-foreground">
+          <li><a href="guru-dashboard.html" class="hover:text-foreground hover:underline">Beranda</a></li>
+          <li aria-hidden="true"><span data-icon="chevron-right" class="h-3 w-3"></span></li>
+          <li><a href="#" class="hover:text-foreground hover:underline">Absensi</a></li>
+          <li aria-hidden="true"><span data-icon="chevron-right" class="h-3 w-3"></span></li>
+          <li class="font-medium text-foreground" aria-current="page">Input Kelas 6A</li>
+        </ol>
+      </nav>
+
+      <div class="mb-4">
+        <h1 class="text-lg font-semibold tracking-tight">Input Absensi</h1>
+        <p class="text-xs text-muted-foreground">Dapat diubah sampai pukul 23.59 hari ini. Setelah itu perlu persetujuan Tata Usaha.</p>
+      </div>
+
+      <!-- Context selectors --------------------------------------------- -->
+      <section class="mb-3 grid gap-3 rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1 sm:grid-cols-3">
+        <div>
+          <label for="kelas" class="mb-1 block text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Kelas</label>
+          <select id="kelas" class="h-10 w-full rounded-md border border-outline-variant bg-background px-2.5 text-sm focus:border-primary">
+            <option>Kelas 6A — 6 siswa</option><option>Kelas 6B — 32 siswa</option><option>Kelas 5A — 30 siswa</option>
+          </select>
+        </div>
+        <div>
+          <label for="mapel" class="mb-1 block text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Mata Pelajaran</label>
+          <select id="mapel" class="h-10 w-full rounded-md border border-outline-variant bg-background px-2.5 text-sm focus:border-primary">
+            <option>Matematika</option><option>Bahasa Indonesia</option><option>IPA</option>
+          </select>
+        </div>
+        <div>
+          <label for="tanggal" class="mb-1 block text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Tanggal</label>
+          <input id="tanggal" type="date" value="2026-09-30"
+                 class="num h-10 w-full rounded-md border border-outline-variant bg-background px-2.5 text-sm focus:border-primary" />
+        </div>
+      </section>
+
+      <!-- Live tally + bulk default -------------------------------------- -->
+      <section class="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-outline-variant bg-surface-1 px-3 py-2.5 shadow-e1">
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1" aria-live="polite">
+          <span class="flex items-center gap-1.5 text-xs"><span class="h-2.5 w-2.5 rounded-full bg-success"></span>Hadir <strong class="num" id="t-hadir">0</strong></span>
+          <span class="flex items-center gap-1.5 text-xs"><span class="h-2.5 w-2.5 rounded-full bg-info"></span>Izin <strong class="num" id="t-izin">0</strong></span>
+          <span class="flex items-center gap-1.5 text-xs"><span class="h-2.5 w-2.5 rounded-full bg-warning"></span>Sakit <strong class="num" id="t-sakit">0</strong></span>
+          <span class="flex items-center gap-1.5 text-xs"><span class="h-2.5 w-2.5 rounded-full bg-destructive"></span>Alpa <strong class="num" id="t-alpa">0</strong></span>
+        </div>
+        <button type="button" id="mark-all"
+                class="ml-auto flex min-h-[36px] items-center gap-1.5 rounded-md border border-outline-variant px-2.5 text-xs font-medium transition-colors hover:bg-surface-3">
+          <span data-icon="list-checks" class="h-3.5 w-3.5"></span>Tandai semua hadir
+        </button>
+      </section>
+
+      <!-- Roster ---------------------------------------------------------- -->
+      <section class="overflow-hidden rounded-md border border-outline-variant bg-surface-1 shadow-e1">
+        <ul id="roster" class="divide-y divide-outline-variant"></ul>
+      </section>
+
+      <p class="mt-2 text-2xs text-muted-foreground">
+        Pintasan papan tik: <kbd class="num rounded border border-outline-variant px-1">H</kbd> hadir ·
+        <kbd class="num rounded border border-outline-variant px-1">I</kbd> izin ·
+        <kbd class="num rounded border border-outline-variant px-1">S</kbd> sakit ·
+        <kbd class="num rounded border border-outline-variant px-1">A</kbd> alpa, saat baris difokuskan.
+      </p>
+    </main>
+  </div>
+
+  <!-- Sticky save bar: clears the gesture bar on phones ------------------ -->
+  <div class="fixed inset-x-0 bottom-0 z-sticky border-t border-outline-variant bg-surface-1/95 px-3 py-2.5 pb-[calc(env(safe-area-inset-bottom,0px)+10px)] backdrop-blur md:left-16 xl:left-56">
+    <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-3">
+      <p class="min-w-0 flex-1 text-xs" aria-live="polite">
+        <strong class="num" id="marked">0</strong> dari <strong class="num" id="total">6</strong> siswa telah ditandai
+        <span id="incomplete" class="ml-1 text-warning">· lengkapi sebelum menyimpan</span>
+      </p>
+      <button type="button" class="min-h-[40px] rounded-md border border-outline-variant px-3 text-xs font-medium transition-colors hover:bg-surface-3">Batal</button>
+      <button type="button" id="save" disabled
+              class="flex min-h-[40px] items-center gap-1.5 rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
+        <span data-icon="save" class="h-4 w-4"></span><span id="save-label">Simpan Absensi</span>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    SMS.shell({
+      role: "guru", active: "absensi", user: "Siti Aminah", notif: 5,
+      title: "SMP Nusantara", subtitle: "Guru · Wali Kelas 6A",
+    });
+
+    var STUDENTS = [
+      { no: 1, name: "Andi Wijaya", nisn: "0098765432" },
+      { no: 2, name: "Bagas Pratama", nisn: "0098765409" },
+      { no: 3, name: "Citra Lestari", nisn: "0098765388" },
+      { no: 4, name: "Dinda Putri", nisn: "0098765411" },
+      { no: 5, name: "Eka Nugroho", nisn: "0098765377" },
+      { no: 6, name: "Farah Aulia", nisn: "0098765366" },
+    ];
+    /* Selected state uses the *container* pair, not the solid tone: amber on
+       white fails AA at 11px, and the container pair is AA by construction.
+       Selection stays obvious via weight + an inset ring. */
+    var OPTIONS = [
+      ["hadir", "Hadir", "bg-success-container text-success-container-foreground ring-1 ring-inset ring-success"],
+      ["izin", "Izin", "bg-info-container text-info-container-foreground ring-1 ring-inset ring-info"],
+      ["sakit", "Sakit", "bg-warning-container text-warning-container-foreground ring-1 ring-inset ring-warning"],
+      ["alpa", "Alpa", "bg-destructive-container text-destructive-container-foreground ring-1 ring-inset ring-destructive"],
+    ];
+    var state = {};
+
+    function initials(n) { var p = n.split(" "); return (p[0][0] + (p[1] ? p[1][0] : "")).toUpperCase(); }
+
+    function render() {
+      document.getElementById("roster").innerHTML = STUDENTS.map(function (s) {
+        return (
+          '<li class="flex flex-wrap items-center gap-3 px-3 py-2" data-nisn="' + s.nisn + '" tabindex="0">' +
+          '<span class="num w-5 shrink-0 text-2xs text-muted-foreground">' + s.no + "</span>" +
+          '<span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-3 text-2xs font-semibold">' + initials(s.name) + "</span>" +
+          '<div class="min-w-0 flex-1"><p class="truncate text-sm font-medium">' + s.name + "</p>" +
+          '<p class="num text-2xs text-muted-foreground">' + s.nisn + "</p></div>" +
+          '<div class="flex shrink-0 overflow-hidden rounded-md border border-outline-variant" role="radiogroup" aria-label="Status kehadiran ' + s.name + '">' +
+          OPTIONS.map(function (o) {
+            var on = state[s.nisn] === o[0];
+            return (
+              '<button type="button" role="radio" aria-checked="' + on + '" data-set="' + o[0] + '" ' +
+              'class="min-h-[40px] border-r border-outline-variant px-2.5 text-2xs transition-colors last:border-r-0 ' +
+              (on ? "font-bold " + o[2] : "font-semibold text-muted-foreground hover:bg-surface-3") + '">' + o[1] + "</button>"
+            );
+          }).join("") + "</div></li>"
+        );
+      }).join("");
+      refresh();
+    }
+
+    function refresh() {
+      var counts = { hadir: 0, izin: 0, sakit: 0, alpa: 0 };
+      STUDENTS.forEach(function (s) { if (state[s.nisn]) counts[state[s.nisn]]++; });
+      document.getElementById("t-hadir").textContent = counts.hadir;
+      document.getElementById("t-izin").textContent = counts.izin;
+      document.getElementById("t-sakit").textContent = counts.sakit;
+      document.getElementById("t-alpa").textContent = counts.alpa;
+
+      var marked = Object.keys(state).length;
+      document.getElementById("marked").textContent = marked;
+      document.getElementById("total").textContent = STUDENTS.length;
+      var complete = marked === STUDENTS.length;
+      document.getElementById("save").disabled = !complete;
+      document.getElementById("incomplete").hidden = complete;
+    }
+
+    document.getElementById("roster").addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-set]");
+      if (!btn) return;
+      state[btn.closest("li").dataset.nisn] = btn.dataset.set;
+      render();
+    });
+
+    /* Keyboard entry: a roster of 32 is faster from the home row. */
+    document.getElementById("roster").addEventListener("keydown", function (e) {
+      var li = e.target.closest("li[data-nisn]");
+      if (!li) return;
+      var map = { h: "hadir", i: "izin", s: "sakit", a: "alpa" };
+      var pick = map[e.key.toLowerCase()];
+      if (!pick) return;
+      e.preventDefault();
+      state[li.dataset.nisn] = pick;
+      var nisn = li.dataset.nisn;
+      render();
+      var again = document.querySelector('li[data-nisn="' + nisn + '"]');
+      if (again) again.focus();
+    });
+
+    /* Bulk default, then edit the exceptions — the common case first. */
+    document.getElementById("mark-all").addEventListener("click", function () {
+      var before = Object.assign({}, state);
+      STUDENTS.forEach(function (s) { state[s.nisn] = "hadir"; });
+      render();
+      SMS.toast("Semua siswa ditandai <strong>hadir</strong>. Ubah yang tidak sesuai.", {
+        tone: "success",
+        undo: function () { state = before; render(); },
+      });
+    });
+
+    document.getElementById("save").addEventListener("click", function () {
+      var btn = this;
+      btn.disabled = true;
+      document.getElementById("save-label").textContent = "Menyimpan…";
+      setTimeout(function () {
+        document.getElementById("save-label").textContent = "Simpan Absensi";
+        btn.disabled = false;
+        SMS.toast("Absensi Kelas 6A · 30 Sep tersimpan.", { tone: "success" });
+      }, 800);
+    });
+
+    render();
+    SMS.hydrate(document);
+  </script>
+</body>
+</html>

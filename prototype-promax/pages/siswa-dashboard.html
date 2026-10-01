@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Beranda Siswa — SDN Menteng 01</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="../assets/tw-config.js"></script>
+  <link rel="stylesheet" href="../assets/theme.css" />
+  <script src="../assets/app.js"></script>
+</head>
+<body class="min-h-dvh bg-background">
+  <a href="#main" class="skip-link">Lewati ke konten</a>
+  <div id="appbar"></div>
+
+  <div class="flex">
+    <div id="sidenav"></div>
+
+    <main id="main" class="min-w-0 flex-1 px-3 pb-24 pt-4 sm:px-5 md:pb-8">
+      <div class="mb-4">
+        <h1 class="text-lg font-semibold tracking-tight">Halo, Andi</h1>
+        <p class="text-xs text-muted-foreground">Kelas 6A · Fase C · Semester Genap 2025/2026 · Senin, 30 September 2026</p>
+      </div>
+
+      <!-- Student KPI strip ---------------------------------------------- -->
+      <section aria-label="Ringkasan saya" class="mb-4 grid grid-cols-3 gap-3">
+        <article class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <p class="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Rata-rata</p>
+          <p class="metric-value mt-1 text-xl font-semibold leading-none">85,3</p>
+          <p class="mt-1 flex items-center gap-1 text-2xs text-success"><span data-icon="trending-up" class="h-3 w-3"></span><span class="num">+2,1</span> dari semester lalu</p>
+        </article>
+        <article class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <p class="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Kehadiran</p>
+          <p class="metric-value mt-1 text-xl font-semibold leading-none">96%</p>
+          <div class="mt-2" id="bullet-hadir"></div>
+        </article>
+        <article class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <p class="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Peringkat</p>
+          <p class="metric-value mt-1 text-xl font-semibold leading-none">4<span class="text-sm font-normal text-muted-foreground">/32</span></p>
+          <p class="mt-1 text-2xs text-muted-foreground">naik <span class="num">2</span> posisi</p>
+        </article>
+      </section>
+
+      <div class="grid gap-3 lg:grid-cols-3">
+        <!-- Today's schedule --------------------------------------------- -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 shadow-e1 lg:col-span-2">
+          <header class="flex items-center justify-between gap-2 border-b border-outline-variant px-3 py-2.5">
+            <h2 class="text-sm font-semibold">Jadwal Hari Ini</h2>
+            <span class="num text-2xs text-muted-foreground">6 mata pelajaran</span>
+          </header>
+          <ol class="divide-y divide-outline-variant">
+            <li class="flex items-center gap-3 px-3 py-2 opacity-60">
+              <span class="num w-11 shrink-0 text-xs text-muted-foreground">07.00</span>
+              <div class="min-w-0 flex-1"><p class="truncate text-sm font-medium">Upacara</p><p class="text-2xs text-muted-foreground">Lapangan</p></div>
+              <span data-icon="check" class="h-4 w-4 text-success"></span>
+            </li>
+            <li class="flex items-center gap-3 bg-primary-container/40 px-3 py-2">
+              <span class="num w-11 shrink-0 text-xs font-semibold">08.30</span>
+              <div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold">Matematika</p><p class="truncate text-2xs text-muted-foreground">Bu Siti · Ruang 6A</p></div>
+              <span class="shrink-0 rounded-full bg-primary px-2 py-0.5 text-2xs font-semibold text-primary-foreground">sekarang</span>
+            </li>
+            <li class="flex items-center gap-3 px-3 py-2">
+              <span class="num w-11 shrink-0 text-xs text-muted-foreground">10.00</span>
+              <div class="min-w-0 flex-1"><p class="truncate text-sm font-medium">Bahasa Indonesia</p><p class="truncate text-2xs text-muted-foreground">Pak Andi · Ruang 6A</p></div>
+            </li>
+            <li class="flex items-center gap-3 px-3 py-2">
+              <span class="num w-11 shrink-0 text-xs text-muted-foreground">11.00</span>
+              <div class="min-w-0 flex-1"><p class="truncate text-sm font-medium">IPA</p><p class="truncate text-2xs text-muted-foreground">Bu Rina · Lab IPA</p></div>
+            </li>
+            <li class="flex items-center gap-3 px-3 py-2">
+              <span class="num w-11 shrink-0 text-xs text-muted-foreground">12.30</span>
+              <div class="min-w-0 flex-1"><p class="truncate text-sm font-medium">IPS</p><p class="truncate text-2xs text-muted-foreground">Pak Hadi · Ruang 6A</p></div>
+            </li>
+            <li class="flex items-center gap-3 px-3 py-2">
+              <span class="num w-11 shrink-0 text-xs text-muted-foreground">13.30</span>
+              <div class="min-w-0 flex-1"><p class="truncate text-sm font-medium">PJOK</p><p class="truncate text-2xs text-muted-foreground">Pak Joko · Lapangan</p></div>
+            </li>
+          </ol>
+        </section>
+
+        <!-- Upcoming work ------------------------------------------------ -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 shadow-e1">
+          <header class="flex items-center justify-between gap-2 border-b border-outline-variant px-3 py-2.5">
+            <h2 class="text-sm font-semibold">Tugas Mendatang</h2>
+            <span class="num rounded-full bg-accent-container px-1.5 py-0.5 text-2xs font-semibold text-accent-container-foreground">3</span>
+          </header>
+          <ul class="divide-y divide-outline-variant">
+            <li class="flex items-start gap-3 px-3 py-2.5">
+              <span class="mt-0.5 h-9 w-1 shrink-0 rounded-full bg-destructive"></span>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-medium">Latihan Pecahan</p>
+                <p class="text-2xs text-muted-foreground">Matematika</p>
+                <p class="mt-1 flex items-center gap-1 text-2xs font-semibold text-destructive"><span data-icon="clock" class="h-3 w-3"></span>besok</p>
+              </div>
+            </li>
+            <li class="flex items-start gap-3 px-3 py-2.5">
+              <span class="mt-0.5 h-9 w-1 shrink-0 rounded-full bg-warning"></span>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-medium">Karangan Deskripsi</p>
+                <p class="text-2xs text-muted-foreground">Bahasa Indonesia</p>
+                <p class="mt-1 flex items-center gap-1 text-2xs font-semibold text-warning"><span data-icon="clock" class="h-3 w-3"></span>3 hari lagi</p>
+              </div>
+            </li>
+            <li class="flex items-start gap-3 px-3 py-2.5">
+              <span class="mt-0.5 h-9 w-1 shrink-0 rounded-full bg-success"></span>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-medium">Laporan Percobaan</p>
+                <p class="text-2xs text-muted-foreground">IPA</p>
+                <p class="mt-1 flex items-center gap-1 text-2xs font-semibold text-success"><span data-icon="clock" class="h-3 w-3"></span>5 hari lagi</p>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <!-- Latest report ------------------------------------------------- -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 shadow-e1 lg:col-span-2">
+          <header class="flex items-center justify-between gap-2 border-b border-outline-variant px-3 py-2.5">
+            <h2 class="text-sm font-semibold">Ringkasan Rapor Terakhir</h2>
+            <a href="rapor-view.html" class="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-surface-3">
+              Lihat rapor <span data-icon="arrow-right" class="h-3.5 w-3.5"></span>
+            </a>
+          </header>
+          <div class="p-3">
+            <div id="bars-nilai"></div>
+            <p class="mt-3 border-t border-outline-variant pt-2 text-2xs text-muted-foreground">
+              IPS <span class="num font-semibold text-foreground">78</span> berada di bawah rata-rata pribadi — minta bimbingan ke Pak Hadi.
+            </p>
+          </div>
+        </section>
+
+        <!-- Announcements -------------------------------------------------- -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 shadow-e1">
+          <header class="flex items-center justify-between gap-2 border-b border-outline-variant px-3 py-2.5">
+            <h2 class="text-sm font-semibold">Pengumuman</h2>
+            <span class="num text-2xs text-muted-foreground">2 baru</span>
+          </header>
+          <ul class="divide-y divide-outline-variant">
+            <li class="px-3 py-2.5">
+              <p class="text-sm font-medium">Libur Maulid Nabi</p>
+              <p class="mt-0.5 text-2xs text-muted-foreground">Sekolah libur pada 7 Oktober 2026.</p>
+              <p class="mt-1 text-2xs text-muted-foreground">2 jam lalu</p>
+            </li>
+            <li class="px-3 py-2.5">
+              <p class="text-sm font-medium">Jadwal Ujian Tengah Semester</p>
+              <p class="mt-0.5 text-2xs text-muted-foreground">UTS dimulai 14 Oktober. Kisi-kisi menyusul.</p>
+              <p class="mt-1 text-2xs text-muted-foreground">5 jam lalu</p>
+            </li>
+          </ul>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="bottomnav"></div>
+
+  <script>
+    SMS.shell({
+      role: "siswa", active: "home", user: "Andi Wijaya", notif: 2,
+      title: "SDN Menteng 01", subtitle: "Siswa · Kelas 6A",
+    });
+
+    document.getElementById("bullet-hadir").innerHTML = SMS.bullet({ value: 96, target: 90, label: "Kehadiran saya" });
+    document.getElementById("bars-nilai").innerHTML = SMS.bars([
+      { label: "IPA", value: 90, display: "90" },
+      { label: "Matematika", value: 88, display: "88" },
+      { label: "Bahasa Indonesia", value: 85, display: "85" },
+      { label: "IPS", value: 78, display: "78" },
+    ], { max: 100 });
+  </script>
+</body>
+</html>

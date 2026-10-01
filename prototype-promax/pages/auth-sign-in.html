@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Masuk — School Management System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="../assets/tw-config.js"></script>
+  <link rel="stylesheet" href="../assets/theme.css" />
+  <script src="../assets/app.js"></script>
+</head>
+<body class="min-h-dvh bg-surface-2">
+  <a href="#form" class="skip-link">Lewati ke formulir</a>
+
+  <div class="relative flex min-h-dvh flex-col">
+    <!-- Theme toggle stays reachable before sign-in --------------------- -->
+    <div class="absolute right-3 top-3 z-10">
+      <button type="button" id="theme-toggle" aria-label="Ganti mode gelap" aria-pressed="false"
+              class="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-surface-3">
+        <span data-icon="moon" class="h-5 w-5" data-theme-icon></span>
+      </button>
+    </div>
+
+    <main class="flex flex-1 items-center justify-center px-4 py-10">
+      <div class="w-full max-w-sm">
+        <!-- Brand -->
+        <div class="mb-6 flex flex-col items-center text-center">
+          <span class="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-e2">
+            <span data-icon="graduation-cap" class="h-6 w-6"></span>
+          </span>
+          <h1 class="text-xl font-semibold tracking-tight">Selamat datang kembali</h1>
+          <p class="mt-1 text-xs text-muted-foreground">Masuk untuk mengelola kelas, nilai, dan pembayaran.</p>
+        </div>
+
+        <form id="form" class="rounded-lg border border-outline-variant bg-surface-1 p-5 shadow-e2" novalidate>
+          <!-- Tenant first: the school decides which data the login reaches -->
+          <div class="mb-4">
+            <label for="jenjang" class="mb-1 block text-xs font-semibold">Sekolah / Jenjang</label>
+            <div class="relative">
+              <select id="jenjang" name="jenjang" autocomplete="organization"
+                      class="h-11 w-full appearance-none rounded-md border border-outline-variant bg-background px-3 pr-9 text-sm transition-colors focus:border-primary">
+                <option>SDN Menteng 01 (SD)</option>
+                <option>SMP Nusantara (SMP)</option>
+                <option>SMA Bhakti (SMA)</option>
+                <option>TK Arkinara (TK)</option>
+              </select>
+              <span data-icon="chevron-down" class="pointer-events-none absolute right-3 top-3.5 h-4 w-4 text-muted-foreground"></span>
+            </div>
+            <p id="jenjang-help" class="mt-1 text-2xs text-muted-foreground">
+              Tiap jenjang adalah tenant terpisah dengan kurikulum dan datanya sendiri.
+            </p>
+          </div>
+
+          <div class="mb-4">
+            <label for="email" class="mb-1 block text-xs font-semibold">Email <span class="text-destructive" aria-hidden="true">*</span></label>
+            <input id="email" name="email" type="email" inputmode="email" autocomplete="username" required
+                   aria-describedby="email-help email-error" placeholder="nama@sekolah.sch.id"
+                   class="h-11 w-full rounded-md border border-outline-variant bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus:border-primary" />
+            <p id="email-help" class="mt-1 text-2xs text-muted-foreground">Gunakan email yang terdaftar di Tata Usaha.</p>
+            <p id="email-error" role="alert" hidden class="mt-1 flex items-center gap-1 text-2xs font-medium text-destructive">
+              <span data-icon="alert-circle" class="h-3 w-3"></span><span>Format email tidak valid. Contoh: budi@sekolah.sch.id</span>
+            </p>
+          </div>
+
+          <div class="mb-4">
+            <div class="mb-1 flex items-baseline justify-between">
+              <label for="password" class="text-xs font-semibold">Kata Sandi <span class="text-destructive" aria-hidden="true">*</span></label>
+              <a href="#" class="text-2xs font-medium text-primary hover:underline">Lupa sandi?</a>
+            </div>
+            <div class="relative">
+              <input id="password" name="password" type="password" autocomplete="current-password" required
+                     aria-describedby="password-error"
+                     class="h-11 w-full rounded-md border border-outline-variant bg-background px-3 pr-11 text-sm transition-colors focus:border-primary" />
+              <button type="button" id="toggle-pw" aria-label="Tampilkan kata sandi" aria-pressed="false"
+                      class="absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-3">
+                <span data-icon="eye" class="h-4 w-4" id="pw-icon"></span>
+              </button>
+            </div>
+            <p id="password-error" role="alert" hidden class="mt-1 flex items-center gap-1 text-2xs font-medium text-destructive">
+              <span data-icon="alert-circle" class="h-3 w-3"></span><span>Kata sandi wajib diisi.</span>
+            </p>
+          </div>
+
+          <label class="mb-4 flex min-h-[44px] items-center gap-2 text-xs">
+            <input type="checkbox" class="h-4 w-4 accent-[hsl(var(--primary))]" />
+            <span>Ingat saya di perangkat ini</span>
+          </label>
+
+          <button type="submit" id="submit"
+                  class="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60">
+            <span id="submit-label">Masuk</span>
+          </button>
+
+          <div class="my-4 flex items-center gap-3">
+            <span class="h-px flex-1 bg-outline-variant"></span>
+            <span class="text-2xs text-muted-foreground">atau</span>
+            <span class="h-px flex-1 bg-outline-variant"></span>
+          </div>
+
+          <button type="button"
+                  class="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-outline-variant text-sm font-medium transition-colors hover:bg-surface-3">
+            <span data-icon="building-2" class="h-4 w-4"></span>Masuk dengan SSO Yayasan
+          </button>
+        </form>
+
+        <p class="mt-4 text-center text-2xs text-muted-foreground">
+          Belum punya akun? Akun dibuat oleh sekolah — hubungi <span class="font-medium text-foreground">Tata Usaha</span>.
+        </p>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    SMS.hydrate(document);
+
+    /* Theme toggle works standalone here (no app shell on this screen). */
+    document.getElementById("theme-toggle").addEventListener("click", function () {
+      SMS.applyTheme(!document.documentElement.classList.contains("dark"));
+    });
+
+    /* Show / hide password. */
+    var pw = document.getElementById("password");
+    document.getElementById("toggle-pw").addEventListener("click", function () {
+      var show = pw.type === "password";
+      pw.type = show ? "text" : "password";
+      this.setAttribute("aria-pressed", String(show));
+      this.setAttribute("aria-label", show ? "Sembunyikan kata sandi" : "Tampilkan kata sandi");
+      var i = document.getElementById("pw-icon");
+      i.setAttribute("data-icon", show ? "eye-off" : "eye");
+      i.dataset.hydrated = "";
+      SMS.hydrate(this);
+    });
+
+    /* Validate on blur, never on every keystroke. */
+    var email = document.getElementById("email");
+    var emailErr = document.getElementById("email-error");
+    email.addEventListener("blur", function () {
+      var bad = email.value.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim());
+      emailErr.hidden = !bad;
+      email.setAttribute("aria-invalid", String(bad));
+      email.classList.toggle("border-destructive", bad);
+    });
+
+    document.getElementById("form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var pwErr = document.getElementById("password-error");
+      var bad = false;
+
+      var emailBad = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim());
+      emailErr.hidden = !emailBad;
+      email.setAttribute("aria-invalid", String(emailBad));
+      email.classList.toggle("border-destructive", emailBad);
+      bad = bad || emailBad;
+
+      var pwBad = pw.value === "";
+      pwErr.hidden = !pwBad;
+      pw.setAttribute("aria-invalid", String(pwBad));
+      pw.classList.toggle("border-destructive", pwBad);
+      bad = bad || pwBad;
+
+      /* Focus the first invalid field so keyboard users land on the problem. */
+      if (bad) { (emailBad ? email : pw).focus(); return; }
+
+      var btn = document.getElementById("submit");
+      btn.disabled = true;
+      document.getElementById("submit-label").textContent = "Memeriksa…";
+      setTimeout(function () {
+        btn.disabled = false;
+        document.getElementById("submit-label").textContent = "Masuk";
+        SMS.toast("Prototipe: autentikasi belum terhubung ke backend.", { tone: "neutral" });
+      }, 900);
+    });
+  </script>
+</body>
+</html>

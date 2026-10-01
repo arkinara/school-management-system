@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>School MS Pro Max — Prototype Viewer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="assets/tw-config.js"></script>
+  <link rel="stylesheet" href="assets/theme.css" />
+  <script src="assets/app.js"></script>
+</head>
+<body class="min-h-dvh bg-surface-2">
+  <a href="#frame" class="skip-link">Lewati ke pratinjau</a>
+
+  <div class="flex min-h-dvh flex-col">
+    <!-- Viewer chrome ------------------------------------------------- -->
+    <header class="flex h-14 shrink-0 items-center gap-3 border-b border-outline-variant bg-surface-1 px-3 sm:px-4">
+      <span class="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+        <span data-icon="graduation-cap" class="h-[18px] w-[18px]"></span>
+      </span>
+      <div class="min-w-0 leading-tight">
+        <p class="truncate text-sm font-semibold">School MS <span class="text-primary">Pro Max</span></p>
+        <p class="truncate text-2xs text-muted-foreground">Prototype Viewer · Indonesia K-12 · data-dense revamp</p>
+      </div>
+
+      <div class="ml-auto flex items-center gap-1.5">
+        <a href="../prototype/index.html"
+           class="hidden h-9 items-center gap-1.5 rounded-md border border-outline-variant px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground sm:flex">
+          <span data-icon="arrow-right" class="h-3.5 w-3.5 rotate-180"></span>Prototipe lama
+        </a>
+        <button type="button" id="viewer-theme"
+                class="flex h-9 min-h-[36px] items-center gap-1.5 rounded-md border border-outline-variant px-3 text-xs font-medium transition-colors hover:bg-surface-3"
+                aria-pressed="false">
+          <span data-icon="moon" class="h-4 w-4" id="viewer-theme-icon"></span><span id="viewer-theme-label">Gelap</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Role tabs ------------------------------------------------------ -->
+    <nav id="tabs" class="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-outline-variant bg-surface-1 px-2 py-1.5"
+         aria-label="Peran dan halaman"></nav>
+
+    <!-- Key sub-pages + viewport ---------------------------------------- -->
+    <div class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-outline-variant bg-background px-3 py-2">
+      <div id="subtabs" class="flex flex-wrap items-center gap-1.5" aria-label="Halaman kunci"></div>
+      <div class="flex items-center gap-1.5">
+        <span class="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Viewport</span>
+        <div id="viewport" class="inline-flex overflow-hidden rounded-md border border-outline-variant" role="group" aria-label="Lebar viewport"></div>
+      </div>
+    </div>
+
+    <!-- Page info ------------------------------------------------------ -->
+    <div class="shrink-0 border-b border-outline-variant bg-background px-3 py-2">
+      <div class="mx-auto flex max-w-5xl items-center gap-3 rounded-md bg-surface-2 px-3 py-2">
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-container text-primary-container-foreground">
+          <span id="info-icon" data-icon="layout-dashboard" class="h-5 w-5"></span>
+        </span>
+        <div class="min-w-0 flex-1">
+          <p class="flex items-center gap-2 text-sm font-semibold">
+            <span id="info-title">Principal Dashboard</span>
+            <span id="info-role" class="rounded-full bg-primary-container px-2 py-0.5 text-2xs font-semibold text-primary-container-foreground">Principal</span>
+          </p>
+          <p id="info-desc" class="truncate text-xs text-muted-foreground"></p>
+        </div>
+        <a id="info-open" href="#" target="_blank" rel="noopener"
+           class="hidden shrink-0 items-center gap-1.5 rounded-md border border-outline-variant px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-surface-3 sm:flex">
+          <span data-icon="arrow-right" class="h-3.5 w-3.5"></span>Tab baru
+        </a>
+      </div>
+    </div>
+
+    <!-- Preview frame --------------------------------------------------- -->
+    <main class="flex flex-1 justify-center overflow-auto bg-surface-2 p-3 sm:p-4">
+      <div id="frame-wrap" class="h-full w-full max-w-full transition-[max-width] duration-medium ease-standard">
+        <iframe id="frame" title="Pratinjau halaman"
+                class="h-full min-h-[620px] w-full rounded-lg border border-outline-variant bg-background shadow-e2"></iframe>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    /* Page registry. Every entry is deep-linkable: #page=<id>&vp=<id>. */
+    var PAGES = [
+      { id: "principal", label: "Principal", role: "Kepala Sekolah", icon: "layout-dashboard", file: "pages/principal-dashboard.html",
+        desc: "KPI sekolah dengan bullet-chart target, donut kehadiran, progres input nilai, antrean persetujuan." },
+      { id: "guru", label: "Guru", role: "Guru", icon: "calendar-check", file: "pages/guru-dashboard.html",
+        desc: "Timeline mengajar hari ini, antrean absensi, nilai belum diinput, status draf rapor." },
+      { id: "siswa", label: "Siswa", role: "Siswa", icon: "book-open", file: "pages/siswa-dashboard.html",
+        desc: "Jadwal hari ini, tugas mendatang dengan urgensi, ringkasan rapor, pengumuman." },
+      { id: "orang-tua", label: "Orang Tua", role: "Orang Tua", icon: "users", file: "pages/orang-tua-dashboard.html",
+        desc: "Pemilih anak, tren nilai per mapel, alert tunggakan SPP, riwayat pembayaran." },
+      { id: "tu", label: "TU", role: "Tata Usaha", icon: "wallet", file: "pages/tu-dashboard.html",
+        desc: "Antrean operasional, tabel tunggakan tersortir, anomali absensi, aksi massal." },
+      { id: "yayasan", label: "Yayasan", role: "Super Admin", icon: "building-2", file: "pages/yayasan-dashboard.html",
+        desc: "Rollup lintas tenant, perbandingan sekolah, kesehatan sistem, distribusi pengguna." },
+      { id: "auth", label: "Auth", role: "Semua", icon: "user", file: "pages/auth-sign-in.html",
+        desc: "Masuk dengan pemilih jenjang (tenant), SSO yayasan, state error inline." },
+      { id: "form", label: "Form Patterns", role: "Semua", icon: "clipboard-list", file: "pages/form-patterns.html",
+        desc: "Katalog state input, validasi, wizard, skeleton, empty, error, dan toast." },
+    ];
+    var SUBPAGES = [
+      { id: "absensi", label: "Absensi Input", role: "Guru", icon: "calendar-check", file: "pages/absensi-input.html",
+        desc: "Roster kelas, segmented status per siswa, aksi massal, undo, simpan dengan konfirmasi." },
+      { id: "rapor", label: "Rapor View", role: "Siswa / Orang Tua", icon: "file-text", file: "pages/rapor-view.html",
+        desc: "Rapor Kurikulum Merdeka: nilai, KKM, capaian naratif, cetak dan unduh PDF." },
+      { id: "spp", label: "SPP Bills", role: "Tata Usaha", icon: "receipt", file: "pages/spp-bills.html",
+        desc: "Generate tagihan massal dengan ringkasan pra-eksekusi dan riwayat batch." },
+    ];
+    var ALL = PAGES.concat(SUBPAGES);
+    var VIEWPORTS = [
+      { id: "m", label: "375", title: "Mobile 375px", w: "375px" },
+      { id: "t", label: "768", title: "Tablet 768px", w: "768px" },
+      { id: "d", label: "1440", title: "Desktop 1440px", w: "1440px" },
+      { id: "f", label: "Full", title: "Lebar penuh", w: "100%" },
+    ];
+
+    var state = { page: "principal", vp: "f", dark: false };
+
+    function readHash() {
+      var h = new URLSearchParams(location.hash.replace(/^#/, ""));
+      if (h.get("page") && ALL.some(function (p) { return p.id === h.get("page"); })) state.page = h.get("page");
+      if (h.get("vp") && VIEWPORTS.some(function (v) { return v.id === h.get("vp"); })) state.vp = h.get("vp");
+      if (h.get("theme")) state.dark = h.get("theme") === "dark";
+    }
+    function writeHash() {
+      var h = "#page=" + state.page + "&vp=" + state.vp + (state.dark ? "&theme=dark" : "");
+      if (location.hash !== h) history.replaceState(null, "", h);
+    }
+
+    function current() {
+      return ALL.filter(function (p) { return p.id === state.page; })[0] || PAGES[0];
+    }
+
+    function renderTabs() {
+      document.getElementById("tabs").innerHTML = PAGES.map(function (p) {
+        var on = p.id === state.page;
+        return '<button type="button" data-page="' + p.id + '" aria-current="' + (on ? "page" : "false") + '" ' +
+          'class="flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors duration-short ' +
+          (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-surface-3 hover:text-foreground") + '">' +
+          '<span data-icon="' + p.icon + '" class="h-4 w-4"></span>' + p.label + "</button>";
+      }).join("");
+
+      document.getElementById("subtabs").innerHTML =
+        '<span class="mr-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Halaman kunci</span>' +
+        SUBPAGES.map(function (p) {
+          var on = p.id === state.page;
+          return '<button type="button" data-page="' + p.id + '" aria-current="' + (on ? "page" : "false") + '" ' +
+            'class="flex min-h-[32px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-short ' +
+            (on ? "border-primary bg-primary-container text-primary-container-foreground" : "border-outline-variant text-muted-foreground hover:bg-surface-3") + '">' +
+            '<span data-icon="' + p.icon + '" class="h-3.5 w-3.5"></span>' + p.label + "</button>";
+        }).join("");
+
+      document.getElementById("viewport").innerHTML = VIEWPORTS.map(function (v) {
+        var on = v.id === state.vp;
+        return '<button type="button" data-vp="' + v.id + '" title="' + v.title + '" aria-pressed="' + on + '" ' +
+          'class="num min-h-[32px] border-r border-outline-variant px-2.5 py-1 text-xs font-medium transition-colors last:border-r-0 ' +
+          (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-surface-3") + '">' + v.label + "</button>";
+      }).join("");
+
+      SMS.hydrate(document);
+    }
+
+    function renderFrame() {
+      var p = current();
+      var vp = VIEWPORTS.filter(function (v) { return v.id === state.vp; })[0];
+      document.getElementById("frame-wrap").style.maxWidth = vp.w;
+      var url = p.file + (state.dark ? "?theme=dark" : "?theme=light");
+      document.getElementById("frame").src = url;
+      document.getElementById("info-title").textContent = p.label;
+      document.getElementById("info-role").textContent = p.role;
+      document.getElementById("info-desc").textContent = p.desc;
+      var icon = document.getElementById("info-icon");
+      icon.setAttribute("data-icon", p.icon); icon.dataset.hydrated = "";
+      document.getElementById("info-open").href = url;
+      SMS.hydrate(document);
+    }
+
+    function applyViewerTheme() {
+      document.documentElement.classList.toggle("dark", state.dark);
+      var i = document.getElementById("viewer-theme-icon");
+      i.setAttribute("data-icon", state.dark ? "sun" : "moon"); i.dataset.hydrated = "";
+      document.getElementById("viewer-theme-label").textContent = state.dark ? "Terang" : "Gelap";
+      document.getElementById("viewer-theme").setAttribute("aria-pressed", String(state.dark));
+      SMS.hydrate(document);
+    }
+
+    document.addEventListener("click", function (e) {
+      var t = e.target.closest("[data-page]");
+      if (t) { state.page = t.dataset.page; renderTabs(); renderFrame(); writeHash(); return; }
+      var v = e.target.closest("[data-vp]");
+      if (v) { state.vp = v.dataset.vp; renderTabs(); renderFrame(); writeHash(); }
+    });
+
+    document.getElementById("viewer-theme").addEventListener("click", function () {
+      state.dark = !state.dark;
+      applyViewerTheme(); renderFrame(); writeHash();
+    });
+
+    window.addEventListener("hashchange", function () {
+      readHash(); applyViewerTheme(); renderTabs(); renderFrame();
+    });
+
+    readHash();
+    applyViewerTheme();
+    renderTabs();
+    renderFrame();
+    writeHash();
+  </script>
+</body>
+</html>

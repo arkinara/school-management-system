@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Beranda Orang Tua — SDN Menteng 01</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="../assets/tw-config.js"></script>
+  <link rel="stylesheet" href="../assets/theme.css" />
+  <script src="../assets/app.js"></script>
+</head>
+<body class="min-h-dvh bg-background">
+  <a href="#main" class="skip-link">Lewati ke konten</a>
+  <div id="appbar"></div>
+
+  <div class="flex">
+    <div id="sidenav"></div>
+
+    <main id="main" class="min-w-0 flex-1 px-3 pb-24 pt-4 sm:px-5 md:pb-8">
+      <div class="mb-3">
+        <h1 class="text-lg font-semibold tracking-tight">Selamat pagi, Dewi</h1>
+        <p class="text-xs text-muted-foreground">Orang Tua · SDN Menteng 01 · Senin, 30 September 2026</p>
+      </div>
+
+      <!-- Child scope: everything below is filtered by this choice -------- -->
+      <div class="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Pilih anak">
+        <span class="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Pilih anak</span>
+        <button type="button" data-child="andi" aria-pressed="true"
+                class="flex min-h-[36px] items-center gap-2 rounded-full border border-primary bg-primary-container px-2.5 py-1 text-xs font-semibold text-primary-container-foreground">
+          <span class="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-2xs text-primary-foreground">AW</span>
+          Andi Wijaya · 6A
+        </button>
+        <button type="button" data-child="dinda" aria-pressed="false"
+                class="flex min-h-[36px] items-center gap-2 rounded-full border border-outline-variant px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface-3">
+          <span class="flex h-6 w-6 items-center justify-center rounded-full bg-surface-3 text-2xs">DW</span>
+          Dinda Wijaya · 3B
+        </button>
+      </div>
+
+      <!-- Urgency first: an overdue bill outranks everything else --------- -->
+      <div id="overdue-alert" role="alert"
+           class="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-destructive/50 bg-destructive-container px-3 py-2.5 text-destructive-container-foreground">
+        <span data-icon="alert-circle" class="h-5 w-5 shrink-0"></span>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-semibold">SPP September belum dibayar</p>
+          <p class="text-2xs">Jatuh tempo <span class="num">10 September 2026</span> · terlambat <span class="num">20 hari</span> · <span class="num font-semibold">Rp 350.000</span></p>
+        </div>
+        <button type="button" id="pay-now" class="min-h-[36px] shrink-0 rounded-md bg-destructive px-3 text-xs font-semibold text-destructive-foreground transition-colors hover:brightness-110">Bayar sekarang</button>
+      </div>
+
+      <div class="grid gap-3 lg:grid-cols-3">
+        <!-- Grade progress ------------------------------------------------ -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 shadow-e1 lg:col-span-2">
+          <header class="flex items-center justify-between gap-2 border-b border-outline-variant px-3 py-2.5">
+            <h2 class="text-sm font-semibold">Perkembangan Nilai · <span id="child-name">Andi Wijaya</span></h2>
+            <a href="rapor-view.html" class="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-surface-3">
+              Rapor lengkap <span data-icon="arrow-right" class="h-3.5 w-3.5"></span>
+            </a>
+          </header>
+          <div class="p-3">
+            <div id="bars-nilai"></div>
+            <dl class="mt-3 grid grid-cols-3 gap-2 border-t border-outline-variant pt-3 text-center">
+              <div><dt class="text-2xs text-muted-foreground">Rata-rata</dt><dd class="num text-base font-semibold">85,3</dd></div>
+              <div><dt class="text-2xs text-muted-foreground">Kehadiran</dt><dd class="num text-base font-semibold">96%</dd></div>
+              <div><dt class="text-2xs text-muted-foreground">Peringkat</dt><dd class="num text-base font-semibold">4/32</dd></div>
+            </dl>
+          </div>
+        </section>
+
+        <!-- Payment status ------------------------------------------------ -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 shadow-e1">
+          <header class="flex items-center justify-between gap-2 border-b border-outline-variant px-3 py-2.5">
+            <h2 class="text-sm font-semibold">Status Pembayaran</h2>
+            <span id="chip-spp"></span>
+          </header>
+          <ul class="divide-y divide-outline-variant">
+            <li class="flex items-center justify-between gap-2 px-3 py-2">
+              <div><p class="text-sm font-medium">SPP September</p><p class="num text-2xs text-muted-foreground">Rp 350.000</p></div>
+              <span data-chip="danger">menunggak</span>
+            </li>
+            <li class="flex items-center justify-between gap-2 px-3 py-2">
+              <div><p class="text-sm font-medium">SPP Agustus</p><p class="num text-2xs text-muted-foreground">Rp 350.000</p></div>
+              <span data-chip="success">lunas</span>
+            </li>
+            <li class="flex items-center justify-between gap-2 px-3 py-2">
+              <div><p class="text-sm font-medium">SPP Juli</p><p class="num text-2xs text-muted-foreground">Rp 350.000</p></div>
+              <span data-chip="success">lunas</span>
+            </li>
+            <li class="flex items-center justify-between gap-2 px-3 py-2">
+              <div><p class="text-sm font-medium">Seragam &amp; Buku</p><p class="num text-2xs text-muted-foreground">Rp 780.000</p></div>
+              <span data-chip="success">lunas</span>
+            </li>
+          </ul>
+          <div class="border-t border-outline-variant px-3 py-2">
+            <div id="bullet-bayar"></div>
+            <p class="mt-1 text-2xs text-muted-foreground"><span class="num">3</span> dari <span class="num">4</span> tagihan tahun ini lunas</p>
+          </div>
+        </section>
+
+        <!-- Announcements -------------------------------------------------- -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 shadow-e1 lg:col-span-3">
+          <header class="flex items-center justify-between gap-2 border-b border-outline-variant px-3 py-2.5">
+            <h2 class="text-sm font-semibold">Pengumuman Sekolah</h2>
+            <button type="button" class="rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-surface-3">Tandai sudah dibaca</button>
+          </header>
+          <ul class="divide-y divide-outline-variant">
+            <li class="flex gap-3 px-3 py-2.5">
+              <span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" aria-label="Belum dibaca"></span>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium">Libur Maulid Nabi — 7 Oktober</p>
+                <p class="mt-0.5 text-xs text-muted-foreground">Kegiatan belajar diliburkan. Pembelajaran kembali normal 8 Oktober.</p>
+              </div>
+              <span class="shrink-0 text-2xs text-muted-foreground">2 jam lalu</span>
+            </li>
+            <li class="flex gap-3 px-3 py-2.5">
+              <span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" aria-label="Belum dibaca"></span>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium">Jadwal Ujian Tengah Semester</p>
+                <p class="mt-0.5 text-xs text-muted-foreground">UTS 14–18 Oktober. Kisi-kisi dibagikan wali kelas minggu depan.</p>
+              </div>
+              <span class="shrink-0 text-2xs text-muted-foreground">5 jam lalu</span>
+            </li>
+            <li class="flex gap-3 px-3 py-2.5 opacity-70">
+              <span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-transparent"></span>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium">Pembagian Rapor Tengah Semester</p>
+                <p class="mt-0.5 text-xs text-muted-foreground">Orang tua diundang hadir 25 Oktober pukul 08.00.</p>
+              </div>
+              <span class="shrink-0 text-2xs text-muted-foreground">2 hari lalu</span>
+            </li>
+          </ul>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="bottomnav"></div>
+
+  <script>
+    SMS.shell({
+      role: "orang_tua", active: "home", user: "Dewi Lestari", notif: 4,
+      title: "SDN Menteng 01", subtitle: "Orang Tua · 2 anak",
+    });
+
+    var CHILDREN = {
+      andi: {
+        name: "Andi Wijaya",
+        bars: [{ label: "IPA", value: 90, display: "90" }, { label: "Matematika", value: 88, display: "88" },
+               { label: "Bahasa Indonesia", value: 85, display: "85" }, { label: "IPS", value: 78, display: "78" }],
+      },
+      dinda: {
+        name: "Dinda Wijaya",
+        bars: [{ label: "Bahasa Indonesia", value: 92, display: "92" }, { label: "Matematika", value: 81, display: "81" },
+               { label: "IPA", value: 86, display: "86" }, { label: "IPS", value: 84, display: "84" }],
+      },
+    };
+
+    function renderChild(key) {
+      var c = CHILDREN[key];
+      document.getElementById("child-name").textContent = c.name;
+      document.getElementById("bars-nilai").innerHTML = SMS.bars(c.bars, { max: 100 });
+    }
+
+    document.querySelectorAll("[data-child]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        document.querySelectorAll("[data-child]").forEach(function (b) {
+          var on = b === btn;
+          b.setAttribute("aria-pressed", String(on));
+          b.className = on
+            ? "flex min-h-[36px] items-center gap-2 rounded-full border border-primary bg-primary-container px-2.5 py-1 text-xs font-semibold text-primary-container-foreground"
+            : "flex min-h-[36px] items-center gap-2 rounded-full border border-outline-variant px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface-3";
+        });
+        renderChild(btn.dataset.child);
+      });
+    });
+
+    renderChild("andi");
+    document.getElementById("chip-spp").innerHTML = SMS.chip("1 menunggak", "danger");
+    document.getElementById("bullet-bayar").innerHTML = SMS.bullet({ value: 75, target: 100, label: "Tagihan lunas" });
+
+    document.querySelectorAll("[data-chip]").forEach(function (el) {
+      el.outerHTML = SMS.chip(el.textContent, el.dataset.chip);
+    });
+
+    document.getElementById("pay-now").addEventListener("click", function () {
+      SMS.toast("Prototipe: pembayaran akan membuka kanal virtual account.", { tone: "neutral" });
+    });
+
+    SMS.hydrate(document);
+  </script>
+</body>
+</html>

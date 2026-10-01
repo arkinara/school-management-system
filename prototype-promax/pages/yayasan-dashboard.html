@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Beranda Yayasan — Arkinara Nusantara</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="../assets/tw-config.js"></script>
+  <link rel="stylesheet" href="../assets/theme.css" />
+  <script src="../assets/app.js"></script>
+</head>
+<body class="min-h-dvh bg-background">
+  <a href="#main" class="skip-link">Lewati ke konten</a>
+  <div id="appbar"></div>
+
+  <div class="flex">
+    <div id="sidenav"></div>
+
+    <main id="main" class="min-w-0 flex-1 px-3 pb-24 pt-4 sm:px-5 md:pb-8">
+      <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 class="text-lg font-semibold tracking-tight">Ringkasan Yayasan</h1>
+          <p class="text-xs text-muted-foreground">Arkinara Nusantara · 4 jenjang · Senin, 30 September 2026</p>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="rounded-full bg-primary-container px-2.5 py-1 text-2xs font-semibold text-primary-container-foreground">Super Admin</span>
+          <button type="button" class="flex min-h-[36px] items-center gap-1.5 rounded-md border border-outline-variant px-2.5 text-xs font-medium transition-colors hover:bg-surface-3">
+            <span data-icon="download" class="h-3.5 w-3.5"></span>Ekspor rollup
+          </button>
+        </div>
+      </div>
+
+      <section aria-label="Indikator lintas tenant" class="stagger mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <article class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <p class="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Total Sekolah</p>
+          <p class="metric-value mt-1 text-2xl font-semibold leading-none">4</p>
+          <p class="mt-1 text-2xs text-muted-foreground">TK · SD · SMP · SMA</p>
+        </article>
+        <article class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <p class="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Total Siswa</p>
+          <p class="metric-value mt-1 text-2xl font-semibold leading-none">1.842</p>
+          <div class="mt-2 flex items-end justify-between gap-2">
+            <p class="flex items-center gap-1 text-2xs text-success"><span data-icon="trending-up" class="h-3 w-3"></span><span class="num">+124</span></p>
+            <div id="spark-siswa"></div>
+          </div>
+        </article>
+        <article class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <p class="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Guru &amp; Staf</p>
+          <p class="metric-value mt-1 text-2xl font-semibold leading-none">156</p>
+          <p class="mt-1 text-2xs text-muted-foreground">rasio <span class="num">1:11,8</span></p>
+        </article>
+        <article class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <p class="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Kolektabilitas SPP</p>
+          <p class="metric-value mt-1 text-2xl font-semibold leading-none">86%</p>
+          <div class="mt-2" id="bullet-spp"></div>
+        </article>
+      </section>
+
+      <!-- Cross-school comparison --------------------------------------- -->
+      <section class="mb-4 rounded-md border border-outline-variant bg-surface-1 shadow-e1">
+        <header class="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant px-3 py-2.5">
+          <h2 class="text-sm font-semibold">Perbandingan Antar Sekolah</h2>
+          <p class="text-2xs text-muted-foreground">Status: <span class="font-semibold text-foreground">sehat</span> jika kehadiran ≥ 93% dan SPP ≥ 85%</p>
+        </header>
+        <div class="overflow-x-auto">
+          <table class="data" data-sortable>
+            <thead>
+              <tr>
+                <th data-sort scope="col">Sekolah</th>
+                <th data-sort scope="col">Jenjang</th>
+                <th data-sort scope="col">Siswa</th>
+                <th data-sort scope="col">Kehadiran</th>
+                <th data-sort scope="col">SPP</th>
+                <th data-sort scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="text font-medium">TK Arkinara</td><td class="text">TK</td>
+                <td class="num" data-value="186">186</td>
+                <td class="num" data-value="97">97%</td>
+                <td class="num" data-value="94">94%</td>
+                <td data-value="2"><span data-chip="success">sehat</span></td>
+              </tr>
+              <tr>
+                <td class="text font-medium">SDN Menteng 01</td><td class="text">SD</td>
+                <td class="num" data-value="482">482</td>
+                <td class="num" data-value="94">94%</td>
+                <td class="num" data-value="82">82%</td>
+                <td data-value="1"><span data-chip="warning">perhatian</span></td>
+              </tr>
+              <tr>
+                <td class="text font-medium">SMP Nusantara</td><td class="text">SMP</td>
+                <td class="num" data-value="526">526</td>
+                <td class="num" data-value="95">95%</td>
+                <td class="num" data-value="88">88%</td>
+                <td data-value="2"><span data-chip="success">sehat</span></td>
+              </tr>
+              <tr>
+                <td class="text font-medium">SMA Bhakti</td><td class="text">SMA</td>
+                <td class="num" data-value="648">648</td>
+                <td class="num" data-value="92">92%</td>
+                <td class="num" data-value="79">79%</td>
+                <td data-value="1"><span data-chip="warning">perhatian</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="grid gap-3 lg:grid-cols-3">
+        <section class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <h2 class="mb-3 text-sm font-semibold">Pengguna per Tenant</h2>
+          <div id="bars-users"></div>
+        </section>
+
+        <section class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <h2 class="mb-3 text-sm font-semibold">Komposisi Siswa</h2>
+          <div id="donut-siswa"></div>
+        </section>
+
+        <section class="rounded-md border border-outline-variant bg-surface-1 shadow-e1">
+          <header class="flex items-center justify-between gap-2 border-b border-outline-variant px-3 py-2.5">
+            <h2 class="text-sm font-semibold">Kesehatan Sistem</h2>
+            <span id="chip-health"></span>
+          </header>
+          <ul class="divide-y divide-outline-variant">
+            <li class="flex items-center justify-between gap-2 px-3 py-2.5">
+              <div class="flex items-center gap-2"><span data-icon="activity" class="h-4 w-4 text-success"></span>
+                <div><p class="text-sm font-medium">Ketersediaan layanan</p><p class="text-2xs text-muted-foreground">30 hari terakhir</p></div></div>
+              <span class="num text-sm font-semibold text-success">99,9%</span>
+            </li>
+            <li class="flex items-center justify-between gap-2 px-3 py-2.5">
+              <div class="flex items-center gap-2"><span data-icon="refresh-cw" class="h-4 w-4 text-success"></span>
+                <div><p class="text-sm font-medium">Sinkronisasi tenant</p><p class="text-2xs text-muted-foreground">4 dari 4 tenant</p></div></div>
+              <span data-chip="success">normal</span>
+            </li>
+            <li class="flex items-center justify-between gap-2 px-3 py-2.5">
+              <div class="flex items-center gap-2"><span data-icon="save" class="h-4 w-4 text-warning"></span>
+                <div><p class="text-sm font-medium">Backup terakhir</p><p class="text-2xs text-muted-foreground">Jadwal: setiap 24 jam</p></div></div>
+              <span data-chip="warning">26 jam lalu</span>
+            </li>
+            <li class="flex items-center justify-between gap-2 px-3 py-2.5">
+              <div class="flex items-center gap-2"><span data-icon="shield-check" class="h-4 w-4 text-success"></span>
+                <div><p class="text-sm font-medium">Pelanggaran batas tenant</p><p class="text-2xs text-muted-foreground">Audit 7 hari</p></div></div>
+              <span class="num text-sm font-semibold">0</span>
+            </li>
+          </ul>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="bottomnav"></div>
+
+  <script>
+    SMS.shell({
+      role: "yayasan", active: "home", user: "Rahmat Hidayat", notif: 2,
+      title: "Yayasan Arkinara Nusantara", subtitle: "Super Admin · 4 tenant",
+    });
+
+    document.getElementById("spark-siswa").innerHTML = SMS.sparkline([1580, 1625, 1680, 1712, 1760, 1801, 1842], { label: "Tren total siswa", width: 72, height: 28 });
+    document.getElementById("bullet-spp").innerHTML = SMS.bullet({ value: 86, target: 90, label: "Kolektabilitas SPP yayasan" });
+
+    document.getElementById("bars-users").innerHTML = SMS.bars([
+      { label: "SMA Bhakti", value: 712, display: "712" },
+      { label: "SMP Nusantara", value: 584, display: "584" },
+      { label: "SDN Menteng 01", value: 531, display: "531" },
+      { label: "TK Arkinara", value: 203, display: "203" },
+    ]);
+
+    document.getElementById("donut-siswa").innerHTML = SMS.donut(
+      [{ label: "SMA", value: 648 }, { label: "SMP", value: 526 }, { label: "SD", value: 482 }, { label: "TK", value: 186 }],
+      { centerValue: 1842, centerLabel: "siswa", label: "Komposisi siswa per jenjang", size: 132 }
+    );
+
+    document.getElementById("chip-health").innerHTML = SMS.chip("1 peringatan", "warning");
+    document.querySelectorAll("[data-chip]").forEach(function (el) {
+      el.outerHTML = SMS.chip(el.textContent, el.dataset.chip);
+    });
+    SMS.hydrate(document);
+  </script>
+</body>
+</html>

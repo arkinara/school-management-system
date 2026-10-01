@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Generate Tagihan SPP — SMA Bhakti</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="../assets/tw-config.js"></script>
+  <link rel="stylesheet" href="../assets/theme.css" />
+  <script src="../assets/app.js"></script>
+</head>
+<body class="min-h-dvh bg-background">
+  <a href="#main" class="skip-link">Lewati ke konten</a>
+  <div id="appbar"></div>
+
+  <div class="flex">
+    <div id="sidenav"></div>
+
+    <main id="main" class="min-w-0 flex-1 px-3 pb-24 pt-4 sm:px-5 md:pb-8">
+      <nav aria-label="Breadcrumb" class="mb-3">
+        <ol class="flex items-center gap-1.5 text-2xs text-muted-foreground">
+          <li><a href="tu-dashboard.html" class="hover:text-foreground hover:underline">Beranda</a></li>
+          <li aria-hidden="true"><span data-icon="chevron-right" class="h-3 w-3"></span></li>
+          <li><a href="#" class="hover:text-foreground hover:underline">SPP</a></li>
+          <li aria-hidden="true"><span data-icon="chevron-right" class="h-3 w-3"></span></li>
+          <li class="font-medium text-foreground" aria-current="page">Generate Tagihan</li>
+        </ol>
+      </nav>
+
+      <div class="mb-4">
+        <h1 class="text-lg font-semibold tracking-tight">Generate Tagihan SPP</h1>
+        <p class="text-xs text-muted-foreground">Membuat tagihan massal untuk satu periode. Tagihan ganda pada periode yang sama akan ditolak sistem.</p>
+      </div>
+
+      <div class="grid gap-3 lg:grid-cols-5">
+        <!-- Configuration --------------------------------------------------- -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 shadow-e1 lg:col-span-3">
+          <header class="border-b border-outline-variant px-3 py-2.5">
+            <h2 class="text-sm font-semibold">Konfigurasi Tagihan</h2>
+          </header>
+          <div class="space-y-4 p-3">
+            <fieldset>
+              <legend class="mb-1 text-xs font-semibold">Rombel / Kelas</legend>
+              <select id="rombel" class="h-10 w-full rounded-md border border-outline-variant bg-background px-2.5 text-sm focus:border-primary">
+                <option value="18">Semua rombel (18 rombel · 648 siswa aktif)</option>
+                <option value="6">Kelas X saja (6 rombel · 224 siswa)</option>
+                <option value="6">Kelas XI saja (6 rombel · 216 siswa)</option>
+                <option value="6">Kelas XII saja (6 rombel · 208 siswa)</option>
+              </select>
+              <p class="mt-1 text-2xs text-muted-foreground">Hanya siswa berstatus aktif yang ditagih. Siswa pindah atau lulus dilewati otomatis.</p>
+            </fieldset>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label for="periode" class="mb-1 block text-xs font-semibold">Periode</label>
+                <input id="periode" type="month" value="2026-10"
+                       class="num h-10 w-full rounded-md border border-outline-variant bg-background px-2.5 text-sm focus:border-primary" />
+              </div>
+              <div>
+                <label for="jatuh-tempo" class="mb-1 block text-xs font-semibold">Jatuh Tempo</label>
+                <input id="jatuh-tempo" type="date" value="2026-10-10"
+                       class="num h-10 w-full rounded-md border border-outline-variant bg-background px-2.5 text-sm focus:border-primary" />
+              </div>
+            </div>
+
+            <div>
+              <label for="nominal" class="mb-1 block text-xs font-semibold">Template Nominal</label>
+              <select id="nominal" class="h-10 w-full rounded-md border border-outline-variant bg-background px-2.5 text-sm focus:border-primary">
+                <option value="350000">SPP Reguler SMA — Rp 350.000</option>
+                <option value="300000">SPP Beasiswa 15% — Rp 300.000</option>
+                <option value="175000">SPP Beasiswa 50% — Rp 175.000</option>
+              </select>
+              <p class="mt-1 text-2xs text-muted-foreground">Keringanan per siswa tetap mengikuti data beasiswa yang tersimpan.</p>
+            </div>
+
+            <label class="flex min-h-[44px] items-start gap-2.5 rounded-md border border-outline-variant p-2.5 text-xs">
+              <input type="checkbox" id="notify" checked class="mt-0.5 h-4 w-4 accent-[hsl(var(--primary))]" />
+              <span>
+                <span class="font-medium">Kirim notifikasi ke orang tua</span>
+                <span class="mt-0.5 block text-muted-foreground">WhatsApp dan email dikirim setelah batch selesai. Kegagalan kirim tidak membatalkan pembuatan tagihan.</span>
+              </span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Preflight summary: the numbers before the irreversible action -- -->
+        <aside class="lg:col-span-2">
+          <div class="sticky top-[4.5rem] rounded-md border border-outline-variant bg-surface-1 shadow-e1">
+            <header class="border-b border-outline-variant px-3 py-2.5">
+              <h2 class="text-sm font-semibold">Ringkasan</h2>
+            </header>
+            <dl class="divide-y divide-outline-variant">
+              <div class="flex items-center justify-between gap-2 px-3 py-2"><dt class="text-xs text-muted-foreground">Rombel</dt><dd class="num text-sm font-semibold" id="s-rombel">18</dd></div>
+              <div class="flex items-center justify-between gap-2 px-3 py-2"><dt class="text-xs text-muted-foreground">Siswa aktif</dt><dd class="num text-sm font-semibold" id="s-siswa">648</dd></div>
+              <div class="flex items-center justify-between gap-2 px-3 py-2"><dt class="text-xs text-muted-foreground">Nominal per siswa</dt><dd class="num text-sm font-semibold" id="s-nominal">Rp 350.000</dd></div>
+              <div class="flex items-center justify-between gap-2 px-3 py-2"><dt class="text-xs text-muted-foreground">Periode</dt><dd class="text-sm font-semibold">Oktober 2026</dd></div>
+              <div class="flex items-center justify-between gap-2 bg-surface-2 px-3 py-2.5"><dt class="text-xs font-semibold">Total tagihan</dt><dd class="num text-base font-semibold text-primary" id="s-total">Rp 226.800.000</dd></div>
+            </dl>
+            <div class="space-y-2 border-t border-outline-variant p-3">
+              <button type="button" id="generate"
+                      class="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:brightness-110 disabled:opacity-60">
+                <span data-icon="receipt" class="h-4 w-4"></span><span id="gen-label">Generate Tagihan</span>
+              </button>
+              <button type="button" class="h-10 w-full rounded-md border border-outline-variant text-xs font-medium transition-colors hover:bg-surface-3">Pratinjau daftar</button>
+              <p class="flex items-start gap-1.5 text-2xs text-muted-foreground">
+                <span data-icon="alert-triangle" class="mt-0.5 h-3 w-3 shrink-0 text-warning"></span>
+                Tagihan yang sudah dibuat tidak dapat dihapus massal — hanya dibatalkan satu per satu dengan alasan.
+              </p>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Batch history ---------------------------------------------------- -->
+      <section class="mt-3 rounded-md border border-outline-variant bg-surface-1 shadow-e1">
+        <header class="flex items-center justify-between gap-2 border-b border-outline-variant px-3 py-2.5">
+          <h2 class="text-sm font-semibold">Riwayat Pembuatan Tagihan</h2>
+          <button type="button" class="flex min-h-[32px] items-center gap-1.5 rounded-md border border-outline-variant px-2.5 text-xs font-medium transition-colors hover:bg-surface-3">
+            <span data-icon="download" class="h-3.5 w-3.5"></span>Ekspor
+          </button>
+        </header>
+        <div class="overflow-x-auto">
+          <table class="data" data-sortable>
+            <thead>
+              <tr>
+                <th data-sort scope="col">Periode</th>
+                <th data-sort scope="col">Rombel</th>
+                <th data-sort scope="col">Tagihan</th>
+                <th data-sort scope="col">Terkumpul</th>
+                <th scope="col" class="w-36">Kolektabilitas</th>
+                <th data-sort scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="text font-medium">September 2026</td><td class="num">18</td>
+                <td class="num" data-value="226800000">Rp 226,8jt</td><td class="num" data-value="179172000">Rp 179,2jt</td>
+                <td><div data-bullet="79"></div></td>
+                <td data-value="1"><span data-chip="info">berjalan</span></td>
+              </tr>
+              <tr>
+                <td class="text font-medium">Agustus 2026</td><td class="num">18</td>
+                <td class="num" data-value="226800000">Rp 226,8jt</td><td class="num" data-value="219996000">Rp 220,0jt</td>
+                <td><div data-bullet="97"></div></td>
+                <td data-value="2"><span data-chip="success">selesai</span></td>
+              </tr>
+              <tr>
+                <td class="text font-medium">Juli 2026</td><td class="num">18</td>
+                <td class="num" data-value="224000000">Rp 224,0jt</td><td class="num" data-value="222880000">Rp 222,9jt</td>
+                <td><div data-bullet="99"></div></td>
+                <td data-value="2"><span data-chip="success">selesai</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="bottomnav"></div>
+
+  <script>
+    SMS.shell({
+      role: "tu", active: "spp", user: "Dewi Lestari", notif: 7,
+      title: "SMA Bhakti", subtitle: "Tata Usaha · Jenjang SMA",
+    });
+
+    document.querySelectorAll("[data-bullet]").forEach(function (el) {
+      el.innerHTML = SMS.bullet({ value: +el.dataset.bullet, target: 90, label: "Kolektabilitas" });
+    });
+    document.querySelectorAll("[data-chip]").forEach(function (el) {
+      el.outerHTML = SMS.chip(el.textContent, el.dataset.chip);
+    });
+
+    /* Summary recalculates live, so the operator sees the blast radius
+       before committing to a bulk write. */
+    var COUNTS = { 18: 648, "6-x": 224 };
+    var rombel = document.getElementById("rombel");
+    var nominal = document.getElementById("nominal");
+
+    function recalc() {
+      var opt = rombel.options[rombel.selectedIndex];
+      var siswa = parseInt((opt.text.match(/(\d+) siswa/) || [0, 648])[1], 10);
+      var r = parseInt(opt.value, 10);
+      var n = parseInt(nominal.value, 10);
+      document.getElementById("s-rombel").textContent = r;
+      document.getElementById("s-siswa").textContent = SMS.nf(siswa);
+      document.getElementById("s-nominal").textContent = SMS.rupiah(n);
+      document.getElementById("s-total").textContent = SMS.rupiah(siswa * n);
+    }
+    rombel.addEventListener("change", recalc);
+    nominal.addEventListener("change", recalc);
+    recalc();
+
+    document.getElementById("generate").addEventListener("click", function () {
+      var btn = this, label = document.getElementById("gen-label");
+      btn.disabled = true;
+      label.textContent = "Membuat tagihan…";
+      setTimeout(function () {
+        btn.disabled = false;
+        label.textContent = "Generate Tagihan";
+        SMS.toast(
+          "Batch Oktober 2026 dibuat: <strong>" + document.getElementById("s-siswa").textContent + "</strong> tagihan, total " +
+          document.getElementById("s-total").textContent + ".",
+          { tone: "success", duration: 6000 }
+        );
+      }, 1100);
+    });
+
+    SMS.hydrate(document);
+  </script>
+</body>
+</html>

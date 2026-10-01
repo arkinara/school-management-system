@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Operasional Hari Ini — Tata Usaha · SMA Bhakti</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="../assets/tw-config.js"></script>
+  <link rel="stylesheet" href="../assets/theme.css" />
+  <script src="../assets/app.js"></script>
+</head>
+<body class="min-h-dvh bg-background">
+  <a href="#main" class="skip-link">Lewati ke konten</a>
+  <div id="appbar"></div>
+
+  <div class="flex">
+    <div id="sidenav"></div>
+
+    <main id="main" class="min-w-0 flex-1 px-3 pb-24 pt-4 sm:px-5 md:pb-8">
+      <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 class="text-lg font-semibold tracking-tight">Operasional Hari Ini</h1>
+          <p class="text-xs text-muted-foreground">Tata Usaha · SMA Bhakti · Senin, 30 September 2026</p>
+        </div>
+        <a href="spp-bills.html" class="flex min-h-[36px] items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:brightness-110">
+          <span data-icon="receipt" class="h-4 w-4"></span>Generate Tagihan SPP
+        </a>
+      </div>
+
+      <!-- KPI strip: each tile drills into the panel beneath it ---------- -->
+      <section aria-label="Indikator operasional" class="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <article class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <p class="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Tugas Antrean</p>
+          <p class="metric-value mt-1 text-2xl font-semibold leading-none">7</p>
+          <p class="mt-1 text-2xs text-muted-foreground">3 mendesak</p>
+        </article>
+        <article class="rounded-md border border-destructive/40 bg-destructive-container/40 p-3 shadow-e1">
+          <p class="text-2xs font-semibold uppercase tracking-wide text-destructive-container-foreground">SPP Menunggak</p>
+          <p class="metric-value mt-1 text-2xl font-semibold leading-none text-destructive">86</p>
+          <p class="mt-1 text-2xs text-destructive-container-foreground">siswa · <span class="num">Rp 30,1jt</span></p>
+        </article>
+        <article class="rounded-md border border-outline-variant bg-surface-1 p-3 shadow-e1">
+          <p class="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Pembayaran Hari Ini</p>
+          <p class="metric-value mt-1 text-2xl font-semibold leading-none">Rp 12jt</p>
+          <div class="mt-2 flex items-end justify-between gap-2">
+            <p class="flex items-center gap-1 text-2xs text-success"><span data-icon="trending-up" class="h-3 w-3"></span><span class="num">+18%</span></p>
+            <div id="spark-bayar"></div>
+          </div>
+        </article>
+        <article class="rounded-md border border-warning/40 bg-warning-container/40 p-3 shadow-e1">
+          <p class="text-2xs font-semibold uppercase tracking-wide text-warning-container-foreground">Absensi Anomali</p>
+          <p class="metric-value mt-1 text-2xl font-semibold leading-none text-warning">4</p>
+          <p class="mt-1 text-2xs text-warning-container-foreground">kelas perlu ditinjau</p>
+        </article>
+      </section>
+
+      <div class="grid gap-3 xl:grid-cols-3">
+        <!-- Operations queue ---------------------------------------------- -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 shadow-e1 xl:col-span-2">
+          <header class="flex items-center justify-between gap-2 border-b border-outline-variant px-3 py-2.5">
+            <h2 class="text-sm font-semibold">Antrean Operasional</h2>
+            <span class="num text-2xs text-muted-foreground">7 tugas</span>
+          </header>
+          <ul class="divide-y divide-outline-variant">
+            <li class="flex flex-wrap items-center gap-3 px-3 py-2.5">
+              <span class="h-8 w-1 shrink-0 rounded-full bg-destructive"></span>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-medium">Generate tagihan SPP Oktober</p>
+                <p class="text-2xs text-muted-foreground">18 rombel · 648 siswa aktif · harus selesai hari ini</p>
+              </div>
+              <a href="spp-bills.html" class="min-h-[36px] shrink-0 rounded-md bg-primary px-3 text-xs font-semibold leading-9 text-primary-foreground transition-colors hover:brightness-110">Proses</a>
+            </li>
+            <li class="flex flex-wrap items-center gap-3 px-3 py-2.5">
+              <span class="h-8 w-1 shrink-0 rounded-full bg-warning"></span>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-medium">Verifikasi dokumen siswa baru</p>
+                <p class="text-2xs text-muted-foreground">6 pendaftar menunggu · akta &amp; KK</p>
+              </div>
+              <button type="button" class="min-h-[36px] shrink-0 rounded-md border border-outline-variant px-3 text-xs font-medium transition-colors hover:bg-surface-3">Tinjau</button>
+            </li>
+            <li class="flex flex-wrap items-center gap-3 px-3 py-2.5">
+              <span class="h-8 w-1 shrink-0 rounded-full bg-warning"></span>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-medium">Konflik jadwal Kelas XI-IPA-2</p>
+                <p class="text-2xs text-muted-foreground">Fisika &amp; Kimia bentrok Selasa 10.00 · ruang sama</p>
+              </div>
+              <button type="button" class="min-h-[36px] shrink-0 rounded-md border border-outline-variant px-3 text-xs font-medium transition-colors hover:bg-surface-3">Perbaiki</button>
+            </li>
+            <li class="flex flex-wrap items-center gap-3 px-3 py-2.5">
+              <span class="h-8 w-1 shrink-0 rounded-full bg-outline-variant"></span>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-medium">Rekap kehadiran mingguan</p>
+                <p class="text-2xs text-muted-foreground">Dikirim ke Kepala Sekolah tiap Jumat</p>
+              </div>
+              <button type="button" class="min-h-[36px] shrink-0 rounded-md border border-outline-variant px-3 text-xs font-medium transition-colors hover:bg-surface-3">Buat</button>
+            </li>
+          </ul>
+        </section>
+
+        <!-- Attendance anomalies ------------------------------------------ -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 shadow-e1">
+          <header class="flex items-center justify-between gap-2 border-b border-outline-variant px-3 py-2.5">
+            <h2 class="text-sm font-semibold">Laporan Anomali Absensi</h2>
+            <span id="chip-anomali"></span>
+          </header>
+          <ul class="divide-y divide-outline-variant">
+            <li class="flex items-center justify-between gap-2 px-3 py-2">
+              <div><p class="text-sm font-medium">XI-IPS-1</p><p class="text-2xs text-muted-foreground">Belum diisi sejak 2 hari</p></div>
+              <span data-chip="danger">belum diisi</span>
+            </li>
+            <li class="flex items-center justify-between gap-2 px-3 py-2">
+              <div><p class="text-sm font-medium">X-IPA-3</p><p class="text-2xs text-muted-foreground">Alpa <span class="num">11</span> siswa</p></div>
+              <span data-chip="warning">tinggi</span>
+            </li>
+            <li class="flex items-center justify-between gap-2 px-3 py-2">
+              <div><p class="text-sm font-medium">XII-IPS-2</p><p class="text-2xs text-muted-foreground">Belum diisi hari ini</p></div>
+              <span data-chip="danger">belum diisi</span>
+            </li>
+            <li class="flex items-center justify-between gap-2 px-3 py-2">
+              <div><p class="text-sm font-medium">X-IPS-1</p><p class="text-2xs text-muted-foreground">Sakit <span class="num">9</span> siswa</p></div>
+              <span data-chip="warning">tinggi</span>
+            </li>
+          </ul>
+        </section>
+
+        <!-- Overdue table: sortable, bulk-selectable ---------------------- -->
+        <section class="rounded-md border border-outline-variant bg-surface-1 shadow-e1 xl:col-span-3">
+          <header class="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant px-3 py-2.5">
+            <h2 class="text-sm font-semibold">Daftar SPP Menunggak</h2>
+            <div class="flex items-center gap-1.5">
+              <button type="button" id="remind-all" disabled
+                      class="min-h-[36px] rounded-md border border-outline-variant px-2.5 text-xs font-medium transition-colors hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40">
+                Kirim pengingat (<span class="num" id="sel-count">0</span>)
+              </button>
+              <button type="button" class="flex min-h-[36px] items-center gap-1.5 rounded-md border border-outline-variant px-2.5 text-xs font-medium transition-colors hover:bg-surface-3">
+                <span data-icon="download" class="h-3.5 w-3.5"></span>Ekspor CSV
+              </button>
+            </div>
+          </header>
+
+          <div class="overflow-x-auto">
+            <table class="data" data-sortable>
+              <thead>
+                <tr>
+                  <th scope="col" class="w-10"><input type="checkbox" id="sel-all" aria-label="Pilih semua baris" class="h-4 w-4 accent-[hsl(var(--primary))]" /></th>
+                  <th data-sort scope="col">Nama Siswa</th>
+                  <th data-sort scope="col">Kelas</th>
+                  <th data-sort scope="col">Periode</th>
+                  <th data-sort scope="col">Nominal</th>
+                  <th data-sort scope="col">Keterlambatan</th>
+                  <th scope="col">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="arrears-body">
+                <tr>
+                  <td><input type="checkbox" class="row-sel h-4 w-4 accent-[hsl(var(--primary))]" aria-label="Pilih Rizky Maulana" /></td>
+                  <td class="text font-medium">Rizky Maulana</td><td class="text">XI-IPA-2</td><td class="text">September 2026</td>
+                  <td class="num" data-value="350000">Rp 350.000</td>
+                  <td class="num" data-value="20"><span class="rounded-full bg-destructive-container px-2 py-0.5 text-2xs font-semibold text-destructive-container-foreground">20 hari lewat</span></td>
+                  <td><button type="button" class="rounded-md px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-surface-3">Catat bayar</button></td>
+                </tr>
+                <tr>
+                  <td><input type="checkbox" class="row-sel h-4 w-4 accent-[hsl(var(--primary))]" aria-label="Pilih Salsabila Putri" /></td>
+                  <td class="text font-medium">Salsabila Putri</td><td class="text">X-IPS-1</td><td class="text">September 2026</td>
+                  <td class="num" data-value="350000">Rp 350.000</td>
+                  <td class="num" data-value="20"><span class="rounded-full bg-destructive-container px-2 py-0.5 text-2xs font-semibold text-destructive-container-foreground">20 hari lewat</span></td>
+                  <td><button type="button" class="rounded-md px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-surface-3">Catat bayar</button></td>
+                </tr>
+                <tr>
+                  <td><input type="checkbox" class="row-sel h-4 w-4 accent-[hsl(var(--primary))]" aria-label="Pilih Fajar Nugraha" /></td>
+                  <td class="text font-medium">Fajar Nugraha</td><td class="text">XII-IPA-1</td><td class="text">Agustus 2026</td>
+                  <td class="num" data-value="700000">Rp 700.000</td>
+                  <td class="num" data-value="51"><span class="rounded-full bg-destructive-container px-2 py-0.5 text-2xs font-semibold text-destructive-container-foreground">51 hari lewat</span></td>
+                  <td><button type="button" class="rounded-md px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-surface-3">Catat bayar</button></td>
+                </tr>
+                <tr>
+                  <td><input type="checkbox" class="row-sel h-4 w-4 accent-[hsl(var(--primary))]" aria-label="Pilih Nabila Rahma" /></td>
+                  <td class="text font-medium">Nabila Rahma</td><td class="text">X-IPA-3</td><td class="text">September 2026</td>
+                  <td class="num" data-value="350000">Rp 350.000</td>
+                  <td class="num" data-value="12"><span class="rounded-full bg-warning-container px-2 py-0.5 text-2xs font-semibold text-warning-container-foreground">12 hari lewat</span></td>
+                  <td><button type="button" class="rounded-md px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-surface-3">Catat bayar</button></td>
+                </tr>
+                <tr>
+                  <td><input type="checkbox" class="row-sel h-4 w-4 accent-[hsl(var(--primary))]" aria-label="Pilih Dimas Aryo" /></td>
+                  <td class="text font-medium">Dimas Aryo</td><td class="text">XI-IPS-1</td><td class="text">September 2026</td>
+                  <td class="num" data-value="350000">Rp 350.000</td>
+                  <td class="num" data-value="8"><span class="rounded-full bg-warning-container px-2 py-0.5 text-2xs font-semibold text-warning-container-foreground">8 hari lewat</span></td>
+                  <td><button type="button" class="rounded-md px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-surface-3">Catat bayar</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="border-t border-outline-variant px-3 py-2 text-2xs text-muted-foreground">
+            Menampilkan <span class="num">5</span> dari <span class="num">86</span> tunggakan. Klik judul kolom untuk mengurutkan.
+          </p>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="bottomnav"></div>
+
+  <script>
+    SMS.shell({
+      role: "tu", active: "home", user: "Dewi Lestari", notif: 7,
+      title: "SMA Bhakti", subtitle: "Tata Usaha · Jenjang SMA",
+    });
+
+    document.getElementById("spark-bayar").innerHTML = SMS.sparkline([6, 8, 7, 9, 11, 10, 12], { label: "Pembayaran 7 hari", width: 72, height: 28 });
+    document.getElementById("chip-anomali").innerHTML = SMS.chip("4 kelas", "warning");
+
+    document.querySelectorAll("[data-chip]").forEach(function (el) {
+      el.outerHTML = SMS.chip(el.textContent, el.dataset.chip);
+    });
+
+    /* Bulk selection — editing 86 rows one by one is not a workflow. */
+    var selAll = document.getElementById("sel-all");
+    var btn = document.getElementById("remind-all");
+    var count = document.getElementById("sel-count");
+
+    function refresh() {
+      var rows = document.querySelectorAll(".row-sel");
+      var n = document.querySelectorAll(".row-sel:checked").length;
+      count.textContent = n;
+      btn.disabled = n === 0;
+      selAll.checked = n > 0 && n === rows.length;
+      selAll.indeterminate = n > 0 && n < rows.length;
+    }
+
+    selAll.addEventListener("change", function () {
+      document.querySelectorAll(".row-sel").forEach(function (c) { c.checked = selAll.checked; });
+      refresh();
+    });
+    document.getElementById("arrears-body").addEventListener("change", function (e) {
+      if (e.target.classList.contains("row-sel")) refresh();
+    });
+    btn.addEventListener("click", function () {
+      var n = count.textContent;
+      SMS.toast("Pengingat terkirim ke <strong>" + n + "</strong> orang tua via WhatsApp.", {
+        tone: "success",
+        undo: function () { SMS.toast("Pengiriman dibatalkan.", { tone: "neutral" }); },
+      });
+    });
+
+    refresh();
+    SMS.hydrate(document);
+  </script>
+</body>
+</html>
