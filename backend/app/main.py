@@ -15,7 +15,16 @@ from app.db.models import Class, Student, Tenant, User
 from app.db.seed import main as seed_main
 from app.db.session import SessionLocal, create_all, get_db
 from app.middleware.scope import TenantScopeMiddleware
-from app.routers import auth, classes, schools, subjects, tenants, users
+from app.routers import (
+    auth,
+    classes,
+    parents,
+    schools,
+    students,
+    subjects,
+    tenants,
+    users,
+)
 
 
 def _auto_seed_enabled() -> bool:
@@ -63,6 +72,8 @@ app.include_router(schools.router, prefix="/api/schools", tags=["schools"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(classes.router, prefix="/api/classes", tags=["classes"])
 app.include_router(subjects.router, prefix="/api/subjects", tags=["subjects"])
+app.include_router(students.router, prefix="/api/students", tags=["students"])
+app.include_router(parents.router, prefix="/api/parents", tags=["parents"])
 
 
 @app.get("/")

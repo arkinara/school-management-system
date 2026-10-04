@@ -14,13 +14,16 @@ from sqlalchemy import (
     JSON,
     Boolean,
     CheckConstraint,
+    Column,
     Date,
     DateTime,
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
+    Table,
     Time,
     UniqueConstraint,
 )
@@ -204,6 +207,28 @@ class Student(Base):
     attendances: Mapped[list[Attendance]] = relationship(back_populates="student")
     report_cards: Mapped[list[ReportCard]] = relationship(back_populates="student")
     spp_bills: Mapped[list[SppBill]] = relationship(back_populates="student")
+
+
+parent_links = Table(
+    "parent_links",
+    Base.metadata,
+    Column(
+        "parent_id",
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "student_id",
+        Integer,
+        ForeignKey("students.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("relationship", String(20), nullable=False, default="orang_tua"),
+    Column("is_primary", Boolean, default=False),
+    Column("created_at", DateTime, default=utcnow),
+    Index("ix_parent_links_student_id", "student_id"),
+)
 
 
 class Subject(Base):
