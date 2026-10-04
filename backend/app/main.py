@@ -15,6 +15,7 @@ from app.db.models import Class, Student, Tenant, User
 from app.db.seed import main as seed_main
 from app.db.session import SessionLocal, create_all, get_db
 from app.middleware.scope import TenantScopeMiddleware
+from app.routers import auth
 
 
 def _auto_seed_enabled() -> bool:
@@ -55,6 +56,8 @@ app.add_middleware(
 )
 
 app.add_middleware(TenantScopeMiddleware)
+
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 
 
 @app.get("/")

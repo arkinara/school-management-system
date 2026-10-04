@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 
 from fastapi import Depends, HTTPException, Request, status
@@ -16,6 +17,8 @@ from app.auth.jwt import (
 from app.db.models import User, UserRole
 from app.db.session import get_db
 from app.middleware.scope import enforce_tenant_scope
+
+logger = logging.getLogger("app.auth.deps")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
 
@@ -64,11 +67,61 @@ def require_role(*allowed_roles: str | UserRole) -> Callable[..., User]:
 
     def _dependency(user: User = Depends(get_current_user)) -> User:
         if str(user.role) not in allowed:
+            logger.warning(
+                "role escalation blocked: user_id=%s role=%s allowed=%s",
+                user.id,
+                str(user.role),
+                sorted(allowed),
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="insufficient role",
+                detail="forbidden",
             )
         return user
+
+    return _dependency
+
+
+# Clearer alias for endpoints open to every authenticated role.
+require_any_authenticated_user = get_current_user
+
+
+def require_self_or_target_admin(user_id_param: str = "user_id") -> Callable[..., User]:
+    """Dependency factory allowing self, super_admin, or the target's school admin.
+
+    ``user_id_param`` names the path/query parameter holding the target user id.
+    """
+
+    def _dependency(
+        request: Request,
+        user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> User:
+        target_id = request.path_params.get(user_id_param)
+        if target_id is None:
+            target_id = request.query_params.get(user_id_param)
+
+        if user.role == UserRole.SUPER_ADMIN:
+            return user
+
+        if target_id is not None and str(user.id) == str(target_id):
+            return user
+
+        if user.role == UserRole.ADMIN and target_id is not None and user.school_id is not None:
+            target = db.get(User, int(target_id))
+            if target is not None and target.school_id == user.school_id:
+                return user
+
+        logger.warning(
+            "self-or-admin access denied: user_id=%s role=%s target=%s",
+            user.id,
+            str(user.role),
+            target_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="forbidden",
+        )
 
     return _dependency
 

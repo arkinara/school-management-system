@@ -1,6 +1,14 @@
 """Pydantic v2 request/response schemas, split per domain."""
 
-from app.schemas.auth import Token, TokenPayload
+from app.schemas.auth import (
+    AuthResponse,
+    ChangePasswordRequest,
+    Token,
+    TokenPayload,
+    UserLogin,
+    UserMe,
+    UserRegister,
+)
 from app.schemas.classes import ClassCreate, ClassOut
 from app.schemas.school import SchoolCreate, SchoolOut
 from app.schemas.stubs import (
@@ -22,6 +30,8 @@ from app.schemas.user import UserCreate, UserOut, UserUpdate
 __all__ = [
     "AnnouncementOut",
     "AttendanceOut",
+    "AuthResponse",
+    "ChangePasswordRequest",
     "ClassCreate",
     "ClassOut",
     "GradeOut",
@@ -42,6 +52,9 @@ __all__ = [
     "Token",
     "TokenPayload",
     "UserCreate",
+    "UserLogin",
+    "UserMe",
     "UserOut",
+    "UserRegister",
     "UserUpdate",
 ]
