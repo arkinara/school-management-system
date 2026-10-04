@@ -111,3 +111,208 @@ export function formatRupiahCompact(amount: number): string {
   if (amount >= 1_000) return `Rp ${Math.round(amount / 1_000)}rb`;
   return `Rp ${amount}`;
 }
+
+/* ==========================================================================
+   Guru (teacher) dashboard — ticket #9
+   ========================================================================== */
+
+export type SessionStatus = "done" | "now" | "upcoming";
+
+export interface TodaySession {
+  id: string;
+  startTime: string;
+  endTime: string;
+  className: string;
+  subject: string;
+  room: string;
+  status: SessionStatus;
+  attendanceTaken: boolean;
+}
+
+export interface GradeQueueItem {
+  id: string;
+  className: string;
+  subject: string;
+  classId: number;
+  subjectId: number;
+  lastEntry: string;
+  urgency: ChipTone;
+  due: string;
+}
+
+export interface AttendanceQueueItem {
+  id: string;
+  className: string;
+  subject: string;
+  classId: number;
+  time: string;
+  studentCount: number;
+}
+
+export interface AnnouncementItem {
+  id: string;
+  title: string;
+  body: string;
+  time: string;
+}
+
+export interface GuruDashboardData {
+  classCount: number;
+  studentCount: number;
+  pendingGrades: number;
+  attendanceRate: number;
+  todaySessions: TodaySession[];
+  gradeQueue: GradeQueueItem[];
+  attendanceQueue: AttendanceQueueItem[];
+  announcements: AnnouncementItem[];
+}
+
+export const guruMock: GuruDashboardData = {
+  classCount: 2,
+  studentCount: 63,
+  pendingGrades: 3,
+  attendanceRate: 94,
+  todaySessions: [
+    {
+      id: "s1",
+      startTime: "07.00",
+      endTime: "07.40",
+      className: "6A",
+      subject: "Matematika",
+      room: "Ruang 6A",
+      status: "done",
+      attendanceTaken: true,
+    },
+    {
+      id: "s2",
+      startTime: "08.30",
+      endTime: "09.10",
+      className: "6B",
+      subject: "Matematika",
+      room: "Ruang 6B",
+      status: "now",
+      attendanceTaken: false,
+    },
+    {
+      id: "s3",
+      startTime: "10.00",
+      endTime: "10.40",
+      className: "5A",
+      subject: "Matematika",
+      room: "Ruang 5A",
+      status: "upcoming",
+      attendanceTaken: false,
+    },
+    {
+      id: "s4",
+      startTime: "12.30",
+      endTime: "13.10",
+      className: "6A",
+      subject: "Wali Kelas",
+      room: "Ruang 6A",
+      status: "upcoming",
+      attendanceTaken: false,
+    },
+    {
+      id: "s5",
+      startTime: "13.30",
+      endTime: "14.10",
+      className: "5B",
+      subject: "Matematika",
+      room: "Ruang 5B",
+      status: "upcoming",
+      attendanceTaken: false,
+    },
+  ],
+  gradeQueue: [
+    {
+      id: "g1",
+      className: "6A",
+      subject: "Ulangan Harian 2",
+      classId: 1,
+      subjectId: 1,
+      lastEntry: "28 Sep 2026",
+      urgency: "danger",
+      due: "Jatuh tempo besok",
+    },
+    {
+      id: "g2",
+      className: "6B",
+      subject: "Tugas Proyek",
+      classId: 2,
+      subjectId: 1,
+      lastEntry: "27 Sep 2026",
+      urgency: "warning",
+      due: "Jatuh tempo 5 Okt",
+    },
+    {
+      id: "g3",
+      className: "5A",
+      subject: "Kuis Pecahan",
+      classId: 3,
+      subjectId: 1,
+      lastEntry: "25 Sep 2026",
+      urgency: "success",
+      due: "Jatuh tempo 9 Okt",
+    },
+  ],
+  attendanceQueue: [
+    {
+      id: "q1",
+      className: "6B",
+      subject: "Matematika",
+      classId: 2,
+      time: "08.30",
+      studentCount: 32,
+    },
+    {
+      id: "q2",
+      className: "5A",
+      subject: "Matematika",
+      classId: 3,
+      time: "10.00",
+      studentCount: 30,
+    },
+    {
+      id: "q3",
+      className: "5B",
+      subject: "Matematika",
+      classId: 4,
+      time: "13.30",
+      studentCount: 31,
+    },
+  ],
+  announcements: [
+    {
+      id: "n1",
+      title: "Rapat Wali Kelas",
+      body: "Rapat koordinasi rapor digelar Jumat pukul 14.00 di ruang guru.",
+      time: "1 jam lalu",
+    },
+    {
+      id: "n2",
+      title: "Batas Input Nilai UTS",
+      body: "Nilai UTS dimasukkan paling lambat 7 Oktober 2026.",
+      time: "3 jam lalu",
+    },
+    {
+      id: "n3",
+      title: "Pelatihan Kurikulum Merdeka",
+      body: "Pelatihan untuk semua guru pada Sabtu, 11 Oktober 2026.",
+      time: "kemarin",
+    },
+    {
+      id: "n4",
+      title: "Libur Maulid Nabi",
+      body: "Sekolah libur pada 7 Oktober 2026.",
+      time: "2 hari lalu",
+    },
+  ],
+};
+
+/** Pending grade-entrant count, clamped so a badge never goes negative. */
+export function safePendingCount(value: number | undefined | null): number {
+  if (typeof value !== "number" || Number.isNaN(value) || value < 0) return 0;
+  return value;
+}
+
