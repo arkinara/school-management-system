@@ -35,3 +35,11 @@ class UserOut(BaseModel):
     role: UserRole
     full_name: str
     created_at: datetime
+    is_active: bool = True
+
+
+class UserListResponse(BaseModel):
+    items: list[UserOut]
+    total: int
+    page: int
+    size: int

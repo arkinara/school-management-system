@@ -9,7 +9,13 @@ class SubjectCreate(BaseModel):
     tenant_id: int
     name: str
     category: str
-    applicable_grade_levels: list | None = None
+    applicable_grade_levels: list[int] = []
+
+
+class SubjectUpdate(BaseModel):
+    name: str | None = None
+    category: str | None = None
+    applicable_grade_levels: list[int] | None = None
 
 
 class SubjectOut(BaseModel):
@@ -19,4 +25,11 @@ class SubjectOut(BaseModel):
     tenant_id: int
     name: str
     category: str
-    applicable_grade_levels: list | None = None
+    applicable_grade_levels: list[int] | None = None
+
+
+class SubjectListResponse(BaseModel):
+    items: list[SubjectOut]
+    total: int
+    page: int
+    size: int

@@ -9,8 +9,13 @@ from app.schemas.auth import (
     UserMe,
     UserRegister,
 )
-from app.schemas.classes import ClassCreate, ClassOut
-from app.schemas.school import SchoolCreate, SchoolOut
+from app.schemas.classes import ClassCreate, ClassListResponse, ClassOut, ClassUpdate
+from app.schemas.school import (
+    SchoolCreate,
+    SchoolListResponse,
+    SchoolOut,
+    SchoolUpdate,
+)
 from app.schemas.stubs import (
     AnnouncementOut,
     AttendanceOut,
@@ -23,9 +28,14 @@ from app.schemas.stubs import (
     SppPaymentOut,
 )
 from app.schemas.student import StudentCreate, StudentOut
-from app.schemas.subject import SubjectCreate, SubjectOut
-from app.schemas.tenant import TenantCreate, TenantOut
-from app.schemas.user import UserCreate, UserOut, UserUpdate
+from app.schemas.subject import (
+    SubjectCreate,
+    SubjectListResponse,
+    SubjectOut,
+    SubjectUpdate,
+)
+from app.schemas.tenant import TenantCreate, TenantOut, TenantUpdate
+from app.schemas.user import UserCreate, UserListResponse, UserOut, UserUpdate
 
 __all__ = [
     "AnnouncementOut",
@@ -33,25 +43,33 @@ __all__ = [
     "AuthResponse",
     "ChangePasswordRequest",
     "ClassCreate",
+    "ClassListResponse",
     "ClassOut",
+    "ClassUpdate",
     "GradeOut",
     "MessageOut",
     "MessageThreadOut",
     "ReportCardOut",
     "ScheduleOut",
     "SchoolCreate",
+    "SchoolListResponse",
     "SchoolOut",
+    "SchoolUpdate",
     "SppBillOut",
     "SppPaymentOut",
     "StudentCreate",
     "StudentOut",
     "SubjectCreate",
+    "SubjectListResponse",
     "SubjectOut",
+    "SubjectUpdate",
     "TenantCreate",
     "TenantOut",
+    "TenantUpdate",
     "Token",
     "TokenPayload",
     "UserCreate",
+    "UserListResponse",
     "UserLogin",
     "UserMe",
     "UserOut",

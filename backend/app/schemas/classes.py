@@ -14,6 +14,14 @@ class ClassCreate(BaseModel):
     academic_year: str
 
 
+class ClassUpdate(BaseModel):
+    name: str | None = None
+    grade_level: int | None = None
+    jurusan: str | None = None
+    wali_kelas_id: int | None = None
+    academic_year: str | None = None
+
+
 class ClassOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -24,3 +32,10 @@ class ClassOut(BaseModel):
     jurusan: str | None = None
     wali_kelas_id: int | None = None
     academic_year: str
+
+
+class ClassListResponse(BaseModel):
+    items: list[ClassOut]
+    total: int
+    page: int
+    size: int
