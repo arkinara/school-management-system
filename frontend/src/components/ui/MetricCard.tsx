@@ -30,7 +30,7 @@ export function MetricCard({ label, value, delta, icon: Icon, hint, className, .
         )}
       </div>
       <div className="mt-3 flex items-end gap-2">
-        <span className="text-3xl font-semibold leading-none tabular-nums text-foreground">{value}</span>
+        <span className="font-mono text-3xl font-semibold leading-none tabular-nums text-foreground">{value}</span>
         {delta && (
           <span
             className={cn(

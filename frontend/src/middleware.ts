@@ -33,5 +33,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/sign-in", "/sign-up", "/dashboard", "/onboarding"],
+  matcher: ["/sign-in", "/sign-up", "/dashboard/:path*", "/onboarding"],
 };
