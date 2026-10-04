@@ -16,6 +16,13 @@ class TenantCreate(BaseModel):
     config: dict | None = None
 
 
+class TenantUpdate(BaseModel):
+    name: str | None = None
+    jenjang_type: JenjangType | None = None
+    kurikulum_version: str | None = None
+    config: dict | None = None
+
+
 class TenantOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -25,3 +32,4 @@ class TenantOut(BaseModel):
     kurikulum_version: str
     config: dict | None = None
     created_at: datetime
+    school_count: int = 0
