@@ -170,6 +170,9 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
   );
   const [semester, setSemester] = React.useState<string>(SEMESTERS[0]);
   const [available, setAvailable] = React.useState<Record<string, boolean>>({});
+  const [records, setRecords] = React.useState<
+    Record<string, ReportCardRecord | null>
+  >({});
   const [rapor, setRapor] = React.useState<ReportCardRecord | null>(null);
   const [status, setStatus] = React.useState<LoadStatus>("loading");
   const [reloadKey, setReloadKey] = React.useState(0);
@@ -185,12 +188,20 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
         ? fetchParentChildren(me.user.id).then((kids) =>
             kids.map((kid) => ({ id: kid.id, full_name: kid.full_name }))
           )
-        : fetchStudents({ size: 1 }).then((page) =>
-            page.items.map((student: StudentRecord) => ({
-              id: student.id,
-              full_name: student.full_name ?? me.user.full_name,
-            }))
-          );
+        : fetchStudents({ size: 100 }).then((page) => {
+            const own =
+              page.items.find(
+                (student: StudentRecord) => student.user_id === me.user.id
+              ) ?? page.items[0];
+            return own
+              ? [
+                  {
+                    id: own.id,
+                    full_name: own.full_name ?? me.user.full_name,
+                  },
+                ]
+              : [];
+          });
     loadChildren
       .then((list) => {
         if (!active) return;
@@ -241,6 +252,7 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
           bySemester[value] = record;
         }
         setAvailable(availability);
+        setRecords(bySemester);
 
         if (initializedFor.current !== selectedStudentId) {
           initializedFor.current = selectedStudentId;
@@ -266,6 +278,12 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
   }, [selectedStudentId, semester, reloadKey]);
 
   const data = rapor?.compiled_data ?? null;
+  const hasAnyRecord = SEMESTERS.some((value) => records[value] != null);
+  const selectedRecord = records[semester] ?? null;
+  const notPublished =
+    status === "ready" &&
+    selectedRecord !== null &&
+    selectedRecord.status !== "published";
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
@@ -376,12 +394,26 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
           title="Belum ada data siswa"
           description="Akun ini belum tertaut ke data siswa mana pun."
         />
-      ) : rapor === null || data === null || rapor.status !== "published" ? (
+      ) : notPublished ? (
         <EmptyState
           icon={FileText}
           title="Rapor belum diterbitkan"
-          description={`Rapor ${studentName} untuk ${semester} belum diterbitkan oleh sekolah.`}
+          description={`Rapor ${studentName} untuk ${semester} masih berstatus draft dan belum dapat dilihat.`}
         />
+      ) : rapor === null || data === null ? (
+        hasAnyRecord ? (
+          <EmptyState
+            icon={FileText}
+            title="Rapor belum diterbitkan"
+            description={`Rapor ${studentName} untuk ${semester} belum diterbitkan oleh sekolah.`}
+          />
+        ) : (
+          <EmptyState
+            icon={FileText}
+            title="Belum ada rapor"
+            description={`Belum ada catatan rapor untuk ${studentName} pada semester ini. Rapor akan tersedia setelah wali kelas menerbitkannya.`}
+          />
+        )
       ) : (
         <Card>
           <CardHeader className="flex-wrap items-start gap-3 border-b border-outline-variant pb-4">
