@@ -541,3 +541,89 @@ export function fetchPayments(
 ): Promise<Paginated<SppPayment>> {
   return apiFetch<Paginated<SppPayment>>(`/api/spp/payments${toQuery(params)}`);
 }
+
+/* ==========================================================================
+   Komunikasi (#26) — announcements + message threads
+   ========================================================================== */
+
+export type AnnouncementAudience = "all" | "class" | "jenjang";
+export type AnnouncementStatus = "draft" | "published";
+
+export interface AnnouncementRecord {
+  id: number;
+  tenant_id: number;
+  school_id: number | null;
+  author_id: number;
+  audience: AnnouncementAudience;
+  title: string;
+  body: string;
+  published_at: string | null;
+  status: AnnouncementStatus | string;
+  target_class_id: number | null;
+  target_tenant_id: number | null;
+}
+
+export interface AnnouncementInput {
+  title: string;
+  body: string;
+  audience?: AnnouncementAudience;
+  school_id?: number | null;
+  target_class_id?: number | null;
+  target_tenant_id?: number | null;
+}
+
+/** GET /api/announcements — audience/school-scoped feed. */
+export function fetchAnnouncements(
+  params: {
+    school_id?: number;
+    audience?: AnnouncementAudience;
+    status?: AnnouncementStatus;
+    class_id?: number;
+    page?: number;
+    size?: number;
+  } = {}
+): Promise<Paginated<AnnouncementRecord>> {
+  return apiFetch<Paginated<AnnouncementRecord>>(
+    `/api/announcements${toQuery(params)}`
+  );
+}
+
+/** POST /api/announcements — create a draft announcement (staff only). */
+export function createAnnouncement(
+  input: AnnouncementInput
+): Promise<AnnouncementRecord> {
+  return apiFetch<AnnouncementRecord>("/api/announcements", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** PATCH /api/announcements/{id} — edit an announcement. */
+export function updateAnnouncement(
+  id: number,
+  input: Partial<AnnouncementInput>
+): Promise<AnnouncementRecord> {
+  return apiFetch<AnnouncementRecord>(`/api/announcements/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+/** POST /api/announcements/{id}/publish — flip a draft to published. */
+export function publishAnnouncement(id: number): Promise<AnnouncementRecord> {
+  return apiFetch<AnnouncementRecord>(`/api/announcements/${id}/publish`, {
+    method: "POST",
+  });
+}
+
+/** POST /api/announcements/{id}/unpublish — retract a published item. */
+export function unpublishAnnouncement(id: number): Promise<AnnouncementRecord> {
+  return apiFetch<AnnouncementRecord>(`/api/announcements/${id}/unpublish`, {
+    method: "POST",
+  });
+}
+
+/** DELETE /api/announcements/{id} — admin-only removal. */
+export function deleteAnnouncement(id: number): Promise<void> {
+  return apiFetch<void>(`/api/announcements/${id}`, { method: "DELETE" });
+}
