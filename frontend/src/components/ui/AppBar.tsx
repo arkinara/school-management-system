@@ -1,8 +1,10 @@
 "use client";
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { GraduationCap, Bell, ChevronDown } from "lucide-react";
 import { Avatar } from "./Avatar";
 import { cn } from "./cn";
+import { useNotificationCount } from "@/lib/notifications";
 
 export interface AppBarProps {
   title: string;
@@ -11,8 +13,15 @@ export interface AppBarProps {
   user: { name: string; src?: string };
   /** Role-aware action slot (e.g. school picker for Yayasan). */
   actions?: React.ReactNode;
-  /** Unread notification count for the bell badge. */
+  /**
+   * Static unread count override (stories/demos). When omitted the bell polls
+   * the aggregated feed every 30s via `useNotificationCount`.
+   */
   notifications?: number;
+  /** Override the bell click; defaults to navigating to the feed page. */
+  onNotificationsClick?: () => void;
+  /** Destination for the default bell action. */
+  notificationsHref?: string;
   onUserMenu?: () => void;
   className?: string;
 }
@@ -23,10 +32,24 @@ export function AppBar({
   subtitle,
   user,
   actions,
-  notifications = 0,
+  notifications,
+  onNotificationsClick,
+  notificationsHref = "/dashboard/notifications",
   onUserMenu,
   className,
 }: AppBarProps) {
+  const router = useRouter();
+  const liveCount = useNotificationCount();
+  const count = notifications ?? liveCount;
+
+  function handleNotifications() {
+    if (onNotificationsClick) {
+      onNotificationsClick();
+      return;
+    }
+    router.push(notificationsHref);
+  }
+
   return (
     <header
       className={cn(
@@ -48,13 +71,14 @@ export function AppBar({
         {actions}
         <button
           type="button"
-          aria-label={notifications > 0 ? `${notifications} notifikasi belum dibaca` : "Notifikasi"}
+          onClick={handleNotifications}
+          aria-label={count > 0 ? `${count} notifikasi belum dibaca` : "Notifikasi"}
           className="relative flex h-12 w-12 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-container-high"
         >
           <Bell className="h-5 w-5" aria-hidden />
-          {notifications > 0 && (
-            <span className="absolute right-2.5 top-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
-              {notifications > 9 ? "9+" : notifications}
+          {count > 0 && (
+            <span className="absolute right-2.5 top-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 font-mono text-[10px] font-semibold tabular-nums text-destructive-foreground">
+              {count > 9 ? "9+" : count}
             </span>
           )}
         </button>

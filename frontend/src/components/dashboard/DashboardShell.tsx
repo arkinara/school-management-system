@@ -154,7 +154,6 @@ export function DashboardShell({
         subtitle={`${roleLabel[navRole]} · ${me.user.full_name}`}
         user={{ name: me.user.full_name }}
         actions={actions?.(me)}
-        notifications={3}
       />
       <div className="flex flex-1">
         <NavRail

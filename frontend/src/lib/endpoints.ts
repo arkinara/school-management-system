@@ -718,3 +718,188 @@ export function removeThreadParticipant(
     { method: "DELETE" }
   );
 }
+
+/* ==========================================================================
+   Notifikasi (#29) — client-side aggregation over existing domains
+   ========================================================================== */
+
+export type NotificationSource = "absensi" | "spp" | "komunikasi";
+export type NotificationType =
+  | "attendance"
+  | "payment"
+  | "announcement"
+  | "message";
+
+export interface AppNotification {
+  /** Stable key derived from the underlying event, e.g. `announcement:12`. */
+  id: string;
+  type: NotificationType;
+  source: NotificationSource;
+  title: string;
+  body: string;
+  timestamp: string;
+  href: string;
+  read: boolean;
+}
+
+const NOTIFICATION_READ_KEY = "sms_notification_read_ids";
+
+/** Event ids the user has already read, persisted per device. */
+export function getReadNotificationIds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(NOTIFICATION_READ_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeReadIds(ids: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(NOTIFICATION_READ_KEY, JSON.stringify(ids));
+  } catch {
+    // Ignore storage failures.
+  }
+  try {
+    window.dispatchEvent(new Event("sms:notifications-changed"));
+  } catch {
+    // Ignore environments without a global event target.
+  }
+}
+
+/** Persist a single read marker (fails safe — caller keeps unread on error). */
+export async function markNotificationRead(id: string): Promise<void> {
+  const ids = getReadNotificationIds();
+  if (!ids.includes(id)) writeReadIds([...ids, id]);
+}
+
+/** Persist read markers for every supplied event id. */
+export async function markAllNotificationsRead(
+  ids: string[]
+): Promise<void> {
+  const existing = new Set(getReadNotificationIds());
+  for (const id of ids) existing.add(id);
+  writeReadIds([...existing]);
+}
+
+function excerpt(text: string, max = 120): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
+}
+
+function statusLabel(status: string): string {
+  const map: Record<string, string> = {
+    hadir: "Hadir",
+    izin: "Izin",
+    sakit: "Sakit",
+    alpa: "Alpa",
+  };
+  return map[status] ?? status;
+}
+
+/**
+ * GET /api/notifications equivalent for v1: aggregates announcements, message
+ * threads, overdue SPP bills and non-hadir attendance. Each source is fetched
+ * independently so one failing domain degrades gracefully instead of blanking
+ * the whole feed. Read state is layered on from local markers.
+ */
+export async function fetchNotifications(params: {
+  currentUserId?: number;
+  unreadOnly?: boolean;
+} = {}): Promise<AppNotification[]> {
+  const readIds = new Set(getReadNotificationIds());
+  const notifications: AppNotification[] = [];
+
+  const [announcements, threads, bills, attendance] = await Promise.allSettled([
+    fetchAnnouncements({ size: 15 }),
+    fetchThreads({ size: 20 }),
+    getBills({ status: "overdue", size: 20 }),
+    fetchAttendances({ size: 20 }),
+  ]);
+
+  if (announcements.status === "fulfilled") {
+    for (const item of announcements.value.items) {
+      if (item.status !== "published" || item.published_at === null) continue;
+      const id = `announcement:${item.id}`;
+      notifications.push({
+        id,
+        type: "announcement",
+        source: "komunikasi",
+        title: item.title,
+        body: excerpt(item.body),
+        timestamp: item.published_at,
+        href: "/dashboard/announcements",
+        read: readIds.has(id),
+      });
+    }
+  }
+
+  if (threads.status === "fulfilled") {
+    for (const thread of threads.value.items) {
+      const last = thread.last_message;
+      if (!last) continue;
+      const isOwn = params.currentUserId === last.sender_id;
+      const id = `message:${last.id}`;
+      notifications.push({
+        id,
+        type: "message",
+        source: "komunikasi",
+        title: thread.subject,
+        body: excerpt(last.body),
+        timestamp: last.sent_at,
+        href: "/dashboard/messages",
+        read: last.read_at !== null || isOwn || readIds.has(id),
+      });
+    }
+  }
+
+  if (bills.status === "fulfilled") {
+    for (const bill of bills.value.items) {
+      const id = `spp:${bill.id}`;
+      notifications.push({
+        id,
+        type: "payment",
+        source: "spp",
+        title: `SPP menunggak · ${bill.period}`,
+        body: `Sisa tagihan ${formatRupiahPlain(bill.balance)} jatuh tempo ${bill.due_date}.`,
+        timestamp: bill.due_date,
+        href: "/dashboard/tu/spp/payments",
+        read: readIds.has(id),
+      });
+    }
+  }
+
+  if (attendance.status === "fulfilled") {
+    for (const record of attendance.value.items) {
+      if (record.status === "hadir") continue;
+      const id = `attendance:${record.id}`;
+      notifications.push({
+        id,
+        type: "attendance",
+        source: "absensi",
+        title: `Absensi: ${statusLabel(record.status)}`,
+        body: `Pencatatan kehadiran tanggal ${record.date}${record.note ? ` · ${record.note}` : ""}.`,
+        timestamp: record.date,
+        href: "/dashboard/guru/absensi",
+        read: readIds.has(id),
+      });
+    }
+  }
+
+  const sorted = notifications.sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+  return params.unreadOnly ? sorted.filter((item) => !item.read) : sorted;
+}
+
+function formatRupiahPlain(amount: number): string {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
