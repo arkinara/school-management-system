@@ -18,6 +18,7 @@ from app.middleware.scope import TenantScopeMiddleware
 from app.routers import (
     announcements,
     attendances,
+    audit,
     auth,
     classes,
     grades,
@@ -94,6 +95,7 @@ app.include_router(
 app.include_router(
     messages.router, prefix="/api/message-threads", tags=["message-threads"]
 )
+app.include_router(audit.router, prefix="/api/audit-log", tags=["audit-log"])
 
 
 @app.get("/")

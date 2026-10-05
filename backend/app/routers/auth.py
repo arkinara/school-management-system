@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from passlib.hash import bcrypt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.audit import log_audit_event
 from app.auth.deps import get_current_user
 from app.auth.jwt import create_access_token
 from app.db.models import AuditLog, School, Tenant, User, UserRole
@@ -125,12 +126,23 @@ def register(payload: UserRegister, db: Session = Depends(get_db)) -> AuthRespon
 
 
 @router.post("/login", response_model=AuthResponse)
-def login(payload: UserLogin, db: Session = Depends(get_db)) -> AuthResponse:
+def login(payload: UserLogin, request: Request, db: Session = Depends(get_db)) -> AuthResponse:
     """Authenticate credentials and issue an access token.
 
     TODO: rate-limit login attempts (future ticket).
     """
-    user = _authenticate(db, str(payload.email), payload.password, payload.tenant_id)
+    try:
+        user = _authenticate(db, str(payload.email), payload.password, payload.tenant_id)
+    except HTTPException:
+        log_audit_event(
+            db,
+            action="login_failed",
+            detail=f"email={payload.email}",
+            tenant_id=payload.tenant_id,
+            request=request,
+        )
+        raise
+    log_audit_event(db, user=user, action="login", request=request)
     return AuthResponse(
         user=UserOut.model_validate(user),
         access_token=_token_for(user),

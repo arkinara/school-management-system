@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.audit import log_audit_event
 from app.auth.deps import get_current_user
 from app.db.models import (
     Attendance,
@@ -264,6 +265,7 @@ def get_report_card(
 @router.patch("/{report_card_id}/publish", response_model=ReportCardOut)
 def publish_report_card(
     report_card_id: int,
+    request: Request,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ReportCardOut:
@@ -279,6 +281,14 @@ def publish_report_card(
     report_card.published_at = utcnow()
     db.commit()
     db.refresh(report_card)
+    log_audit_event(
+        db,
+        user=user,
+        action="publish_rapor",
+        entity_type="report_card",
+        entity_id=report_card.id,
+        request=request,
+    )
     return ReportCardOut.model_validate(report_card)
 
 

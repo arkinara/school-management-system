@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from datetime import date as date_type
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.audit import log_audit_event
 from app.auth.deps import get_current_user, require_role
 from app.db.models import (
     Class,
@@ -410,12 +411,13 @@ def mark_overdue_bills(
 )
 def create_payment(
     payload: SppPaymentCreate,
+    request: Request,
     user: User = Depends(_manage),
     db: Session = Depends(get_db),
 ) -> SppPaymentOut:
     """Record a payment; marks the bill paid once fully covered."""
     bill = _bill_or_404(db, payload.bill_id)
-    _authorize_bill(db, user, bill)
+    school = _authorize_bill(db, user, bill)
     if bill.status == _PAID:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="bill is already paid"
@@ -449,6 +451,16 @@ def create_payment(
         bill.status = _PAID
     db.commit()
     db.refresh(payment)
+    log_audit_event(
+        db,
+        user=user,
+        action="payment",
+        entity_type="spp_payment",
+        entity_id=payment.id,
+        tenant_id=school.tenant_id if school is not None else None,
+        school_id=school.id if school is not None else None,
+        request=request,
+    )
     return SppPaymentOut.model_validate(payment)
 
 
