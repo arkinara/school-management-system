@@ -26,6 +26,7 @@ import {
   fetchAttendances,
   fetchClasses,
   fetchStudents,
+  getTeacherSchedule,
   updateAttendance,
   type AttendanceRecord,
   type AttendanceStatus,
@@ -95,14 +96,22 @@ function AbsensiContent({ me }: { me: UserMe }) {
 
   React.useEffect(() => {
     let active = true;
-    fetchClasses({ size: 100 })
-      .then((res) => {
+    Promise.all([
+      fetchClasses({ size: 100 }),
+      me.role === "teacher"
+        ? getTeacherSchedule(me.user.id).catch(() => [])
+        : Promise.resolve([]),
+    ])
+      .then(([res, schedule]) => {
         if (!active) return;
-        const mine = res.items.filter(
-          (klass) =>
-            klass.wali_kelas_id === me.user.id || me.role !== "teacher"
-        );
-        const list = mine.length > 0 ? mine : res.items;
+        const taught = new Set(schedule.map((row) => row.class_id));
+        const list =
+          me.role === "teacher"
+            ? res.items.filter(
+                (klass) =>
+                  klass.wali_kelas_id === me.user.id || taught.has(klass.id)
+              )
+            : res.items;
         setClasses(list);
         if (list.length > 0) setClassId(String(list[0].id));
       })
@@ -242,9 +251,17 @@ function AbsensiContent({ me }: { me: UserMe }) {
         undo: undoLastSave,
       });
     } catch (err) {
-      const detail =
-        err instanceof ApiError ? err.detail : "Gagal menyimpan absensi.";
-      setToast({ message: detail, tone: "error" });
+      if (err instanceof ApiError && err.status === 409) {
+        setToast({
+          message:
+            "Sebagian absensi sudah tercatat. Muat ulang kelas lalu ulangi koreksi.",
+          tone: "error",
+        });
+      } else {
+        const detail =
+          err instanceof ApiError ? err.detail : "Gagal menyimpan absensi.";
+        setToast({ message: detail, tone: "error" });
+      }
     } finally {
       setSaving(false);
     }
