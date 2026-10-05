@@ -21,6 +21,7 @@ from app.routers import (
     classes,
     grades,
     parents,
+    report_cards,
     schools,
     students,
     subjects,
@@ -78,6 +79,9 @@ app.include_router(students.router, prefix="/api/students", tags=["students"])
 app.include_router(parents.router, prefix="/api/parents", tags=["parents"])
 app.include_router(attendances.router, prefix="/api/attendances", tags=["attendances"])
 app.include_router(grades.router, prefix="/api/grades", tags=["grades"])
+app.include_router(
+    report_cards.router, prefix="/api/report-cards", tags=["report-cards"]
+)
 
 
 @app.get("/")
