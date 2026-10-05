@@ -627,3 +627,94 @@ export function unpublishAnnouncement(id: number): Promise<AnnouncementRecord> {
 export function deleteAnnouncement(id: number): Promise<void> {
   return apiFetch<void>(`/api/announcements/${id}`, { method: "DELETE" });
 }
+
+/* --------------------------------------------------------------------------
+   Direct message threads (#26)
+   -------------------------------------------------------------------------- */
+
+export interface MessageRecord {
+  id: number;
+  thread_id: number;
+  sender_id: number;
+  body: string;
+  sent_at: string;
+  read_at: string | null;
+}
+
+export interface MessageThreadRecord {
+  id: number;
+  tenant_id: number;
+  school_id: number | null;
+  participant_ids: number[];
+  subject: string;
+  created_at: string;
+  last_message: MessageRecord | null;
+}
+
+export interface MessageThreadInput {
+  participant_ids: number[];
+  subject: string;
+  school_id?: number | null;
+}
+
+/** GET /api/message-threads — threads the caller participates in. */
+export function fetchThreads(
+  params: { page?: number; size?: number } = {}
+): Promise<Paginated<MessageThreadRecord>> {
+  return apiFetch<Paginated<MessageThreadRecord>>(
+    `/api/message-threads${toQuery(params)}`
+  );
+}
+
+/** POST /api/message-threads — open a new thread (caller auto-added). */
+export function createMessageThread(
+  input: MessageThreadInput
+): Promise<MessageThreadRecord> {
+  return apiFetch<MessageThreadRecord>("/api/message-threads", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** GET /api/message-threads/{threadId}/messages — chronological history. */
+export function fetchMessages(
+  threadId: number,
+  params: { page?: number; size?: number } = {}
+): Promise<Paginated<MessageRecord>> {
+  return apiFetch<Paginated<MessageRecord>>(
+    `/api/message-threads/${threadId}/messages${toQuery(params)}`
+  );
+}
+
+/** POST /api/message-threads/{threadId}/messages — append a reply. */
+export function sendMessage(
+  threadId: number,
+  body: string
+): Promise<MessageRecord> {
+  return apiFetch<MessageRecord>(`/api/message-threads/${threadId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  });
+}
+
+/** POST /api/message-threads/{threadId}/participants — add a member. */
+export function addThreadParticipant(
+  threadId: number,
+  userId: number
+): Promise<MessageThreadRecord> {
+  return apiFetch<MessageThreadRecord>(
+    `/api/message-threads/${threadId}/participants`,
+    { method: "POST", body: JSON.stringify({ user_id: userId }) }
+  );
+}
+
+/** DELETE /api/message-threads/{threadId}/participants/{userId} — leave. */
+export function removeThreadParticipant(
+  threadId: number,
+  userId: number
+): Promise<void> {
+  return apiFetch<void>(
+    `/api/message-threads/${threadId}/participants/${userId}`,
+    { method: "DELETE" }
+  );
+}
