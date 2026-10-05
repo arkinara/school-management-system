@@ -24,6 +24,7 @@ from app.routers import (
     report_cards,
     schedules,
     schools,
+    spp,
     students,
     subjects,
     tenants,
@@ -84,6 +85,7 @@ app.include_router(
     report_cards.router, prefix="/api/report-cards", tags=["report-cards"]
 )
 app.include_router(schedules.router, prefix="/api/schedules", tags=["schedules"])
+app.include_router(spp.router, prefix="/api/spp", tags=["spp"])
 
 
 @app.get("/")
