@@ -3,42 +3,145 @@
 import * as React from "react";
 import Link from "next/link";
 import {
+  AlertCircle,
   ArrowRight,
   BookOpen,
   CalendarCheck,
   Check,
   ClipboardList,
+  FileText,
+  RotateCcw,
   Users,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { StatusChip } from "@/components/ui/StatusChip";
-import { SkeletonCard } from "@/components/ui/Skeleton";
+import { SkeletonCard, SkeletonList } from "@/components/ui/Skeleton";
 import { cn } from "@/components/ui/cn";
-import { fetchClasses, fetchStudents } from "@/lib/endpoints";
+import {
+  fetchAttendanceToday,
+  fetchClasses,
+  fetchGrades,
+  fetchReportCards,
+  fetchStudents,
+  fetchSubjects,
+  getTeacherSchedule,
+  currentSemester,
+  indonesianDayName,
+  type AttendanceRecord,
+  type ClassRecord,
+  type GradeRecord,
+  type ReportCardRecord,
+  type ScheduleRecord,
+  type StudentRecord,
+  type SubjectRecord,
+} from "@/lib/endpoints";
 import type { UserMe } from "@/lib/auth";
-import { guruMock, safePendingCount } from "@/components/dashboard/mock-data";
 
-const BAR_TONE: Record<string, string> = {
-  danger: "bg-destructive",
-  warning: "bg-warning",
-  success: "bg-success",
-  info: "bg-info",
-  neutral: "bg-outline",
-  primary: "bg-primary",
-};
+type LoadStatus = "loading" | "ready" | "error";
+type SessionStatus = "done" | "now" | "upcoming";
+
+interface SessionItem {
+  id: string;
+  startTime: string;
+  endTime: string;
+  className: string;
+  subject: string;
+  classId: number;
+  subjectId: number;
+  status: SessionStatus;
+  attendanceTaken: boolean;
+}
+
+interface GradeQueueItem {
+  id: string;
+  className: string;
+  subject: string;
+  classId: number;
+  subjectId: number;
+  pendingCount: number;
+}
+
+interface AttendanceQueueItem {
+  id: string;
+  className: string;
+  subject: string;
+  classId: number;
+  time: string;
+  studentCount: number;
+}
+
+function minutesOf(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function prettyTime(time: string): string {
+  return time.slice(0, 5).replace(":", ".");
+}
+
+function WidgetError({
+  title,
+  onRetry,
+}: {
+  title: string;
+  onRetry: () => void;
+}) {
+  return (
+    <EmptyState
+      icon={AlertCircle}
+      title={title}
+      description="Tidak dapat mengambil data. Periksa koneksi lalu coba lagi."
+      action={
+        <Button variant="tonal" icon={RotateCcw} onClick={onRetry}>
+          Coba lagi
+        </Button>
+      }
+    />
+  );
+}
 
 function GuruContent({ me }: { me: UserMe }) {
-  const [status, setStatus] = React.useState<"loading" | "ready" | "error">(
-    "loading"
-  );
-  const [counts, setCounts] = React.useState({
-    classCount: guruMock.classCount,
-    studentCount: guruMock.studentCount,
-  });
+  const teacherId = me.user.id;
   const [today, setToday] = React.useState("");
+
+  const [schedule, setSchedule] = React.useState<{
+    status: LoadStatus;
+    sessions: SessionItem[];
+    classCount: number;
+    studentCount: number;
+    attendanceRate: number;
+    takenClassIds: Set<number>;
+    studentsByClass: Map<number, StudentRecord[]>;
+    classes: Map<number, ClassRecord>;
+    subjects: Map<number, SubjectRecord>;
+  }>({
+    status: "loading",
+    sessions: [],
+    classCount: 0,
+    studentCount: 0,
+    attendanceRate: 0,
+    takenClassIds: new Set(),
+    studentsByClass: new Map(),
+    classes: new Map(),
+    subjects: new Map(),
+  });
+  const [scheduleKey, setScheduleKey] = React.useState(0);
+
+  const [gradeQueue, setGradeQueue] = React.useState<{
+    status: LoadStatus;
+    items: GradeQueueItem[];
+  }>({ status: "loading", items: [] });
+  const [gradeKey, setGradeKey] = React.useState(0);
+
+  const [drafts, setDrafts] = React.useState<{
+    status: LoadStatus;
+    items: ReportCardRecord[];
+  }>({ status: "loading", items: [] });
+  const [draftKey, setDraftKey] = React.useState(0);
 
   React.useEffect(() => {
     setToday(
@@ -52,36 +155,171 @@ function GuruContent({ me }: { me: UserMe }) {
 
   React.useEffect(() => {
     let active = true;
-    fetchClasses({ size: 100 })
-      .then((res) => {
-        const mine = res.items.filter(
-          (klass) => klass.wali_kelas_id === me.user.id
+    setSchedule((current) => ({ ...current, status: "loading" }));
+    Promise.all([
+      getTeacherSchedule(teacherId),
+      fetchClasses({ size: 100 }),
+      fetchSubjects({ size: 100 }),
+      fetchStudents({ size: 100 }),
+      fetchAttendanceToday(),
+    ])
+      .then(([scheduleRows, classPage, subjectPage, studentPage, attendance]) => {
+        if (!active) return;
+        const classMap = new Map(classPage.items.map((k) => [k.id, k]));
+        const subjectMap = new Map(subjectPage.items.map((s) => [s.id, s]));
+        const studentsByClass = new Map<number, StudentRecord[]>();
+        for (const student of studentPage.items) {
+          if (student.class_id === null) continue;
+          const list = studentsByClass.get(student.class_id) ?? [];
+          list.push(student);
+          studentsByClass.set(student.class_id, list);
+        }
+
+        const day = indonesianDayName(new Date());
+        const todayRows = scheduleRows.filter(
+          (row) => row.day_of_week.toLowerCase() === day
         );
-        const classIds = new Set(mine.map((klass) => klass.id));
-        return fetchStudents({ size: 100 }).then((students) => {
-          const total = students.items.filter(
-            (student) =>
-              student.class_id !== null && classIds.has(student.class_id)
-          ).length;
-          if (!active) return;
-          setCounts({ classCount: mine.length, studentCount: total });
-          setStatus("ready");
+        const takenClassIds = new Set(
+          attendance.items.map((row: AttendanceRecord) => row.class_id)
+        );
+        const now = new Date().getHours() * 60 + new Date().getMinutes();
+        const sessions: SessionItem[] = todayRows
+          .slice()
+          .sort((a, b) => a.period_number - b.period_number)
+          .map((row: ScheduleRecord) => {
+            const start = minutesOf(row.start_time);
+            const end = minutesOf(row.end_time);
+            const status: SessionStatus =
+              end < now ? "done" : start <= now && now <= end ? "now" : "upcoming";
+            return {
+              id: String(row.id),
+              startTime: prettyTime(row.start_time),
+              endTime: prettyTime(row.end_time),
+              className: classMap.get(row.class_id)?.name ?? `Kelas ${row.class_id}`,
+              subject:
+                subjectMap.get(row.subject_id)?.name ?? `Mapel ${row.subject_id}`,
+              classId: row.class_id,
+              subjectId: row.subject_id,
+              status,
+              attendanceTaken: takenClassIds.has(row.class_id),
+            };
+          });
+
+        const allClassIds = new Set(scheduleRows.map((row) => row.class_id));
+        const studentCount = [...studentsByClass.entries()]
+          .filter(([classId]) => allClassIds.has(classId))
+          .reduce((sum, [, roster]) => sum + roster.length, 0);
+
+        const counts = attendance.counts ?? {};
+        const attendanceTotal = attendance.total;
+        const attendanceRate =
+          attendanceTotal > 0
+            ? Math.round(((counts.hadir ?? 0) / attendanceTotal) * 100)
+            : 0;
+
+        setSchedule({
+          status: "ready",
+          sessions,
+          classCount: allClassIds.size,
+          studentCount,
+          attendanceRate,
+          takenClassIds,
+          studentsByClass,
+          classes: classMap,
+          subjects: subjectMap,
         });
       })
       .catch(() => {
-        if (active) setStatus("error");
+        if (active) setSchedule((current) => ({ ...current, status: "error" }));
       });
     return () => {
       active = false;
     };
-  }, [me.user.id]);
+  }, [teacherId, scheduleKey]);
 
-  const sessions = guruMock.todaySessions;
-  const gradeQueue = guruMock.gradeQueue;
-  const attendanceQueue = guruMock.attendanceQueue;
-  const pendingCount = safePendingCount(guruMock.pendingGrades);
-  const kpiHint =
-    status === "error" ? "Perkiraan — gagal memuat data langsung" : undefined;
+  React.useEffect(() => {
+    if (schedule.status !== "ready") return;
+    let active = true;
+    setGradeQueue({ status: "loading", items: [] });
+    const semester = currentSemester();
+    getTeacherSchedule(teacherId)
+      .then((scheduleRows) =>
+        fetchGrades({ semester, size: 100 }).then((grades) => ({
+          scheduleRows,
+          grades,
+        }))
+      )
+      .then(({ scheduleRows, grades }) => {
+        if (!active) return;
+        const gradedKeys = new Set(
+          grades.items.map(
+            (grade: GradeRecord) => `${grade.student_id}:${grade.subject_id}`
+          )
+        );
+        const seen = new Set<string>();
+        const items: GradeQueueItem[] = [];
+        for (const row of scheduleRows) {
+          const key = `${row.class_id}:${row.subject_id}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const roster = schedule.studentsByClass.get(row.class_id) ?? [];
+          if (roster.length === 0) continue;
+          const pendingCount = roster.filter(
+            (student) => !gradedKeys.has(`${student.id}:${row.subject_id}`)
+          ).length;
+          if (pendingCount === 0) continue;
+          items.push({
+            id: key,
+            className:
+              schedule.classes.get(row.class_id)?.name ?? `Kelas ${row.class_id}`,
+            subject:
+              schedule.subjects.get(row.subject_id)?.name ??
+              `Mapel ${row.subject_id}`,
+            classId: row.class_id,
+            subjectId: row.subject_id,
+            pendingCount,
+          });
+        }
+        setGradeQueue({ status: "ready", items });
+      })
+      .catch(() => {
+        if (active) setGradeQueue({ status: "error", items: [] });
+      });
+    return () => {
+      active = false;
+    };
+  }, [schedule, teacherId, gradeKey]);
+
+  React.useEffect(() => {
+    let active = true;
+    setDrafts({ status: "loading", items: [] });
+    fetchReportCards({ status: "draft", size: 5 })
+      .then((page) => {
+        if (active) setDrafts({ status: "ready", items: page.items });
+      })
+      .catch(() => {
+        if (active) setDrafts({ status: "error", items: [] });
+      });
+    return () => {
+      active = false;
+    };
+  }, [draftKey]);
+
+  const attendanceQueue: AttendanceQueueItem[] = schedule.sessions
+    .filter((session) => !session.attendanceTaken)
+    .map((session) => ({
+      id: session.id,
+      className: session.className,
+      subject: session.subject,
+      classId: session.classId,
+      time: session.startTime,
+      studentCount: schedule.studentsByClass.get(session.classId)?.length ?? 0,
+    }));
+
+  const pendingCount = gradeQueue.items.reduce(
+    (sum, item) => sum + item.pendingCount,
+    0
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
@@ -90,12 +328,10 @@ function GuruContent({ me }: { me: UserMe }) {
           <h1 className="text-lg font-semibold tracking-tight text-foreground">
             Selamat pagi, {me.user.full_name.split(" ")[0]}
           </h1>
-          <p className="text-xs text-muted-foreground">
-            Guru · {today}
-          </p>
+          <p className="text-xs text-muted-foreground">Guru · {today}</p>
         </div>
         <Link
-          href="/dashboard/guru/attendance"
+          href="/dashboard/guru/absensi"
           className="flex min-h-10 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground transition-colors hover:opacity-90"
         >
           <CalendarCheck className="h-4 w-4" aria-hidden />
@@ -107,7 +343,7 @@ function GuruContent({ me }: { me: UserMe }) {
         aria-label="Ringkasan tugas"
         className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
       >
-        {status === "loading" ? (
+        {schedule.status === "loading" ? (
           <>
             <SkeletonCard />
             <SkeletonCard />
@@ -118,27 +354,32 @@ function GuruContent({ me }: { me: UserMe }) {
           <>
             <MetricCard
               label="Kelas Diampu"
-              value={counts.classCount}
+              value={schedule.classCount}
               icon={BookOpen}
-              hint={kpiHint ?? "Wali kelas"}
+              hint={schedule.status === "error" ? "Gagal memuat data" : "Dari jadwal Anda"}
             />
             <MetricCard
               label="Siswa Aktif"
-              value={counts.studentCount}
+              value={schedule.studentCount}
               icon={Users}
-              hint={kpiHint ?? "Di kelas yang diampu"}
+              hint={schedule.status === "error" ? "Gagal memuat data" : "Di kelas yang diampu"}
             />
             <MetricCard
               label="Nilai Belum Diinput"
               value={pendingCount}
               icon={ClipboardList}
-              hint="Terdekat jatuh tempo 2 Okt"
+              hint={
+                gradeQueue.status === "error"
+                  ? "Gagal memuat data"
+                  : pendingCount === 0
+                    ? "Semua sudah terisi"
+                    : "Siswa tanpa nilai semester ini"
+              }
             />
             <MetricCard
               label="Kehadiran Hari Ini"
-              value={`${guruMock.attendanceRate}%`}
+              value={`${schedule.attendanceRate}%`}
               icon={CalendarCheck}
-              delta={{ value: "+1%", direction: "up" }}
               hint="Untuk kelas yang diampu"
             />
           </>
@@ -150,10 +391,21 @@ function GuruContent({ me }: { me: UserMe }) {
           <CardHeader className="items-center border-b border-outline-variant pb-3">
             <CardTitle>Jadwal Mengajar Hari Ini</CardTitle>
             <span className="font-mono text-2xs tabular-nums text-muted-foreground">
-              {sessions.length} sesi
+              {schedule.sessions.length} sesi
             </span>
           </CardHeader>
-          {sessions.length === 0 ? (
+          {schedule.status === "loading" ? (
+            <CardBody>
+              <SkeletonList rows={4} />
+            </CardBody>
+          ) : schedule.status === "error" ? (
+            <CardBody>
+              <WidgetError
+                title="Gagal memuat jadwal"
+                onRetry={() => setScheduleKey((k) => k + 1)}
+              />
+            </CardBody>
+          ) : schedule.sessions.length === 0 ? (
             <CardBody>
               <EmptyState
                 icon={CalendarCheck}
@@ -163,7 +415,7 @@ function GuruContent({ me }: { me: UserMe }) {
             </CardBody>
           ) : (
             <ol className="divide-y divide-outline-variant">
-              {sessions.map((session) => (
+              {schedule.sessions.map((session) => (
                 <li
                   key={session.id}
                   className={cn(
@@ -191,7 +443,8 @@ function GuruContent({ me }: { me: UserMe }) {
                       {session.subject} · {session.className}
                     </p>
                     <p className="truncate text-2xs text-muted-foreground">
-                      {session.room} · {session.startTime}–{session.endTime}
+                      {session.startTime}–{session.endTime}
+                      {session.attendanceTaken ? " · absensi terisi" : ""}
                     </p>
                   </div>
                   {session.status === "done" ? (
@@ -200,7 +453,7 @@ function GuruContent({ me }: { me: UserMe }) {
                     <StatusChip tone="primary">sekarang</StatusChip>
                   ) : (
                     <Link
-                      href={`/dashboard/guru/attendance/${session.id}`}
+                      href="/dashboard/guru/absensi"
                       className="min-h-9 shrink-0 rounded-full border border-outline px-3 text-xs font-medium leading-9 text-primary hover:bg-surface-container-high"
                     >
                       Mulai
@@ -224,7 +477,11 @@ function GuruContent({ me }: { me: UserMe }) {
                 <StatusChip tone="success">selesai</StatusChip>
               )}
             </CardHeader>
-            {attendanceQueue.length === 0 ? (
+            {schedule.status === "loading" ? (
+              <CardBody>
+                <SkeletonList rows={3} />
+              </CardBody>
+            ) : attendanceQueue.length === 0 ? (
               <CardBody>
                 <EmptyState
                   icon={Check}
@@ -248,7 +505,7 @@ function GuruContent({ me }: { me: UserMe }) {
                       </p>
                     </div>
                     <Link
-                      href={`/dashboard/guru/attendance/${item.classId}`}
+                      href="/dashboard/guru/absensi"
                       className="min-h-9 shrink-0 rounded-full bg-primary px-3 text-xs font-semibold leading-9 text-primary-foreground hover:opacity-90"
                     >
                       Isi
@@ -266,7 +523,18 @@ function GuruContent({ me }: { me: UserMe }) {
                 {pendingCount}
               </span>
             </CardHeader>
-            {gradeQueue.length === 0 ? (
+            {gradeQueue.status === "loading" ? (
+              <CardBody>
+                <SkeletonList rows={3} />
+              </CardBody>
+            ) : gradeQueue.status === "error" ? (
+              <CardBody>
+                <WidgetError
+                  title="Gagal memuat antrean nilai"
+                  onRetry={() => setGradeKey((k) => k + 1)}
+                />
+              </CardBody>
+            ) : gradeQueue.items.length === 0 ? (
               <CardBody>
                 <EmptyState
                   icon={ClipboardList}
@@ -276,16 +544,13 @@ function GuruContent({ me }: { me: UserMe }) {
               </CardBody>
             ) : (
               <ul className="divide-y divide-outline-variant">
-                {gradeQueue.map((item) => (
+                {gradeQueue.items.map((item) => (
                   <li
                     key={item.id}
                     className="flex items-center gap-3 px-5 py-3"
                   >
                     <span
-                      className={cn(
-                        "h-9 w-1 shrink-0 rounded-full",
-                        BAR_TONE[item.urgency] ?? "bg-outline"
-                      )}
+                      className="h-9 w-1 shrink-0 rounded-full bg-warning"
                       aria-hidden
                     />
                     <div className="min-w-0 flex-1">
@@ -293,11 +558,11 @@ function GuruContent({ me }: { me: UserMe }) {
                         {item.subject} · {item.className}
                       </p>
                       <p className="text-2xs text-muted-foreground">
-                        Entri terakhir {item.lastEntry} · {item.due}
+                        {item.pendingCount} siswa belum dinilai
                       </p>
                     </div>
                     <Link
-                      href={`/dashboard/guru/grades/${item.classId}/${item.subjectId}`}
+                      href="/dashboard/guru/grades"
                       className="min-h-9 shrink-0 rounded-full border border-outline px-3 text-xs font-medium leading-9 text-primary hover:bg-surface-container-high"
                     >
                       Input
@@ -310,26 +575,45 @@ function GuruContent({ me }: { me: UserMe }) {
 
           <Card className="xl:col-span-2">
             <CardHeader className="items-center border-b border-outline-variant pb-3">
-              <CardTitle>Pengumuman Terbaru</CardTitle>
+              <CardTitle>Draf Rapor</CardTitle>
               <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden />
             </CardHeader>
-            <ul className="divide-y divide-outline-variant">
-              {guruMock.announcements.map((item) => (
-                <li key={item.id} className="px-5 py-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {item.title}
+            {drafts.status === "loading" ? (
+              <CardBody>
+                <SkeletonList rows={2} />
+              </CardBody>
+            ) : drafts.status === "error" ? (
+              <CardBody>
+                <WidgetError
+                  title="Gagal memuat draf rapor"
+                  onRetry={() => setDraftKey((k) => k + 1)}
+                />
+              </CardBody>
+            ) : drafts.items.length === 0 ? (
+              <CardBody>
+                <EmptyState
+                  icon={FileText}
+                  title="Tidak ada draf rapor"
+                  description="Rapor yang belum diterbitkan akan tampil di sini."
+                />
+              </CardBody>
+            ) : (
+              <ul className="divide-y divide-outline-variant">
+                {drafts.items.map((item) => (
+                  <li key={item.id} className="px-5 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {item.semester}
+                      </p>
+                      <StatusChip tone="warning">draft</StatusChip>
+                    </div>
+                    <p className="mt-0.5 text-2xs text-muted-foreground">
+                      Siswa #{item.student_id} · {item.kurikulum_version}
                     </p>
-                    <span className="shrink-0 text-2xs text-muted-foreground">
-                      {item.time}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-2xs text-muted-foreground">
-                    {item.body}
-                  </p>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
         </div>
       </div>
