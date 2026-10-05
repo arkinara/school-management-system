@@ -8,7 +8,9 @@ import {
   CalendarCheck,
   ClipboardList,
   Megaphone,
+  RotateCcw,
   TrendingUp,
+  Wallet,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { GradeBars, type GradeBarItem } from "@/components/dashboard/GradeBars";
@@ -16,11 +18,26 @@ import { ProgressBars } from "@/components/dashboard/ProgressBars";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { StatusChip } from "@/components/ui/StatusChip";
-import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
+import { Skeleton, SkeletonCard, SkeletonList } from "@/components/ui/Skeleton";
 import { cn } from "@/components/ui/cn";
-import { fetchParentChildren, type ChildSummary } from "@/lib/endpoints";
+import {
+  fetchAnnouncements,
+  fetchAttendances,
+  fetchClasses,
+  fetchGradeAggregate,
+  fetchParentChildren,
+  fetchReportCards,
+  getBills,
+  currentSemester,
+  type AnnouncementRecord,
+  type AttendanceRecord,
+  type ChildSummary,
+  type ClassRecord,
+  type SppBill,
+} from "@/lib/endpoints";
 import type { UserMe } from "@/lib/auth";
 
 type LoadStatus = "loading" | "ready" | "error";
@@ -32,105 +49,32 @@ interface AttendanceBreakdown {
   alpa: number;
 }
 
-interface ChildProfile {
-  key: string;
-  name: string;
-  className: string;
-  nis: string;
-  average: number;
-  attendanceRate: number;
-  rank: number;
-  classSize: number;
-  grades: GradeBarItem[];
-  attendance: AttendanceBreakdown;
-}
-
 interface BillItem {
-  id: string;
+  id: number;
   label: string;
   amount: number;
-  status: "paid" | "overdue";
+  status: "paid" | "overdue" | "unpaid";
 }
 
-interface ParentAnnouncement {
-  id: string;
-  title: string;
-  body: string;
-  audience: string;
-  time: string;
+interface ChildData {
+  status: LoadStatus;
+  average: number | null;
+  attendanceRate: number;
+  rank: null;
+  grades: GradeBarItem[];
+  attendance: AttendanceBreakdown;
+  bills: BillItem[];
 }
 
-const CHILD_MOCKS: ChildProfile[] = [
-  {
-    key: "andi",
-    name: "Andi Wijaya",
-    className: "6A",
-    nis: "2019001",
-    average: 85.7,
-    attendanceRate: 96,
-    rank: 4,
-    classSize: 32,
-    grades: [
-      { subject: "Matematika", score: 88 },
-      { subject: "Bahasa Indonesia", score: 85 },
-      { subject: "IPA", score: 90 },
-      { subject: "IPS", score: 78 },
-      { subject: "Bahasa Inggris", score: 82 },
-      { subject: "PJOK", score: 91 },
-    ],
-    attendance: { hadir: 23, izin: 1, sakit: 0, alpa: 0 },
-  },
-  {
-    key: "dinda",
-    name: "Dinda Wijaya",
-    className: "3B",
-    nis: "2022008",
-    average: 86.5,
-    attendanceRate: 98,
-    rank: 2,
-    classSize: 30,
-    grades: [
-      { subject: "Matematika", score: 81 },
-      { subject: "Bahasa Indonesia", score: 92 },
-      { subject: "IPA", score: 86 },
-      { subject: "IPS", score: 84 },
-      { subject: "Bahasa Inggris", score: 79 },
-      { subject: "PJOK", score: 90 },
-    ],
-    attendance: { hadir: 24, izin: 0, sakit: 1, alpa: 0 },
-  },
-];
-
-const BILLS: BillItem[] = [
-  { id: "sep", label: "SPP September", amount: 350_000, status: "overdue" },
-  { id: "agu", label: "SPP Agustus", amount: 350_000, status: "paid" },
-  { id: "jul", label: "SPP Juli", amount: 350_000, status: "paid" },
-  { id: "ser", label: "Seragam & Buku", amount: 780_000, status: "paid" },
-];
-
-const ANNOUNCEMENTS: ParentAnnouncement[] = [
-  {
-    id: "n1",
-    title: "Libur Maulid Nabi — 7 Oktober",
-    body: "Kegiatan belajar diliburkan. Pembelajaran kembali normal 8 Oktober.",
-    audience: "Semua sekolah",
-    time: "2 jam lalu",
-  },
-  {
-    id: "n2",
-    title: "Jadwal Ujian Tengah Semester",
-    body: "UTS 14–18 Oktober. Kisi-kisi dibagikan wali kelas minggu depan.",
-    audience: "Kelas 6A",
-    time: "5 jam lalu",
-  },
-  {
-    id: "n3",
-    title: "Pembagian Rapor Tengah Semester",
-    body: "Orang tua diunduh hadir 25 Oktober pukul 08.00 di ruang kelas.",
-    audience: "Kelas 6A",
-    time: "2 hari lalu",
-  },
-];
+const EMPTY_CHILD: ChildData = {
+  status: "loading",
+  average: null,
+  attendanceRate: 0,
+  rank: null,
+  grades: [],
+  attendance: { hadir: 0, izin: 0, sakit: 0, alpa: 0 },
+  bills: [],
+};
 
 function formatRupiah(amount: number): string {
   return new Intl.NumberFormat("id-ID", {
@@ -140,18 +84,25 @@ function formatRupiah(amount: number): string {
   }).format(amount);
 }
 
-function resolveChild(child: ChildSummary, index: number): ChildProfile {
-  const base =
-    CHILD_MOCKS.find((mock) => mock.name === child.full_name) ??
-    CHILD_MOCKS[index % CHILD_MOCKS.length];
-  return {
-    ...base,
-    key: `child-${child.id}`,
-    name: child.full_name,
-    nis: child.nis,
-    className: child.class_id ? `Kelas ${child.class_id}` : base.className,
-    grades: [],
-  };
+function WidgetError({
+  title,
+  onRetry,
+}: {
+  title: string;
+  onRetry: () => void;
+}) {
+  return (
+    <EmptyState
+      icon={AlertCircle}
+      title={title}
+      description="Tidak dapat mengambil data. Periksa koneksi lalu coba lagi."
+      action={
+        <Button variant="tonal" icon={RotateCcw} onClick={onRetry}>
+          Coba lagi
+        </Button>
+      }
+    />
+  );
 }
 
 function AttendanceBreakdownList({
@@ -186,10 +137,23 @@ function AttendanceBreakdownList({
 }
 
 function OrangTuaContent({ me }: { me: UserMe }) {
-  const [status, setStatus] = React.useState<LoadStatus>("loading");
-  const [children, setChildren] = React.useState<ChildProfile[]>([]);
-  const [selectedKey, setSelectedKey] = React.useState<string>("");
+  const [childrenStatus, setChildrenStatus] =
+    React.useState<LoadStatus>("loading");
+  const [children, setChildren] = React.useState<ChildSummary[]>([]);
+  const [classMap, setClassMap] = React.useState<Map<number, ClassRecord>>(
+    new Map()
+  );
+  const [childrenKey, setChildrenKey] = React.useState(0);
+  const [selectedId, setSelectedId] = React.useState<number | null>(null);
+  const [childData, setChildData] = React.useState<ChildData>(EMPTY_CHILD);
+  const [childKey, setChildKey] = React.useState(0);
   const [today, setToday] = React.useState("");
+
+  const [announcements, setAnnouncements] = React.useState<{
+    status: LoadStatus;
+    items: AnnouncementRecord[];
+  }>({ status: "loading", items: [] });
+  const [announcementKey, setAnnouncementKey] = React.useState(0);
 
   React.useEffect(() => {
     setToday(
@@ -204,38 +168,125 @@ function OrangTuaContent({ me }: { me: UserMe }) {
 
   React.useEffect(() => {
     let active = true;
-    fetchParentChildren(me.user.id)
-      .then((kids) => {
+    setChildrenStatus("loading");
+    Promise.all([
+      fetchParentChildren(me.user.id),
+      fetchClasses({ size: 100 }),
+    ])
+      .then(([kids, classPage]) => {
         if (!active) return;
-        if (kids.length === 0) {
-          setChildren([]);
-          setStatus("ready");
-          return;
-        }
-        const resolved = kids.map(resolveChild);
-        setChildren(resolved);
-        setSelectedKey(resolved[0].key);
-        setStatus("ready");
+        setChildren(kids);
+        setClassMap(new Map(classPage.items.map((k) => [k.id, k])));
+        setSelectedId((prev) => prev ?? kids[0]?.id ?? null);
+        setChildrenStatus("ready");
       })
       .catch(() => {
-        if (!active) return;
-        setChildren(CHILD_MOCKS);
-        setSelectedKey(CHILD_MOCKS[0].key);
-        setStatus("error");
+        if (active) setChildrenStatus("error");
       });
     return () => {
       active = false;
     };
-  }, [me.user.id]);
+  }, [me.user.id, childrenKey]);
 
-  const child = children.find((item) => item.key === selectedKey) ?? children[0];
-  const overdue = BILLS.find((bill) => bill.status === "overdue");
-  const paidCount = BILLS.filter((bill) => bill.status === "paid").length;
-  const paidPct = Math.round((paidCount / BILLS.length) * 100);
-  const kpiHint =
-    status === "error" ? "Perkiraan — gagal memuat data langsung" : undefined;
+  React.useEffect(() => {
+    if (selectedId === null) return;
+    let active = true;
+    setChildData(EMPTY_CHILD);
+    const semester = currentSemester();
+    Promise.all([
+      fetchGradeAggregate({ student_id: selectedId, semester }).catch(
+        () => null
+      ),
+      fetchAttendances({ student_id: selectedId, size: 100 }),
+      fetchReportCards({ student_id: selectedId, semester, size: 1 }),
+      getBills({ student_id: selectedId, size: 100 }),
+    ])
+      .then(([aggregate, attendance, rapors, bills]) => {
+        if (!active) return;
+        const breakdown: AttendanceBreakdown = {
+          hadir: 0,
+          izin: 0,
+          sakit: 0,
+          alpa: 0,
+        };
+        for (const row of attendance.items as AttendanceRecord[]) {
+          breakdown[row.status] += 1;
+        }
+        const totalAttendance = attendance.total;
+        const rate =
+          totalAttendance > 0
+            ? Math.round((breakdown.hadir / totalAttendance) * 100)
+            : 0;
 
-  if (status === "loading") {
+        let grades: GradeBarItem[] = [];
+        let average: number | null = null;
+        if (aggregate && aggregate.per_subject.length > 0) {
+          grades = aggregate.per_subject.map((item) => ({
+            subject: item.subject_name ?? `Mapel ${item.subject_id}`,
+            score: Math.round(item.average),
+          }));
+          average = aggregate.overall_average;
+        } else {
+          const nilai = rapors.items[0]?.compiled_data?.nilai ?? [];
+          grades = nilai.map((entry) => ({
+            subject: entry.subject,
+            score: Math.round(entry.score),
+          }));
+          average =
+            grades.length > 0
+              ? grades.reduce((sum, item) => sum + item.score, 0) / grades.length
+              : null;
+        }
+
+        const billItems: BillItem[] = (bills.items as SppBill[]).map((bill) => ({
+          id: bill.id,
+          label: `SPP ${bill.period}`,
+          amount: bill.status === "paid" ? bill.amount : bill.balance,
+          status: bill.status,
+        }));
+
+        setChildData({
+          status: "ready",
+          average,
+          attendanceRate: rate,
+          rank: null,
+          grades,
+          attendance: breakdown,
+          bills: billItems,
+        });
+      })
+      .catch(() => {
+        if (active) setChildData({ ...EMPTY_CHILD, status: "error" });
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedId, childKey]);
+
+  React.useEffect(() => {
+    let active = true;
+    setAnnouncements({ status: "loading", items: [] });
+    fetchAnnouncements({ status: "published", size: 5 })
+      .then((page) => {
+        if (active) setAnnouncements({ status: "ready", items: page.items });
+      })
+      .catch(() => {
+        if (active) setAnnouncements({ status: "error", items: [] });
+      });
+    return () => {
+      active = false;
+    };
+  }, [announcementKey]);
+
+  const child = children.find((item) => item.id === selectedId) ?? children[0];
+  const overdue = childData.bills.find((bill) => bill.status === "overdue");
+  const paidCount = childData.bills.filter((bill) => bill.status === "paid").length;
+  const paidPct =
+    childData.bills.length > 0
+      ? Math.round((paidCount / childData.bills.length) * 100)
+      : 0;
+
+  if (childrenStatus === "loading") {
     return (
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
         <div>
@@ -258,14 +309,27 @@ function OrangTuaContent({ me }: { me: UserMe }) {
     );
   }
 
-  if (children.length === 0) {
+  if (childrenStatus === "error") {
+    return (
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
+        <WidgetError
+          title="Gagal memuat data anak"
+          onRetry={() => setChildrenKey((k) => k + 1)}
+        />
+      </div>
+    );
+  }
+
+  if (children.length === 0 || !child) {
     return (
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
         <div>
           <h1 className="text-lg font-semibold tracking-tight text-foreground">
             Selamat pagi, {me.user.full_name.split(" ")[0]}
           </h1>
-          <p className="text-xs text-muted-foreground">Orang Tua{today ? ` · ${today}` : ""}</p>
+          <p className="text-xs text-muted-foreground">
+            Orang Tua{today ? ` · ${today}` : ""}
+          </p>
         </div>
         <EmptyState
           icon={ClipboardList}
@@ -275,6 +339,10 @@ function OrangTuaContent({ me }: { me: UserMe }) {
       </div>
     );
   }
+
+  const className = child.class_id
+    ? classMap.get(child.class_id)?.name ?? `Kelas ${child.class_id}`
+    : "—";
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
@@ -302,18 +370,21 @@ function OrangTuaContent({ me }: { me: UserMe }) {
         </span>
         {children.length === 1 ? (
           <div className="flex min-h-10 items-center gap-2 rounded-full border border-primary bg-primary-container px-3 py-1 text-xs font-semibold text-primary-container-foreground">
-            <Avatar name={child.name} size="sm" />
-            {child.name} · {child.className}
+            <Avatar name={child.full_name} size="sm" />
+            {child.full_name} · {className}
           </div>
         ) : (
           children.map((item) => {
-            const on = item.key === selectedKey;
+            const on = item.id === child.id;
+            const itemClass = item.class_id
+              ? classMap.get(item.class_id)?.name ?? `Kelas ${item.class_id}`
+              : "—";
             return (
               <button
-                key={item.key}
+                key={item.id}
                 type="button"
                 aria-pressed={on}
-                onClick={() => setSelectedKey(item.key)}
+                onClick={() => setSelectedId(item.id)}
                 className={cn(
                   "flex min-h-10 items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors",
                   on
@@ -321,8 +392,8 @@ function OrangTuaContent({ me }: { me: UserMe }) {
                     : "border-outline-variant font-medium text-muted-foreground hover:bg-surface-3"
                 )}
               >
-                <Avatar name={item.name} size="sm" />
-                {item.name} · {item.className}
+                <Avatar name={item.full_name} size="sm" />
+                {item.full_name} · {itemClass}
               </button>
             );
           })
@@ -346,10 +417,10 @@ function OrangTuaContent({ me }: { me: UserMe }) {
             </p>
           </div>
           <Link
-            href="/dashboard/orang-tua/spp"
+            href="/dashboard/orang-tua/rapor"
             className="flex min-h-10 shrink-0 items-center rounded-full bg-destructive px-4 text-xs font-semibold text-destructive-foreground hover:opacity-90"
           >
-            Bayar
+            Lihat
           </Link>
         </div>
       )}
@@ -358,30 +429,63 @@ function OrangTuaContent({ me }: { me: UserMe }) {
         aria-label="Ringkasan anak"
         className="grid grid-cols-1 gap-3 sm:grid-cols-3"
       >
-        <MetricCard
-          label="Rata-rata"
-          value={child.average.toFixed(1).replace(".", ",")}
-          icon={TrendingUp}
-          hint={kpiHint ?? `Semester ini · ${child.name}`}
-        />
-        <MetricCard
-          label="Kehadiran"
-          value={`${child.attendanceRate}%`}
-          icon={CalendarCheck}
-          hint="Semester ini"
-        />
-        <MetricCard
-          label="Peringkat Kelas"
-          value={`${child.rank}/${child.classSize}`}
-          icon={ClipboardList}
-          hint="Dari jumlah siswa sekelas"
-        />
+        {childData.status === "loading" ? (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
+        ) : childData.status === "error" ? (
+          <div className="sm:col-span-3">
+            <WidgetError
+              title="Gagal memuat ringkasan anak"
+              onRetry={() => setChildKey((k) => k + 1)}
+            />
+          </div>
+        ) : (
+          <>
+            <MetricCard
+              label="Rata-rata"
+              value={
+                childData.average !== null
+                  ? childData.average.toFixed(1).replace(".", ",")
+                  : "—"
+              }
+              icon={TrendingUp}
+              hint={`Semester ini · ${child.full_name}`}
+            />
+            <MetricCard
+              label="Kehadiran"
+              value={`${childData.attendanceRate}%`}
+              icon={CalendarCheck}
+              hint="Dari pencatatan absensi"
+            />
+            <MetricCard
+              label="Tagihan Aktif"
+              value={
+                overdue
+                  ? formatRupiah(overdue.amount)
+                  : childData.bills.length > 0
+                    ? `${childData.bills.length - paidCount} tagihan`
+                    : "—"
+              }
+              icon={Wallet}
+              hint={
+                overdue
+                  ? "Ada tunggakan"
+                  : childData.bills.length > 0
+                    ? "Belum lunas"
+                    : "Tidak ada tagihan"
+              }
+            />
+          </>
+        )}
       </section>
 
       <div className="grid gap-3 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="items-center border-b border-outline-variant pb-3">
-            <CardTitle>Perkembangan Nilai · {child.name}</CardTitle>
+            <CardTitle>Perkembangan Nilai · {child.full_name}</CardTitle>
             <Link
               href="/dashboard/orang-tua/rapor"
               className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-surface-container-high"
@@ -391,19 +495,21 @@ function OrangTuaContent({ me }: { me: UserMe }) {
             </Link>
           </CardHeader>
           <CardBody>
-            {child.grades.length === 0 ? (
+            {childData.status === "loading" ? (
+              <SkeletonList rows={4} />
+            ) : childData.grades.length === 0 ? (
               <EmptyState
                 icon={ClipboardList}
                 title="Belum ada nilai tercatat"
-                description={`Nilai ${child.name} akan tampil setelah guru menerbitkannya.`}
+                description={`Nilai ${child.full_name} akan tampil setelah guru menerbitkannya.`}
               />
             ) : (
               <>
                 <GradeBars
-                  items={child.grades}
-                  ariaLabel={`Nilai mata pelajaran ${child.name}`}
+                  items={childData.grades}
+                  ariaLabel={`Nilai mata pelajaran ${child.full_name}`}
                 />
-                <AttendanceBreakdownList attendance={child.attendance} />
+                <AttendanceBreakdownList attendance={childData.attendance} />
               </>
             )}
           </CardBody>
@@ -418,7 +524,11 @@ function OrangTuaContent({ me }: { me: UserMe }) {
               <StatusChip tone="success">lunas</StatusChip>
             )}
           </CardHeader>
-          {BILLS.length === 0 ? (
+          {childData.status === "loading" ? (
+            <CardBody>
+              <SkeletonList rows={3} />
+            </CardBody>
+          ) : childData.bills.length === 0 ? (
             <CardBody>
               <EmptyState
                 icon={Megaphone}
@@ -429,7 +539,7 @@ function OrangTuaContent({ me }: { me: UserMe }) {
           ) : (
             <>
               <ul className="divide-y divide-outline-variant">
-                {BILLS.map((bill) => (
+                {childData.bills.map((bill) => (
                   <li
                     key={bill.id}
                     className="flex items-center justify-between gap-2 px-5 py-2.5"
@@ -445,7 +555,11 @@ function OrangTuaContent({ me }: { me: UserMe }) {
                     <StatusChip
                       tone={bill.status === "paid" ? "success" : "danger"}
                     >
-                      {bill.status === "paid" ? "lunas" : "menunggak"}
+                      {bill.status === "paid"
+                        ? "lunas"
+                        : bill.status === "overdue"
+                          ? "menunggak"
+                          : "belum lunas"}
                     </StatusChip>
                   </li>
                 ))}
@@ -456,16 +570,16 @@ function OrangTuaContent({ me }: { me: UserMe }) {
                     {
                       label: "Tagihan lunas",
                       value: paidPct,
-                      display: `${paidCount}/${BILLS.length}`,
+                      display: `${paidCount}/${childData.bills.length}`,
                     },
                   ]}
                   ariaLabel="Rasio tagihan lunas"
                 />
                 <Link
-                  href="/dashboard/orang-tua/spp"
+                  href="/dashboard/orang-tua/rapor"
                   className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                 >
-                  Lihat semua
+                  Lihat rapor
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                 </Link>
               </div>
@@ -478,10 +592,21 @@ function OrangTuaContent({ me }: { me: UserMe }) {
         <CardHeader className="items-center border-b border-outline-variant pb-3">
           <CardTitle>Pengumuman Terbaru</CardTitle>
           <span className="font-mono text-2xs tabular-nums text-muted-foreground">
-            {ANNOUNCEMENTS.length} baru
+            {announcements.items.length} baru
           </span>
         </CardHeader>
-        {ANNOUNCEMENTS.length === 0 ? (
+        {announcements.status === "loading" ? (
+          <CardBody>
+            <SkeletonList rows={3} />
+          </CardBody>
+        ) : announcements.status === "error" ? (
+          <CardBody>
+            <WidgetError
+              title="Gagal memuat pengumuman"
+              onRetry={() => setAnnouncementKey((k) => k + 1)}
+            />
+          </CardBody>
+        ) : announcements.items.length === 0 ? (
           <CardBody>
             <EmptyState
               icon={Megaphone}
@@ -491,7 +616,7 @@ function OrangTuaContent({ me }: { me: UserMe }) {
           </CardBody>
         ) : (
           <ul className="divide-y divide-outline-variant">
-            {ANNOUNCEMENTS.map((item) => (
+            {announcements.items.map((item) => (
               <li key={item.id} className="flex gap-3 px-5 py-3">
                 <span
                   className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary"
@@ -504,12 +629,11 @@ function OrangTuaContent({ me }: { me: UserMe }) {
                   <p className="mt-0.5 text-2xs text-muted-foreground">
                     {item.body}
                   </p>
-                  <p className="mt-1 text-2xs text-muted-foreground">
-                    {item.audience}
-                  </p>
                 </div>
                 <span className="shrink-0 text-2xs text-muted-foreground">
-                  {item.time}
+                  {item.published_at
+                    ? new Date(item.published_at).toLocaleDateString("id-ID")
+                    : ""}
                 </span>
               </li>
             ))}
