@@ -635,6 +635,13 @@ export const fetchBillList = getBills;
 /** Alias matching the shared wiring contract for bulk bill generation. */
 export const createBillBulk = bulkCreateBills;
 
+/** GET /api/spp/bills/overdue — overdue or unpaid-past-due bills. */
+export function fetchOverdueBills(
+  params: { class_id?: number; page?: number; size?: number } = {}
+): Promise<Paginated<SppBill>> {
+  return apiFetch<Paginated<SppBill>>(`/api/spp/bills/overdue${toQuery(params)}`);
+}
+
 /** Aggregated counts used by the principal/TU KPI rows. */
 export interface DashboardCounts {
   students: number;

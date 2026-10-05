@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-  CalendarCheck,
+  AlertCircle,
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
@@ -11,6 +11,7 @@ import {
   Megaphone,
   MessageSquareWarning,
   Receipt,
+  RotateCcw,
   Send,
   UserCheck,
   Users,
@@ -19,11 +20,23 @@ import {
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { StatusChip } from "@/components/ui/StatusChip";
-import { SkeletonCard, SkeletonTable } from "@/components/ui/Skeleton";
+import { SkeletonCard, SkeletonList, SkeletonTable } from "@/components/ui/Skeleton";
 import { cn } from "@/components/ui/cn";
-import { fetchStudents, fetchUsers } from "@/lib/endpoints";
+import {
+  fetchAnnouncements,
+  fetchClasses,
+  fetchDashboardCounts,
+  fetchOverdueBills,
+  fetchStudents,
+  getBills,
+  type AnnouncementRecord,
+  type ClassRecord,
+  type SppBill,
+  type StudentRecord,
+} from "@/lib/endpoints";
 import type { UserMe } from "@/lib/auth";
 
 type LoadStatus = "loading" | "ready" | "error";
@@ -40,7 +53,7 @@ interface QueueTask {
 }
 
 interface OverdueRow {
-  id: string;
+  id: number;
   nis: string;
   name: string;
   className: string;
@@ -50,65 +63,12 @@ interface OverdueRow {
 }
 
 interface UrgentAnnouncement {
-  id: string;
+  id: number;
   title: string;
   audience: string;
 }
 
-const TASKS: QueueTask[] = [
-  {
-    id: "t1",
-    time: "08.00",
-    label: "Generate SPP bulan ini",
-    detail: "18 rombel · 648 siswa aktif",
-    group: "Tagihan",
-    icon: Receipt,
-  },
-  {
-    id: "t2",
-    time: "09.30",
-    label: "Cek absensi pagi",
-    detail: "Tandai kelas yang belum mengisi",
-    group: "Master data",
-    icon: CalendarCheck,
-  },
-  {
-    id: "t3",
-    time: "11.00",
-    label: "Approve pendaftaran siswa",
-    detail: "6 pendaftar menunggu verifikasi",
-    group: "Master data",
-    icon: UserCheck,
-  },
-  {
-    id: "t4",
-    time: "14.00",
-    label: "Reminder orang tua menunggak",
-    detail: "86 siswa dengan tunggakan aktif",
-    group: "Pembayaran",
-    icon: MessageSquareWarning,
-  },
-];
-
 const GROUP_ORDER: TaskGroup[] = ["Tagihan", "Pembayaran", "Master data"];
-
-const OVERDUE_ROWS: OverdueRow[] = [
-  { id: "s1", nis: "2021001", name: "Rizky Maulana", className: "XI-IPA-2", amount: 350_000, dueDays: 20, status: "overdue" },
-  { id: "s2", nis: "2021014", name: "Salsabila Putri", className: "X-IPS-1", amount: 350_000, dueDays: 20, status: "overdue" },
-  { id: "s3", nis: "2020012", name: "Fajar Nugraha", className: "XII-IPA-1", amount: 700_000, dueDays: 51, status: "overdue" },
-  { id: "s4", nis: "2021033", name: "Nabila Rahma", className: "X-IPA-3", amount: 350_000, dueDays: 12, status: "pending" },
-  { id: "s5", nis: "2021050", name: "Dimas Aryo", className: "XI-IPS-1", amount: 350_000, dueDays: 8, status: "pending" },
-  { id: "s6", nis: "2020061", name: "Ayu Lestari", className: "XII-IPS-2", amount: 350_000, dueDays: 0, status: "pending" },
-  { id: "s7", nis: "2021078", name: "Bagas Prakoso", className: "X-IPA-1", amount: 350_000, dueDays: 0, status: "pending" },
-  { id: "s8", nis: "2020090", name: "Citra Amelia", className: "XII-IPA-2", amount: 700_000, dueDays: 51, status: "overdue" },
-  { id: "s9", nis: "2021102", name: "Eka Saputra", className: "X-IPS-2", amount: 350_000, dueDays: 4, status: "pending" },
-  { id: "s10", nis: "2020110", name: "Gita Permata", className: "XII-IPS-1", amount: 350_000, dueDays: 0, status: "pending" },
-];
-
-const URGENT_ANNOUNCEMENTS: UrgentAnnouncement[] = [
-  { id: "u1", title: "Perubahan jam pulang 7 Oktober", audience: "Semua kelas" },
-  { id: "u2", title: "Pendaftaran ekskul semester genap", audience: "Kelas X & XI" },
-];
 
 type SortKey = "nis" | "name" | "className" | "amount" | "status" | "dueDays";
 
@@ -120,18 +80,66 @@ function formatRupiah(amount: number): string {
   }).format(amount);
 }
 
+function WidgetError({
+  title,
+  onRetry,
+}: {
+  title: string;
+  onRetry: () => void;
+}) {
+  return (
+    <EmptyState
+      icon={AlertCircle}
+      title={title}
+      description="Tidak dapat mengambil data. Periksa koneksi lalu coba lagi."
+      action={
+        <Button variant="tonal" icon={RotateCcw} onClick={onRetry}>
+          Coba lagi
+        </Button>
+      }
+    />
+  );
+}
+
+function daysBetween(from: string, to: Date): number {
+  const start = new Date(from).getTime();
+  const end = new Date(to.toISOString().slice(0, 10)).getTime();
+  return Math.floor((end - start) / 86_400_000);
+}
+
 function TuContent({ me }: { me: UserMe }) {
-  const [status, setStatus] = React.useState<LoadStatus>("loading");
-  const [counts, setCounts] = React.useState<{
+  const [overview, setOverview] = React.useState<{
+    status: LoadStatus;
     students: number | null;
     teachers: number | null;
-  }>({ students: null, teachers: null });
-  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+    unpaidCount: number;
+    overdueCount: number;
+  }>({
+    status: "loading",
+    students: null,
+    teachers: null,
+    unpaidCount: 0,
+    overdueCount: 0,
+  });
+  const [overviewKey, setOverviewKey] = React.useState(0);
+
+  const [bills, setBills] = React.useState<{
+    status: LoadStatus;
+    rows: OverdueRow[];
+  }>({ status: "loading", rows: [] });
+  const [billsKey, setBillsKey] = React.useState(0);
+
+  const [urgentStatus, setUrgentStatus] =
+    React.useState<LoadStatus>("loading");
+  const [urgent, setUrgent] = React.useState<UrgentAnnouncement[]>([]);
+  const [urgentKey, setUrgentKey] = React.useState(0);
+
+  const [selected, setSelected] = React.useState<Set<number>>(new Set());
   const [reminded, setReminded] = React.useState(0);
-  const [sort, setSort] = React.useState<{ key: SortKey; direction: "asc" | "desc" }>(
-    { key: "dueDays", direction: "desc" }
-  );
-  const [urgent, setUrgent] = React.useState(URGENT_ANNOUNCEMENTS);
+  const [sort, setSort] = React.useState<{
+    key: SortKey;
+    direction: "asc" | "desc";
+  }>({ key: "dueDays", direction: "desc" });
   const [today, setToday] = React.useState("");
   const selectAllRef = React.useRef<HTMLInputElement>(null);
 
@@ -146,31 +154,107 @@ function TuContent({ me }: { me: UserMe }) {
     );
   }, []);
 
+  const scope = React.useMemo(
+    () => (me.school_id === null ? {} : { school_id: me.school_id }),
+    [me.school_id]
+  );
+
   React.useEffect(() => {
     let active = true;
-    const scope = me.school_id === null ? {} : { school_id: me.school_id };
-    setStatus("loading");
+    setOverview((current) => ({ ...current, status: "loading" }));
     Promise.all([
-      fetchStudents({ ...scope, size: 1 }),
-      fetchUsers({ ...scope, role: "teacher", size: 1 }),
+      fetchDashboardCounts(scope),
+      fetchOverdueBills({ size: 1 }),
+      getBills({ status: "unpaid", size: 1 }),
     ])
-      .then(([students, teachers]) => {
+      .then(([counts, overduePage, unpaidPage]) => {
         if (!active) return;
-        setCounts({ students: students.total, teachers: teachers.total });
-        setStatus("ready");
+        setOverview({
+          status: "ready",
+          students: counts.students,
+          teachers: counts.teachers,
+          unpaidCount: unpaidPage.total,
+          overdueCount: overduePage.total,
+        });
       })
       .catch(() => {
-        if (!active) return;
-        setCounts({ students: null, teachers: null });
-        setStatus("error");
+        if (!active) setOverview((current) => ({ ...current, status: "error" }));
       });
     return () => {
       active = false;
     };
-  }, [me.school_id]);
+  }, [scope, overviewKey]);
+
+  React.useEffect(() => {
+    let active = true;
+    setBills({ status: "loading", rows: [] });
+    Promise.all([
+      fetchOverdueBills({ size: 50 }),
+      fetchStudents({ ...scope, size: 100 }),
+      fetchClasses({ ...scope, size: 100 }),
+    ])
+      .then(([billPage, studentPage, classPage]) => {
+        if (!active) return;
+        const studentMap = new Map<number, StudentRecord>(
+          studentPage.items.map((s) => [s.id, s])
+        );
+        const classMap = new Map<number, ClassRecord>(
+          classPage.items.map((k) => [k.id, k])
+        );
+        const now = new Date();
+        const rows: OverdueRow[] = (billPage.items as SppBill[]).map((bill) => {
+          const student = studentMap.get(bill.student_id);
+          const days = daysBetween(bill.due_date, now);
+          return {
+            id: bill.id,
+            nis: student?.nis ?? String(bill.student_id),
+            name: student?.full_name ?? `Siswa #${bill.student_id}`,
+            className: bill.class_id
+              ? classMap.get(bill.class_id)?.name ?? `Kelas ${bill.class_id}`
+              : "—",
+            amount: bill.balance > 0 ? bill.balance : bill.amount,
+            dueDays: days,
+            status: days > 0 ? "overdue" : "pending",
+          };
+        });
+        setBills({ status: "ready", rows });
+      })
+      .catch(() => {
+        if (active) setBills({ status: "error", rows: [] });
+      });
+    return () => {
+      active = false;
+    };
+  }, [scope, billsKey]);
+
+  React.useEffect(() => {
+    let active = true;
+    setUrgentStatus("loading");
+    fetchAnnouncements({ ...scope, status: "draft", size: 5 })
+      .then((page) => {
+        if (!active) return;
+        setUrgent(
+          page.items.map((item: AnnouncementRecord) => ({
+            id: item.id,
+            title: item.title,
+            audience: item.audience,
+          }))
+        );
+        setUrgentStatus("ready");
+      })
+      .catch(() => {
+        if (active) {
+          setUrgent([]);
+          setUrgentStatus("error");
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [scope, urgentKey]);
 
   const rows = React.useMemo(() => {
-    const copy = [...OVERDUE_ROWS];
+    const copy = [...bills.rows];
     copy.sort((a, b) => {
       const dir = sort.direction === "asc" ? 1 : -1;
       if (sort.key === "amount" || sort.key === "dueDays") {
@@ -184,7 +268,7 @@ function TuContent({ me }: { me: UserMe }) {
       return a[sort.key].localeCompare(b[sort.key]) * dir;
     });
     return copy;
-  }, [sort]);
+  }, [bills.rows, sort]);
 
   React.useEffect(() => {
     if (selectAllRef.current) {
@@ -201,7 +285,7 @@ function TuContent({ me }: { me: UserMe }) {
     );
   }
 
-  function toggleRow(id: string) {
+  function toggleRow(id: number) {
     setSelected((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
@@ -224,13 +308,49 @@ function TuContent({ me }: { me: UserMe }) {
     setReminded(n);
   }
 
-  function resolveUrgent(id: string) {
+  function resolveUrgent(id: number) {
     setUrgent((current) => current.filter((item) => item.id !== id));
   }
 
+  const tasks: QueueTask[] = React.useMemo(() => {
+    const list: QueueTask[] = [];
+    if (overview.overdueCount > 0) {
+      list.push({
+        id: "t1",
+        time: "08.00",
+        label: "Tindak lanjuti tunggakan SPP",
+        detail: `${overview.overdueCount} tagihan menunggu pembayaran`,
+        group: "Pembayaran",
+        icon: MessageSquareWarning,
+      });
+    }
+    if (urgent.length > 0) {
+      list.push({
+        id: "t2",
+        time: "09.30",
+        label: "Tinjau pengumuman",
+        detail: `${urgent.length} pengumuman menunggu persetujuan`,
+        group: "Master data",
+        icon: Megaphone,
+      });
+    }
+    list.push({
+      id: "t3",
+      time: "08.00",
+      label: "Generate SPP periode berjalan",
+      detail:
+        overview.students !== null
+          ? `${overview.students} siswa aktif`
+          : "Buat tagihan bulanan per kelas",
+      group: "Tagihan",
+      icon: Receipt,
+    });
+    return list;
+  }, [overview.overdueCount, overview.students, urgent.length]);
+
+  const totalOverdue = rows.filter((row) => row.status === "overdue").length;
   const kpiHint =
-    status === "error" ? "Perkiraan — gagal memuat data langsung" : undefined;
-  const totalOverdue = OVERDUE_ROWS.filter((row) => row.status === "overdue").length;
+    overview.status === "error" ? "Gagal memuat data" : undefined;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
@@ -244,7 +364,7 @@ function TuContent({ me }: { me: UserMe }) {
           </p>
         </div>
         <Link
-          href="/dashboard/tu/spp"
+          href="/dashboard/tu/spp/generate"
           className="flex min-h-10 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground hover:opacity-90"
         >
           <Receipt className="h-4 w-4" aria-hidden />
@@ -256,7 +376,7 @@ function TuContent({ me }: { me: UserMe }) {
         aria-label="Indikator operasional"
         className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
       >
-        {status === "loading" ? (
+        {overview.status === "loading" ? (
           <>
             <SkeletonCard />
             <SkeletonCard />
@@ -267,27 +387,27 @@ function TuContent({ me }: { me: UserMe }) {
           <>
             <MetricCard
               label="Tagihan Aktif"
-              value={86}
+              value={overview.unpaidCount}
               icon={Wallet}
-              hint={`${totalOverdue} menunggak hari ini`}
+              hint={`${overview.overdueCount} menunggak hari ini`}
             />
             <MetricCard
               label="Siswa Aktif"
-              value={counts.students ?? 648}
+              value={overview.students ?? 0}
               icon={Users}
               hint={kpiHint ?? "Terdaftar di sekolah Anda"}
             />
             <MetricCard
               label="Total Guru"
-              value={counts.teachers ?? 34}
+              value={overview.teachers ?? 0}
               icon={UserCheck}
               hint={kpiHint ?? "Guru aktif"}
             />
             <MetricCard
-              label="Pengumuman Aktif"
-              value={urgent.length + 5}
+              label="Pengumuman Menunggu"
+              value={urgent.length}
               icon={Megaphone}
-              hint={`${urgent.length} menunggu persetujuan`}
+              hint={urgentStatus === "error" ? "Gagal memuat data" : "Perlu persetujuan"}
             />
           </>
         )}
@@ -298,10 +418,14 @@ function TuContent({ me }: { me: UserMe }) {
           <CardHeader className="items-center border-b border-outline-variant pb-3">
             <CardTitle>Antrean Hari Ini</CardTitle>
             <span className="font-mono text-2xs tabular-nums text-muted-foreground">
-              {TASKS.length} tugas
+              {tasks.length} tugas
             </span>
           </CardHeader>
-          {TASKS.length === 0 ? (
+          {overview.status === "loading" ? (
+            <div className="p-4">
+              <SkeletonList rows={3} />
+            </div>
+          ) : tasks.length === 0 ? (
             <div className="p-4">
               <EmptyState
                 icon={ClipboardList}
@@ -312,7 +436,7 @@ function TuContent({ me }: { me: UserMe }) {
           ) : (
             <div className="divide-y divide-outline-variant">
               {GROUP_ORDER.map((group) => {
-                const groupTasks = TASKS.filter((task) => task.group === group);
+                const groupTasks = tasks.filter((task) => task.group === group);
                 if (groupTasks.length === 0) return null;
                 return (
                   <div key={group}>
@@ -347,7 +471,7 @@ function TuContent({ me }: { me: UserMe }) {
                               </p>
                             </div>
                             <Link
-                              href={`/dashboard/tu/tasks/${task.id}`}
+                              href="/dashboard/tu/spp/payments"
                               className="flex min-h-10 shrink-0 items-center rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground hover:opacity-90"
                             >
                               Kerjakan
@@ -365,16 +489,27 @@ function TuContent({ me }: { me: UserMe }) {
 
         <Card>
           <CardHeader className="items-center border-b border-outline-variant pb-3">
-            <CardTitle>Pengumuman Mendesak</CardTitle>
+            <CardTitle>Pengumuman Menunggu</CardTitle>
             <span className="rounded-full bg-accent-container px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums text-accent-container-foreground">
               {urgent.length}
             </span>
           </CardHeader>
-          {urgent.length === 0 ? (
+          {urgentStatus === "loading" ? (
+            <div className="p-4">
+              <SkeletonList rows={3} />
+            </div>
+          ) : urgentStatus === "error" ? (
+            <div className="p-4">
+              <WidgetError
+                title="Gagal memuat pengumuman"
+                onRetry={() => setUrgentKey((k) => k + 1)}
+              />
+            </div>
+          ) : urgent.length === 0 ? (
             <div className="p-4">
               <EmptyState
                 icon={Megaphone}
-                title="Tidak ada pengumuman mendesak"
+                title="Tidak ada pengumuman menunggu"
                 description="Pengajuan pengumuman baru akan muncul di sini untuk disetujui."
               />
             </div>
@@ -442,9 +577,16 @@ function TuContent({ me }: { me: UserMe }) {
           </div>
         </CardHeader>
 
-        {status === "loading" ? (
+        {bills.status === "loading" || overview.status === "loading" ? (
           <div className="p-4">
             <SkeletonTable rows={6} cols={6} />
+          </div>
+        ) : bills.status === "error" ? (
+          <div className="p-4">
+            <WidgetError
+              title="Gagal memuat tunggakan"
+              onRetry={() => setBillsKey((k) => k + 1)}
+            />
           </div>
         ) : rows.length === 0 ? (
           <div className="p-4">
@@ -552,7 +694,7 @@ function TuContent({ me }: { me: UserMe }) {
                       >
                         {row.status === "overdue"
                           ? `${row.dueDays} hari lewat`
-                          : "sebagian"}
+                          : "belum jatuh tempo"}
                       </StatusChip>
                     </td>
                   </tr>
@@ -564,8 +706,7 @@ function TuContent({ me }: { me: UserMe }) {
 
         <p className="border-t border-outline-variant px-5 py-2 text-2xs text-muted-foreground">
           Menampilkan <span className="font-mono tabular-nums">{rows.length}</span>{" "}
-          dari <span className="font-mono tabular-nums">86</span> tunggakan. Klik
-          judul kolom untuk mengurutkan.
+          tagihan menunggak. Klik judul kolom untuk mengurutkan.
         </p>
       </Card>
     </div>
