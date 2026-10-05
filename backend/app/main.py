@@ -16,10 +16,12 @@ from app.db.seed import main as seed_main
 from app.db.session import SessionLocal, create_all, get_db
 from app.middleware.scope import TenantScopeMiddleware
 from app.routers import (
+    announcements,
     attendances,
     auth,
     classes,
     grades,
+    messages,
     parents,
     report_cards,
     schedules,
@@ -86,6 +88,12 @@ app.include_router(
 )
 app.include_router(schedules.router, prefix="/api/schedules", tags=["schedules"])
 app.include_router(spp.router, prefix="/api/spp", tags=["spp"])
+app.include_router(
+    announcements.router, prefix="/api/announcements", tags=["announcements"]
+)
+app.include_router(
+    messages.router, prefix="/api/message-threads", tags=["message-threads"]
+)
 
 
 @app.get("/")
