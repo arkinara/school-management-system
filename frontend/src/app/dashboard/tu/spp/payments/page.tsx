@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
+  Printer,
   Receipt,
   RotateCcw,
   Wallet,
@@ -24,12 +25,13 @@ import { Toast, ToastViewport } from "@/components/ui/Toast";
 import { cn } from "@/components/ui/cn";
 import {
   SPP_PAYMENT_METHODS,
+  fetchBillList,
   fetchClasses,
   fetchStudents,
-  getBills,
   recordPayment,
   type ClassRecord,
   type SppBill,
+  type SppPayment,
   type StudentRecord,
 } from "@/lib/endpoints";
 import { ApiError } from "@/lib/api";
@@ -74,6 +76,9 @@ function PaymentsContent() {
     tone: "success" | "error";
     undo?: () => void;
   } | null>(null);
+  const [receipt, setReceipt] = React.useState<
+    { billId: number; payment: SppPayment }[] | null
+  >(null);
   const selectAllRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
@@ -98,7 +103,7 @@ function PaymentsContent() {
   React.useEffect(() => {
     let active = true;
     setStatus("loading");
-    getBills({
+    fetchBillList({
       size: 200,
       class_id: classFilter ? Number(classFilter) : undefined,
       period: periodFilter || undefined,
@@ -216,27 +221,37 @@ function PaymentsContent() {
     if (!validate()) return;
     setSubmitting(true);
     const paidIds = [...selected];
+    const recorded: { billId: number; payment: SppPayment }[] = [];
+    const fullyPaid: number[] = [];
     try {
       for (const id of paidIds) {
         const draft = drafts[id];
-        if (!draft) continue;
-        await recordPayment({
+        const bill = bills.find((item) => item.id === id);
+        if (!draft || !bill) continue;
+        const payment = await recordPayment({
           bill_id: id,
           method,
           amount: Number(draft.amount),
           receipt_no: draft.receipt_no.trim(),
         });
+        recorded.push({ billId: id, payment });
+        if (Number(draft.amount) >= bill.balance - 0.001) fullyPaid.push(id);
       }
-      setHiddenIds((current) => new Set([...current, ...paidIds]));
+      setReceipt(recorded);
+      setHiddenIds((current) => new Set([...current, ...fullyPaid]));
       setSelected(new Set());
       setModalOpen(false);
+      const partial = recorded.length - fullyPaid.length;
       setToast({
-        message: `${paidIds.length} pembayaran tercatat`,
+        message:
+          partial > 0
+            ? `${recorded.length} pembayaran tercatat · ${partial} sebagian, tagihan tetap terbuka`
+            : `${recorded.length} pembayaran tercatat`,
         tone: "success",
         undo: () => {
           setHiddenIds((current) => {
             const next = new Set(current);
-            for (const id of paidIds) next.delete(id);
+            for (const id of fullyPaid) next.delete(id);
             return next;
           });
           setToast({ message: "Pembayaran dikembalikan ke daftar", tone: "success" });
@@ -246,6 +261,7 @@ function PaymentsContent() {
       const detail =
         err instanceof ApiError ? err.detail : "Gagal mencatat pembayaran.";
       setToast({ message: detail, tone: "error" });
+      setReloadKey((current) => current + 1);
     } finally {
       setSubmitting(false);
     }
@@ -577,6 +593,72 @@ function PaymentsContent() {
             </ul>
           </div>
         </div>
+      </Dialog>
+
+      <Dialog
+        open={receipt !== null}
+        onClose={() => setReceipt(null)}
+        title="Kwitansi Pembayaran"
+        className="max-w-xl"
+        actions={
+          <>
+            <Button variant="outlined" onClick={() => setReceipt(null)}>
+              Tutup
+            </Button>
+            <Button icon={Printer} onClick={() => window.print()}>
+              Cetak
+            </Button>
+          </>
+        }
+      >
+        <ul className="flex flex-col gap-3">
+          {(receipt ?? []).map(({ billId, payment }) => {
+            const bill = bills.find((item) => item.id === billId);
+            const student = bill ? students[bill.student_id] : undefined;
+            return (
+              <li
+                key={payment.id}
+                className="rounded-md border border-outline-variant bg-surface-container-low p-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-foreground">
+                    {student?.full_name ?? `Siswa #${bill?.student_id ?? "-"}`}
+                  </p>
+                  <span className="font-mono text-2xs tabular-nums text-muted-foreground">
+                    {payment.receipt_no}
+                  </span>
+                </div>
+                <dl className="mt-2 grid grid-cols-2 gap-1 text-2xs text-muted-foreground">
+                  <div>
+                    <dt>Periode</dt>
+                    <dd className="font-medium text-foreground">
+                      {bill?.period ?? "-"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Metode</dt>
+                    <dd className="font-medium text-foreground">
+                      {SPP_PAYMENT_METHODS.find((m) => m.value === payment.method)
+                        ?.label ?? payment.method}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Nominal</dt>
+                    <dd className="font-mono font-medium tabular-nums text-foreground">
+                      {formatRupiah(payment.amount)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Waktu</dt>
+                    <dd className="font-medium text-foreground">
+                      {new Date(payment.paid_at).toLocaleString("id-ID")}
+                    </dd>
+                  </div>
+                </dl>
+              </li>
+            );
+          })}
+        </ul>
       </Dialog>
 
       <ToastViewport>

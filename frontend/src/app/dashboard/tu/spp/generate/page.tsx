@@ -19,10 +19,10 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { Toast, ToastViewport } from "@/components/ui/Toast";
 import { cn } from "@/components/ui/cn";
 import {
-  bulkCreateBills,
+  createBillBulk,
+  fetchBillList,
   fetchClasses,
   fetchStudents,
-  getBills,
   type ClassRecord,
   type SppBillBulkResult,
 } from "@/lib/endpoints";
@@ -101,7 +101,7 @@ function SppGenerateContent() {
     setLoadingPreview(true);
     Promise.all([
       fetchStudents({ class_id: Number(classId), size: 1 }),
-      getBills({ class_id: Number(classId), period, size: 1 }),
+      fetchBillList({ class_id: Number(classId), period, size: 1 }),
     ])
       .then(([students, bills]) => {
         if (!active) return;
@@ -156,7 +156,7 @@ function SppGenerateContent() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const created = await bulkCreateBills({
+      const created = await createBillBulk({
         class_id: Number(classId),
         period,
         amount: Number(amount),
