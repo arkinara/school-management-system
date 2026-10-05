@@ -543,6 +543,129 @@ export function fetchPayments(
 }
 
 /* ==========================================================================
+   Dashboard aggregation helpers (#31-#35 wiring)
+   ========================================================================== */
+
+/** Attendance today summary returned by GET /api/attendances/today. */
+export interface AttendanceTodaySummary {
+  date: string;
+  total: number;
+  counts: Record<string, number>;
+  items: AttendanceRecord[];
+}
+
+/** GET /api/attendances/today — per-status counts scoped to the caller. */
+export function fetchAttendanceToday(): Promise<AttendanceTodaySummary> {
+  return apiFetch<AttendanceTodaySummary>("/api/attendances/today");
+}
+
+/** Per-subject rollup returned inside a grade aggregate. */
+export interface SubjectAggregate {
+  subject_id: number;
+  subject_name: string | null;
+  average: number;
+  count: number;
+}
+
+/** GET /api/grades/aggregate response for one student/semester. */
+export interface GradeAggregate {
+  student_id: number;
+  semester: string;
+  total: number;
+  per_subject: SubjectAggregate[];
+  overall_average: number | null;
+}
+
+/** GET /api/grades/aggregate — per-subject + overall averages. */
+export function fetchGradeAggregate(params: {
+  student_id: number;
+  semester: string;
+}): Promise<GradeAggregate> {
+  return apiFetch<GradeAggregate>(`/api/grades/aggregate${toQuery(params)}`);
+}
+
+/** Aggregate billing figures returned by GET /api/spp/summary. */
+export interface SppSummary {
+  bill_count: number;
+  total_billed: number;
+  total_collected: number;
+  total_outstanding: number;
+  collection_rate: number;
+  overdue_count: number;
+}
+
+/** GET /api/spp/summary — collection rate/totals for the caller's scope. */
+export function fetchSppSummary(
+  params: { class_id?: number; period?: string } = {}
+): Promise<SppSummary> {
+  return apiFetch<SppSummary>(`/api/spp/summary${toQuery(params)}`);
+}
+
+/** GET /api/report-cards — paginated rapors, published-only for read-only roles. */
+export function fetchReportCards(
+  params: {
+    student_id?: number;
+    semester?: string;
+    status?: ReportCardStatus;
+    page?: number;
+    size?: number;
+  } = {}
+): Promise<Paginated<ReportCardRecord>> {
+  return apiFetch<Paginated<ReportCardRecord>>(
+    `/api/report-cards${toQuery(params)}`
+  );
+}
+
+/** GET /api/report-cards/{id} — a single rapor (drafts hidden from parents). */
+export function fetchRaporById(id: number): Promise<ReportCardRecord> {
+  return apiFetch<ReportCardRecord>(`/api/report-cards/${id}`);
+}
+
+/** Convenience list wrapper scoped to one student. */
+export function fetchRaporList(
+  studentId: number,
+  params: { semester?: string; page?: number; size?: number } = {}
+): Promise<Paginated<ReportCardRecord>> {
+  return fetchReportCards({ ...params, student_id: studentId });
+}
+
+/** Alias matching the shared wiring contract for the SPP bill list. */
+export const fetchBillList = getBills;
+
+/** Alias matching the shared wiring contract for bulk bill generation. */
+export const createBillBulk = bulkCreateBills;
+
+/** Aggregated counts used by the principal/TU KPI rows. */
+export interface DashboardCounts {
+  students: number;
+  teachers: number;
+  classes: number;
+}
+
+/** Fetch the student/teacher/class totals for a school in one round-trip set. */
+export function fetchDashboardCounts(
+  params: { school_id?: number } = {}
+): Promise<DashboardCounts> {
+  return Promise.all([
+    fetchStudents({ ...params, size: 1 }),
+    fetchUsers({ ...params, role: "teacher", size: 1 }),
+    fetchClasses({ ...params, size: 1 }),
+  ]).then(([students, teachers, classes]) => ({
+    students: students.total,
+    teachers: teachers.total,
+    classes: classes.total,
+  }));
+}
+
+/** Current academic semester label derived from the calendar (Jul→Ganjil). */
+export function currentSemester(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  if (month >= 6) return `Semester Ganjil ${year}/${year + 1}`;
+  return `Semester Genap ${year - 1}/${year}`;
+}
+
+/* ==========================================================================
    Komunikasi (#26) — announcements + message threads
    ========================================================================== */
 
