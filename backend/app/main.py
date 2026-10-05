@@ -19,6 +19,7 @@ from app.routers import (
     attendances,
     auth,
     classes,
+    grades,
     parents,
     schools,
     students,
@@ -76,6 +77,7 @@ app.include_router(subjects.router, prefix="/api/subjects", tags=["subjects"])
 app.include_router(students.router, prefix="/api/students", tags=["students"])
 app.include_router(parents.router, prefix="/api/parents", tags=["parents"])
 app.include_router(attendances.router, prefix="/api/attendances", tags=["attendances"])
+app.include_router(grades.router, prefix="/api/grades", tags=["grades"])
 
 
 @app.get("/")
