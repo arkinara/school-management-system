@@ -58,6 +58,36 @@ export interface SchoolRecord {
   created_at: string;
 }
 
+export interface ChildSummary {
+  id: number;
+  user_id: number;
+  nis: string;
+  full_name: string;
+  class_id: number | null;
+  enrollment_status: string;
+  relationship: string;
+  is_primary: boolean;
+}
+
+export interface ParentRecord {
+  id: number;
+  tenant_id: number;
+  school_id: number | null;
+  full_name: string;
+  email: string;
+  children: ChildSummary[];
+}
+
+export interface TenantRecord {
+  id: number;
+  name: string;
+  jenjang_type: string;
+  kurikulum_version: string;
+  config: Record<string, unknown> | null;
+  created_at: string;
+  school_count: number;
+}
+
 type QueryValue = string | number | boolean | undefined | null;
 
 function toQuery(params: Record<string, QueryValue>): string {
@@ -96,6 +126,23 @@ export function fetchSchools(
   params: { tenant_id?: number; page?: number; size?: number } = {}
 ): Promise<Paginated<SchoolRecord>> {
   return apiFetch<Paginated<SchoolRecord>>(`/api/schools${toQuery(params)}`);
+}
+
+/** GET /api/parents — tenant-scoped parent users (super_admin sees all). */
+export function fetchParents(
+  params: { page?: number; size?: number } = {}
+): Promise<Paginated<ParentRecord>> {
+  return apiFetch<Paginated<ParentRecord>>(`/api/parents${toQuery(params)}`);
+}
+
+/** GET /api/parents/{id}/children — sibling lookup for a parent user. */
+export function fetchParentChildren(parentId: number): Promise<ChildSummary[]> {
+  return apiFetch<ChildSummary[]>(`/api/parents/${parentId}/children`);
+}
+
+/** GET /api/tenants — every jenjang tenant (super_admin only). */
+export function fetchTenants(): Promise<TenantRecord[]> {
+  return apiFetch<TenantRecord[]>("/api/tenants");
 }
 
 /** GET /api/auth/me — current profile (throws on 401 instead of nulling). */

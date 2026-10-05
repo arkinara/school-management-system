@@ -17,6 +17,9 @@ const ROLE_HOME: Partial<Record<UserRole, string>> = {
   principal: "/dashboard/principal",
   teacher: "/dashboard/guru",
   student: "/dashboard/siswa",
+  parent: "/dashboard/orang-tua",
+  admin: "/dashboard/tu",
+  super_admin: "/dashboard/yayasan",
 };
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -29,9 +32,9 @@ const ROLE_LABEL: Record<UserRole, string> = {
 };
 
 /**
- * Role-aware dispatcher. Redirects the three shipped dashboards to their own
- * routes; the remaining role dashboards (tickets #11-#13) render a coming-soon
- * placeholder so auth flows always land somewhere sensible.
+ * Role-aware dispatcher. Every role now owns a dashboard route (tickets
+ * #8-#13); the coming-soon placeholder remains as a defensive fallback if a
+ * future role is added without a page.
  */
 export default function DashboardPage() {
   const router = useRouter();
