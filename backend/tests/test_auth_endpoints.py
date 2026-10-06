@@ -40,24 +40,24 @@ def test_register_success_creates_user_and_token(client: TestClient, db_session:
     response = client.post(
         "/api/auth/register",
         json={
-            "email": "new.teacher@menteng.sch.id",
+            "email": "new.student@menteng.sch.id",
             "password": "newpass123",
-            "full_name": "New Teacher",
-            "role": "teacher",
+            "full_name": "New Student",
+            "role": "student",
             "school_id": 1,
         },
     )
     assert response.status_code == 201, response.text
     body = response.json()
     assert body["token_type"] == "bearer"
-    assert body["user"]["email"] == "new.teacher@menteng.sch.id"
-    assert body["user"]["role"] == "teacher"
+    assert body["user"]["email"] == "new.student@menteng.sch.id"
+    assert body["user"]["role"] == "student"
     assert body["user"]["school_id"] == 1
     assert body["user"]["tenant_id"] == 1
 
     claims = decode_access_token(body["access_token"])
     assert claims is not None
-    assert claims["role"] == "teacher"
+    assert claims["role"] == "student"
     assert claims["tenant_id"] == 1
     assert claims["school_id"] == 1
 
@@ -71,10 +71,10 @@ def test_register_duplicate_email_returns_409(client: TestClient, db_session: Se
     response = client.post(
         "/api/auth/register",
         json={
-            "email": TEACHER_EMAIL,
+            "email": STUDENT_EMAIL,
             "password": "whatever123",
             "full_name": "Dup",
-            "role": "teacher",
+            "role": "student",
             "school_id": 1,
         },
     )
@@ -88,7 +88,7 @@ def test_register_weak_password_returns_422(client: TestClient) -> None:
             "email": "weak@menteng.sch.id",
             "password": "short",
             "full_name": "Weak",
-            "role": "teacher",
+            "role": "student",
             "school_id": 1,
         },
     )
@@ -122,17 +122,32 @@ def test_register_super_admin_rejected(client: TestClient) -> None:
     assert response.status_code == 400
 
 
-def test_register_teacher_without_school_id_returns_400(client: TestClient) -> None:
+def test_register_privileged_roles_rejected(client: TestClient) -> None:
+    for idx, role in enumerate(("admin", "principal", "teacher"), start=1):
+        response = client.post(
+            "/api/auth/register",
+            json={
+                "email": f"priv{idx}.{role}@menteng.sch.id",
+                "password": "privpass123",
+                "full_name": f"Priv {role}",
+                "role": role,
+                "school_id": 1,
+            },
+        )
+        assert response.status_code == 400, f"{role}: {response.text}"
+
+
+def test_register_student_without_school_id_returns_422(client: TestClient) -> None:
     response = client.post(
         "/api/auth/register",
         json={
             "email": "nosc@menteng.sch.id",
             "password": "nosc12345",
             "full_name": "No School",
-            "role": "teacher",
+            "role": "student",
         },
     )
-    assert response.status_code == 400
+    assert response.status_code == 422
 
 
 # ---------------------------------------------------------------------------

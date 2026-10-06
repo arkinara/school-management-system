@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 from passlib.hash import bcrypt
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.jwt import create_access_token
-from app.db.models import JenjangType, Tenant, User, UserRole
+from app.db.models import AuditLog, JenjangType, Tenant, User, UserRole
 from app.db.seed import SEED_PASSWORD
 
 
@@ -163,3 +164,160 @@ def test_delete_user_removes_record(client: TestClient, db_session: Session) -> 
 def test_delete_user_cross_tenant_forbidden(client: TestClient, db_session: Session) -> None:
     _add_other_tenant(db_session)
     assert client.delete("/api/users/200", headers=_auth(PRINCIPAL)).status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# role escalation guard (ticket #39)
+# ---------------------------------------------------------------------------
+
+
+def test_admin_cannot_promote_to_super_admin(client: TestClient, db_session: Session) -> None:
+    response = client.patch(
+        "/api/users/5", headers=_auth(ADMIN), json={"role": "super_admin"}
+    )
+    assert response.status_code == 403, response.text
+
+    rows = db_session.scalars(
+        select(AuditLog).where(AuditLog.action == "role_escalation_attempt")
+    ).all()
+    assert any(row.actor_id == 2 for row in rows)
+
+
+def test_admin_cannot_promote_to_principal(client: TestClient, db_session: Session) -> None:
+    response = client.patch(
+        "/api/users/5", headers=_auth(ADMIN), json={"role": "principal"}
+    )
+    assert response.status_code == 403, response.text
+    assert db_session.get(User, 5).role == UserRole.TEACHER
+
+
+def test_principal_cannot_promote_to_super_admin(client: TestClient, db_session: Session) -> None:
+    response = client.patch(
+        "/api/users/5", headers=_auth(PRINCIPAL), json={"role": "super_admin"}
+    )
+    assert response.status_code == 403, response.text
+
+
+def test_admin_can_assign_assignable_role(client: TestClient, db_session: Session) -> None:
+    response = client.patch(
+        "/api/users/5", headers=_auth(ADMIN), json={"role": "parent"}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["role"] == "parent"
+
+
+def test_super_admin_cannot_create_super_admin_without_confirmation(
+    client: TestClient, db_session: Session
+) -> None:
+    _add_user(
+        db_session,
+        user_id=500,
+        tenant_id=1,
+        school_id=1,
+        email="newsuper@menteng.sch.id",
+        role=UserRole.TEACHER,
+    )
+    response = client.patch(
+        "/api/users/500", headers=_auth(SUPER), json={"role": "super_admin"}
+    )
+    assert response.status_code == 403, response.text
+
+    confirmed = client.patch(
+        "/api/users/500",
+        headers={**_auth(SUPER), "x-confirm-super-admin": "true"},
+        json={"role": "super_admin"},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["role"] == "super_admin"
+
+
+def test_user_cannot_change_own_role(client: TestClient, db_session: Session) -> None:
+    response = client.patch("/api/users/4", headers=_auth(TEACHER), json={"role": "admin"})
+    assert response.status_code == 403
+    assert response.json()["detail"] == "cannot change own role"
+    assert db_session.get(User, 4).role == UserRole.TEACHER
+
+
+def test_register_principal_rejected(client: TestClient) -> None:
+    response = client.post(
+        "/api/auth/register",
+        json={
+            "email": "newprincipal@menteng.sch.id",
+            "password": "principal123",
+            "full_name": "New Principal",
+            "role": "principal",
+            "school_id": 1,
+        },
+    )
+    assert response.status_code in {400, 422}, response.text
+
+
+def test_register_admin_rejected(client: TestClient) -> None:
+    response = client.post(
+        "/api/auth/register",
+        json={
+            "email": "newadmin@menteng.sch.id",
+            "password": "newadmin123",
+            "full_name": "New Admin",
+            "role": "admin",
+            "school_id": 1,
+        },
+    )
+    assert response.status_code in {400, 422}, response.text
+
+
+def test_register_teacher_rejected(client: TestClient) -> None:
+    response = client.post(
+        "/api/auth/register",
+        json={
+            "email": "newteacher2@menteng.sch.id",
+            "password": "newteach123",
+            "full_name": "New Teacher",
+            "role": "teacher",
+            "school_id": 1,
+        },
+    )
+    assert response.status_code in {400, 422}, response.text
+
+
+def test_full_escalation_chain_blocked(client: TestClient, db_session: Session) -> None:
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "email": "chain@menteng.sch.id",
+            "password": "chainpass123",
+            "full_name": "Chain Student",
+            "role": "student",
+            "school_id": 1,
+        },
+    )
+    assert register.status_code == 201, register.text
+    body = register.json()
+    user_id = body["user"]["id"]
+    token = body["access_token"]
+
+    # Step 1: no auth -> 401.
+    anon = client.patch(f"/api/users/{user_id}", json={"role": "super_admin"})
+    assert anon.status_code == 401
+
+    # Step 2: cannot obtain an admin token via public registration.
+    temp_admin = client.post(
+        "/api/auth/register",
+        json={
+            "email": "temproot@menteng.sch.id",
+            "password": "temproot123",
+            "full_name": "Temp Root",
+            "role": "admin",
+            "school_id": 1,
+        },
+    )
+    assert temp_admin.status_code == 400
+
+    # Step 3: authenticated student cannot self-promote.
+    self_promote = client.patch(
+        f"/api/users/{user_id}", headers=_auth(token), json={"role": "super_admin"}
+    )
+    assert self_promote.status_code == 403
+
+    assert db_session.get(User, user_id).role == UserRole.STUDENT
+

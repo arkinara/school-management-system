@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
+import sys
 from collections.abc import Callable
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
+from app.auth.audit import log_audit_event
 from app.auth.jwt import (
     TokenError,
     TokenExpiredError,
@@ -65,7 +67,11 @@ def require_role(*allowed_roles: str | UserRole) -> Callable[..., User]:
     """Dependency factory enforcing membership in ``allowed_roles`` (else 403)."""
     allowed = {str(r) for r in allowed_roles}
 
-    def _dependency(user: User = Depends(get_current_user)) -> User:
+    def _dependency(
+        request: Request,
+        user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> User:
         if str(user.role) not in allowed:
             logger.warning(
                 "role escalation blocked: user_id=%s role=%s allowed=%s",
@@ -73,6 +79,18 @@ def require_role(*allowed_roles: str | UserRole) -> Callable[..., User]:
                 str(user.role),
                 sorted(allowed),
             )
+            try:
+                log_audit_event(
+                    db,
+                    actor=user,
+                    action="role_escalation_attempt",
+                    entity_type="user",
+                    entity_id=user.id,
+                    before={"required": sorted(allowed), "actual": str(user.role)},
+                    request=request,
+                )
+            except Exception as exc:  # noqa: BLE001 - audit is best-effort
+                print(f"[audit] failed to write role_escalation_attempt: {exc}", file=sys.stderr)
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="forbidden",

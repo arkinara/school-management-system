@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.audit import log_audit_event
 from app.auth.deps import get_current_user
 from app.auth.jwt import create_access_token
-from app.db.models import AuditLog, School, Tenant, User, UserRole
+from app.db.models import AuditLog, School, User, UserRole
 from app.db.session import get_db
 from app.schemas.auth import (
     AuthResponse,
@@ -23,19 +23,16 @@ from app.schemas.user import UserOut
 
 router = APIRouter()
 
+# Only non-privileged roles can self-register. Privileged accounts
+# (principal, teacher, admin) are created by authorised admins via #48.
 PUBLIC_REGISTER_ROLES: set[str] = {
-    UserRole.PRINCIPAL.value,
-    UserRole.TEACHER.value,
     UserRole.STUDENT.value,
     UserRole.PARENT.value,
-    UserRole.ADMIN.value,
 }
 
 SCHOOL_REQUIRED_ROLES: set[str] = {
-    UserRole.TEACHER.value,
     UserRole.STUDENT.value,
     UserRole.PARENT.value,
-    UserRole.ADMIN.value,
 }
 
 
@@ -77,27 +74,24 @@ def register(payload: UserRegister, db: Session = Depends(get_db)) -> AuthRespon
 
     if role in SCHOOL_REQUIRED_ROLES and payload.school_id is None:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="school_id is required for this role",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="school_id is required for public registration",
         )
 
-    tenant_id: int | None = None
-    if payload.school_id is not None:
-        school = db.get(School, payload.school_id)
-        if school is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="school not found",
-            )
-        tenant_id = school.tenant_id
-    else:
-        first_tenant = db.scalar(select(Tenant).order_by(Tenant.id))
-        if first_tenant is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="no tenant available",
-            )
-        tenant_id = first_tenant.id
+    # Defense in depth: public roles always require an explicit school.
+    if payload.school_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="school_id is required for public registration",
+        )
+
+    school = db.get(School, payload.school_id)
+    if school is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="school not found",
+        )
+    tenant_id = school.tenant_id
 
     existing = db.scalar(select(User).where(User.email == payload.email))
     if existing is not None:
