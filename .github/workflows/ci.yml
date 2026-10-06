@@ -30,6 +30,10 @@ jobs:
       - name: Prettier format check
         run: pnpm --filter frontend format:check
 
+      - name: Run FE tests
+        working-directory: frontend
+        run: pnpm test
+
       - name: Build (check)
         run: pnpm --filter frontend build
 
