@@ -89,7 +89,7 @@ def test_teacher_creates_grade(client: TestClient, db_session: Session) -> None:
         json={
             "student_id": 1,
             "subject_id": 1,
-            "semester": "ganjil",
+            "semester": "2026/2027-ganjil",
             "category": "sumatif",
             "score": 88,
             "description": "Sangat baik",
@@ -108,7 +108,7 @@ def test_bulk_grade_entry(client: TestClient, db_session: Session) -> None:
         json={
             "class_id": 1,
             "subject_id": 2,
-            "semester": "ganjil",
+            "semester": "2026/2027-ganjil",
             "category": "tugas",
             "entries": [
                 {"student_id": 1, "score": 80},
@@ -129,7 +129,7 @@ def test_bulk_rejects_student_from_other_class(
         json={
             "class_id": 1,
             "subject_id": 2,
-            "semester": "ganjil",
+            "semester": "2026/2027-ganjil",
             "category": "tugas",
             "entries": [{"student_id": 3, "score": 80}],
         },
@@ -145,7 +145,7 @@ def test_score_range_validation(client: TestClient, db_session: Session) -> None
             json={
                 "student_id": 1,
                 "subject_id": 1,
-                "semester": "ganjil",
+                "semester": "2026/2027-ganjil",
                 "category": "formatif",
                 "score": score,
             },
@@ -160,7 +160,7 @@ def test_category_validation(client: TestClient, db_session: Session) -> None:
         json={
             "student_id": 1,
             "subject_id": 1,
-            "semester": "ganjil",
+            "semester": "2026/2027-ganjil",
             "category": "ujian",
             "score": 80,
         },
@@ -172,7 +172,7 @@ def test_aggregate_returns_per_subject_and_overall(
     client: TestClient, db_session: Session
 ) -> None:
     response = client.get(
-        "/api/grades/aggregate?student_id=1&semester=ganjil", headers=_auth(TEACHER4)
+        "/api/grades/aggregate?student_id=1&semester=2026/2027-ganjil", headers=_auth(TEACHER4)
     )
     assert response.status_code == 200, response.text
     body = response.json()
@@ -185,7 +185,7 @@ def test_aggregate_empty_semester_returns_empty(
     client: TestClient, db_session: Session
 ) -> None:
     response = client.get(
-        "/api/grades/aggregate?student_id=1&semester=genap", headers=_auth(TEACHER4)
+        "/api/grades/aggregate?student_id=1&semester=2026/2027-genap", headers=_auth(TEACHER4)
     )
     assert response.status_code == 200
     body = response.json()

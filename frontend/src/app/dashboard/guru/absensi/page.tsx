@@ -16,6 +16,7 @@ import { cn } from "@/components/ui/cn";
 import {
   ATTENDANCE_STATUSES,
   bulkSaveAttendances,
+  fetchAll,
   fetchAttendances,
   fetchClasses,
   fetchStudents,
@@ -113,20 +114,20 @@ function AbsensiContent({ me }: { me: UserMe }) {
     setStatus("loading");
     const numericClass = Number(classId);
     Promise.all([
-      fetchStudents({ class_id: numericClass, size: 200 }),
-      fetchAttendances({ class_id: numericClass, date, size: 200 }),
+      fetchAll((p) => fetchStudents({ class_id: numericClass, ...p })),
+      fetchAll((p) => fetchAttendances({ class_id: numericClass, date, ...p })),
     ])
       .then(([students, records]) => {
         if (!active) return;
-        setRoster(students.items);
+        setRoster(students);
         const nextStatus: Record<number, AttendanceStatus> = {};
         const nextNote: Record<number, string> = {};
         const byStudent: Record<number, AttendanceRecord> = {};
-        for (const student of students.items) {
+        for (const student of students) {
           nextStatus[student.id] = "hadir";
           nextNote[student.id] = "";
         }
-        for (const record of records.items) {
+        for (const record of records) {
           byStudent[record.student_id] = record;
           nextStatus[record.student_id] = record.status;
           nextNote[record.student_id] = record.note ?? "";

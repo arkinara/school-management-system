@@ -21,6 +21,7 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { SkeletonCard, SkeletonList } from "@/components/ui/Skeleton";
 import { cn } from "@/components/ui/cn";
 import {
+  fetchAll,
   fetchAnnouncements,
   fetchAttendances,
   fetchClasses,
@@ -29,7 +30,6 @@ import {
   fetchSubjects,
   fetchUsers,
   getTodaySchedule,
-  currentSemester,
   type AnnouncementRecord,
   type AttendanceRecord,
   type ClassRecord,
@@ -39,6 +39,7 @@ import {
   type SubjectRecord,
   type UserRecord,
 } from "@/lib/endpoints";
+import { fetchActiveSemester, semesterLabel, type Semester } from "@/lib/academic";
 import type { UserMe } from "@/lib/auth";
 
 type LoadStatus = "loading" | "ready" | "error";
@@ -117,6 +118,20 @@ function SiswaContent({ me }: { me: UserMe }) {
     items: AnnouncementRecord[];
   }>({ status: "loading", items: [] });
   const [announcementKey, setAnnouncementKey] = React.useState(0);
+
+  const [activeSemester, setActiveSemester] = React.useState<Semester>("2026/2027-ganjil");
+
+  React.useEffect(() => {
+    let active = true;
+    fetchActiveSemester()
+      .then((semester) => {
+        if (active) setActiveSemester(semester);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   React.useEffect(() => {
     setToday(
@@ -199,11 +214,11 @@ function SiswaContent({ me }: { me: UserMe }) {
     if (profile.status !== "ready" || student === null) return;
     let active = true;
     setAttendance({ status: "loading", rate: 0 });
-    fetchAttendances({ student_id: student.id, size: 100 })
-      .then((page) => {
+    fetchAll((p) => fetchAttendances({ student_id: student.id, ...p }))
+      .then((rows) => {
         if (!active) return;
-        const total = page.total;
-        const hadir = page.items.filter((row: AttendanceRecord) => row.status === "hadir").length;
+        const total = rows.length;
+        const hadir = rows.filter((row: AttendanceRecord) => row.status === "hadir").length;
         setAttendance({
           status: "ready",
           rate: total > 0 ? Math.round((hadir / total) * 100) : 0,
@@ -224,7 +239,7 @@ function SiswaContent({ me }: { me: UserMe }) {
     setRapor({ status: "loading", record: null });
     fetchReportCards({
       student_id: student.id,
-      semester: currentSemester(),
+      semester: activeSemester,
       size: 1,
     })
       .then((page) => {
@@ -236,7 +251,7 @@ function SiswaContent({ me }: { me: UserMe }) {
     return () => {
       active = false;
     };
-  }, [profile, raporKey]);
+  }, [profile, raporKey, activeSemester]);
 
   React.useEffect(() => {
     let active = true;
@@ -333,7 +348,7 @@ function SiswaContent({ me }: { me: UserMe }) {
               label="Status Rapor"
               value={raporStatus === "published" ? "Terbit" : "Draft"}
               icon={ClipboardList}
-              hint={currentSemester()}
+              hint={semesterLabel(activeSemester)}
             />
           </>
         )}
@@ -446,7 +461,9 @@ function SiswaContent({ me }: { me: UserMe }) {
             ) : (
               <>
                 <p className="mb-3 text-2xs text-muted-foreground">
-                  {rapor.record?.semester ?? currentSemester()}
+                  {rapor.record
+                    ? semesterLabel(rapor.record.semester)
+                    : semesterLabel(activeSemester)}
                 </p>
                 {raporGrades.length === 0 ? (
                   <EmptyState

@@ -22,6 +22,7 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { SkeletonCard, SkeletonList } from "@/components/ui/Skeleton";
 import { cn } from "@/components/ui/cn";
 import {
+  fetchAll,
   fetchAttendanceToday,
   fetchClasses,
   fetchGrades,
@@ -29,8 +30,6 @@ import {
   fetchStudents,
   fetchSubjects,
   getTeacherSchedule,
-  currentSemester,
-  indonesianDayName,
   type AttendanceRecord,
   type ClassRecord,
   type GradeRecord,
@@ -39,6 +38,8 @@ import {
   type StudentRecord,
   type SubjectRecord,
 } from "@/lib/endpoints";
+import { fetchActiveSemester } from "@/lib/academic";
+import { todayDayOfWeek } from "@/lib/days";
 import type { UserMe } from "@/lib/auth";
 
 type LoadStatus = "loading" | "ready" | "error";
@@ -169,8 +170,8 @@ function GuruContent({ me }: { me: UserMe }) {
           studentsByClass.set(student.class_id, list);
         }
 
-        const day = indonesianDayName(new Date());
-        const todayRows = scheduleRows.filter((row) => row.day_of_week.toLowerCase() === day);
+        const day = todayDayOfWeek();
+        const todayRows = scheduleRows.filter((row) => row.day_of_week === day);
         const takenClassIds = new Set(
           attendance.items.map((row: AttendanceRecord) => row.class_id)
         );
@@ -230,18 +231,16 @@ function GuruContent({ me }: { me: UserMe }) {
     if (schedule.status !== "ready") return;
     let active = true;
     setGradeQueue({ status: "loading", items: [] });
-    const semester = currentSemester();
-    getTeacherSchedule(teacherId)
-      .then((scheduleRows) =>
-        fetchGrades({ semester, size: 100 }).then((grades) => ({
-          scheduleRows,
-          grades,
-        }))
-      )
-      .then(({ scheduleRows, grades }) => {
+    Promise.all([
+      getTeacherSchedule(teacherId),
+      fetchActiveSemester()
+        .then((semester) => fetchAll((p) => fetchGrades({ semester, ...p })))
+        .catch(() => [] as GradeRecord[]),
+    ])
+      .then(([scheduleRows, grades]) => {
         if (!active) return;
         const gradedKeys = new Set(
-          grades.items.map((grade: GradeRecord) => `${grade.student_id}:${grade.subject_id}`)
+          grades.map((grade: GradeRecord) => `${grade.student_id}:${grade.subject_id}`)
         );
         const seen = new Set<string>();
         const items: GradeQueueItem[] = [];

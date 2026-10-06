@@ -81,7 +81,7 @@ describe("AbsensiPage", () => {
   it("shows an empty state when the class has no students", async () => {
     server.use(
       http.get(`${API}/api/students`, () =>
-        HttpResponse.json({ items: [], total: 0, page: 1, size: 200 })
+        HttpResponse.json({ items: [], total: 0, page: 1, size: 100 })
       )
     );
     render(<AbsensiPage />);

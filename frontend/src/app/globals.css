@@ -244,7 +244,7 @@
       hsl(var(--surface-3)) 37%,
       hsl(var(--surface-2)) 63%
     );
-    background-size: 400% 100%;
+    background-size: var(--skeleton-span, 400%) 100%;
     animation: shimmer 1.4s ease-in-out infinite;
     border-radius: 6px;
   }

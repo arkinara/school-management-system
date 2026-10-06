@@ -29,6 +29,7 @@ import { ApiError } from "@/lib/api";
 import {
   createAnnouncement,
   deleteAnnouncement,
+  fetchAll,
   fetchAnnouncements,
   fetchClasses,
   fetchTenants,
@@ -430,10 +431,10 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
 
   React.useEffect(() => {
     let active = true;
-    Promise.all([fetchUsers({ size: 200 }), fetchClasses({ size: 100 })])
+    Promise.all([fetchAll((p) => fetchUsers(p)), fetchClasses({ size: 100 })])
       .then(([users, classPage]) => {
         if (!active) return;
-        setAuthors(Object.fromEntries(users.items.map((user) => [user.id, user.full_name])));
+        setAuthors(Object.fromEntries(users.map((user) => [user.id, user.full_name])));
         setClasses(classPage.items);
       })
       .catch(() => {

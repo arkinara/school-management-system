@@ -25,6 +25,7 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { SkeletonCard, SkeletonList } from "@/components/ui/Skeleton";
 import {
+  fetchAll,
   fetchAnnouncements,
   fetchAttendanceToday,
   fetchAttendances,
@@ -34,13 +35,13 @@ import {
   fetchSppSummary,
   fetchStudents,
   fetchUsers,
-  currentSemester,
   type AnnouncementRecord,
   type AttendanceTodaySummary,
   type SchoolRecord,
   type SppSummary,
   type StudentRecord,
 } from "@/lib/endpoints";
+import { fetchActiveSemester, semesterLabel, type Semester } from "@/lib/academic";
 import type { UserMe } from "@/lib/auth";
 import { attendanceSegments, formatRupiahCompact } from "@/components/dashboard/mock-data";
 
@@ -131,6 +132,20 @@ function PrincipalContent({ me }: { me: UserMe }) {
   }>({ status: "loading", items: [] });
   const [announcementKey, setAnnouncementKey] = React.useState(0);
 
+  const [activeSemester, setActiveSemester] = React.useState<Semester>("2026/2027-ganjil");
+
+  React.useEffect(() => {
+    let active = true;
+    fetchActiveSemester()
+      .then((semester) => {
+        if (active) setActiveSemester(semester);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
   React.useEffect(() => {
     setToday(
       new Intl.DateTimeFormat("id-ID", {
@@ -220,7 +235,7 @@ function PrincipalContent({ me }: { me: UserMe }) {
   React.useEffect(() => {
     let active = true;
     setGradeEntry({ status: "loading", items: [] });
-    const semester = currentSemester();
+    const semester = activeSemester;
     Promise.all([
       fetchClasses({ ...scope, size: 100 }),
       fetchStudents({ ...scope, size: 100 }),
@@ -257,7 +272,7 @@ function PrincipalContent({ me }: { me: UserMe }) {
     return () => {
       active = false;
     };
-  }, [scope, gradeKey]);
+  }, [scope, gradeKey, activeSemester]);
 
   React.useEffect(() => {
     let active = true;
@@ -428,7 +443,7 @@ function PrincipalContent({ me }: { me: UserMe }) {
         <Card>
           <CardHeader>
             <CardTitle>Penginputan Nilai</CardTitle>
-            <span className="text-2xs text-muted-foreground">{currentSemester()}</span>
+            <span className="text-2xs text-muted-foreground">{semesterLabel(activeSemester)}</span>
           </CardHeader>
           <CardBody>
             {gradeEntry.status === "loading" ? (
@@ -556,10 +571,10 @@ function PrincipalContent({ me }: { me: UserMe }) {
 
 /** Attendance rate (0-100) for a single date, or null when no data exists. */
 async function fetchAttendancesForRate(date: string): Promise<number | null> {
-  const page = await fetchAttendances({ date, size: 100 });
-  if (page.total === 0) return null;
-  const hadir = page.items.filter((row) => row.status === "hadir").length;
-  return Math.round((hadir / page.total) * 100);
+  const rows = await fetchAll((p) => fetchAttendances({ date, ...p }));
+  if (rows.length === 0) return null;
+  const hadir = rows.filter((row) => row.status === "hadir").length;
+  return Math.round((hadir / rows.length) * 100);
 }
 
 export default function PrincipalDashboardPage() {

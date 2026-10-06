@@ -8,7 +8,7 @@ The 15 tables from PRD §Database Schema are defined here, plus an
 from __future__ import annotations
 
 from datetime import date, datetime, time, timezone
-from enum import StrEnum
+from enum import IntEnum, StrEnum
 
 from sqlalchemy import (
     JSON,
@@ -100,6 +100,18 @@ class AnnouncementAudience(StrEnum):
     ALL = "all"
     CLASS = "class"
     JENJANG = "jenjang"
+
+
+class DayOfWeek(IntEnum):
+    """ISO weekday: Monday = 1 … Sunday = 7."""
+
+    MONDAY = 1
+    TUESDAY = 2
+    WEDNESDAY = 3
+    THURSDAY = 4
+    FRIDAY = 5
+    SATURDAY = 6
+    SUNDAY = 7
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +268,7 @@ class Schedule(Base):
     class_id: Mapped[int] = mapped_column(ForeignKey("classes.id"), nullable=False, index=True)
     subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id"), nullable=False, index=True)
     teacher_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    day_of_week: Mapped[str] = mapped_column(String(16), nullable=False)
+    day_of_week: Mapped[int] = mapped_column(Integer, nullable=False)
     period_number: Mapped[int] = mapped_column(Integer, nullable=False)
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
     end_time: Mapped[time] = mapped_column(Time, nullable=False)

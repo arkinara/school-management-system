@@ -19,6 +19,7 @@ from app.db.seed import main as seed_main
 from app.db.session import SessionLocal, create_all, engine, get_db
 from app.middleware.scope import TenantScopeMiddleware
 from app.routers import (
+    academic,
     announcements,
     attendances,
     audit,
@@ -102,6 +103,7 @@ app.add_middleware(
 app.add_middleware(TenantScopeMiddleware)
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(academic.router, prefix="/api/academic", tags=["academic"])
 app.include_router(tenants.router, prefix="/api/tenants", tags=["tenants"])
 app.include_router(schools.router, prefix="/api/schools", tags=["schools"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])

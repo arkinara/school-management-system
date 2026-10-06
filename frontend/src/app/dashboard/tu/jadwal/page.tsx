@@ -14,6 +14,7 @@ import { Toast, ToastViewport } from "@/components/ui/Toast";
 import { cn } from "@/components/ui/cn";
 import {
   bulkSaveSchedules,
+  fetchAll,
   fetchClasses,
   fetchSubjects,
   fetchUsers,
@@ -22,19 +23,12 @@ import {
   type SubjectRecord,
   type UserRecord,
 } from "@/lib/endpoints";
+import { DAYS_OF_WEEK } from "@/lib/days";
 import { ApiError } from "@/lib/api";
 
 type LoadStatus = "loading" | "ready" | "error";
 
-const DAYS = [
-  { value: "senin", label: "Senin" },
-  { value: "selasa", label: "Selasa" },
-  { value: "rabu", label: "Rabu" },
-  { value: "kamis", label: "Kamis" },
-  { value: "jumat", label: "Jumat" },
-  { value: "sabtu", label: "Sabtu" },
-  { value: "minggu", label: "Minggu" },
-];
+const DAYS = DAYS_OF_WEEK.map((day) => ({ value: day.value as number, label: day.long }));
 
 const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -78,7 +72,7 @@ function JadwalConfigContent() {
   const [saving, setSaving] = React.useState(false);
   const [errors, setErrors] = React.useState<string[]>([]);
   const [cellError, setCellError] = React.useState<string | null>(null);
-  const [activeCell, setActiveCell] = React.useState<{ day: string; period: number } | null>(null);
+  const [activeCell, setActiveCell] = React.useState<{ day: number; period: number } | null>(null);
   const [draft, setDraft] = React.useState<{
     subjectId: string;
     teacherId: string;
@@ -95,15 +89,15 @@ function JadwalConfigContent() {
     let active = true;
     Promise.all([
       fetchClasses({ size: 100 }),
-      fetchSubjects({ size: 200 }),
-      fetchUsers({ role: "teacher", size: 200 }),
+      fetchAll((p) => fetchSubjects(p)),
+      fetchAll((p) => fetchUsers({ role: "teacher", ...p })),
     ])
-      .then(([classPage, subjectPage, userPage]) => {
+      .then(([classPage, subjectList, userList]) => {
         if (!active) return;
         setClasses(classPage.items);
-        setSubjects(subjectPage.items);
+        setSubjects(subjectList);
         setTeachers(
-          userPage.items.map((user: UserRecord) => ({
+          userList.map((user: UserRecord) => ({
             id: user.id,
             full_name: user.full_name,
           }))
@@ -186,7 +180,7 @@ function JadwalConfigContent() {
     setStep(3);
   }
 
-  function openCell(day: string, period: number) {
+  function openCell(day: number, period: number) {
     const key = `${day}:${period}`;
     const existing = grid[key];
     const poolDefault = pool[0];
@@ -249,7 +243,7 @@ function JadwalConfigContent() {
       return {
         subject_id: slot.subjectId,
         teacher_id: slot.teacherId,
-        day_of_week: day,
+        day_of_week: Number(day),
         period_number: Number(period),
         start_time: slot.start,
         end_time: slot.end,

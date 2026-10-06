@@ -97,7 +97,7 @@ class ScheduleOut(BaseModel):
     class_id: int
     subject_id: int
     teacher_id: int
-    day_of_week: str
+    day_of_week: int
     period_number: int
     start_time: time
     end_time: time

@@ -11,30 +11,20 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { Toast, ToastViewport } from "@/components/ui/Toast";
 import { cn } from "@/components/ui/cn";
 import {
+  fetchAll,
   fetchClasses,
   fetchStudents,
   fetchSubjects,
   fetchUsers,
   getSchedule,
   getTeacherSchedule,
-  indonesianDayName,
   type ScheduleRecord,
 } from "@/lib/endpoints";
+import { DAYS_OF_WEEK, dayLabel, todayDayOfWeek } from "@/lib/days";
 import type { UserMe } from "@/lib/auth";
 
 type LoadStatus = "loading" | "ready" | "error";
 type View = "today" | "week";
-
-const DAY_ORDER = ["senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "minggu"];
-const DAY_LABEL: Record<string, string> = {
-  senin: "Senin",
-  selasa: "Selasa",
-  rabu: "Rabu",
-  kamis: "Kamis",
-  jumat: "Jumat",
-  sabtu: "Sabtu",
-  minggu: "Minggu",
-};
 
 function timeRange(record: ScheduleRecord): string {
   return `${record.start_time.slice(0, 5)}–${record.end_time.slice(0, 5)}`;
@@ -42,9 +32,7 @@ function timeRange(record: ScheduleRecord): string {
 
 function sortSessions(records: ScheduleRecord[]): ScheduleRecord[] {
   return [...records].sort((a, b) => {
-    const dayDiff =
-      DAY_ORDER.indexOf(a.day_of_week.toLowerCase()) -
-      DAY_ORDER.indexOf(b.day_of_week.toLowerCase());
+    const dayDiff = a.day_of_week - b.day_of_week;
     if (dayDiff !== 0) return dayDiff;
     return a.period_number - b.period_number;
   });
@@ -71,9 +59,9 @@ export function ScheduleTimeline({ me, audience }: ScheduleTimelineProps) {
     setStatus("loading");
 
     const lookups = Promise.all([
-      fetchSubjects({ size: 200 }).catch(() => ({ items: [] })),
+      fetchAll((p) => fetchSubjects(p)).catch(() => []),
       fetchClasses({ size: 100 }).catch(() => ({ items: [] })),
-      fetchUsers({ role: "teacher", size: 200 }).catch(() => ({ items: [] })),
+      fetchAll((p) => fetchUsers({ role: "teacher", ...p })).catch(() => []),
     ]);
 
     const schedulePromise: Promise<{
@@ -103,10 +91,10 @@ export function ScheduleTimeline({ me, audience }: ScheduleTimelineProps) {
     Promise.all([lookups, schedulePromise])
       .then(([lookupResult, scheduleResult]) => {
         if (!active) return;
-        const [subjectPage, classPage, userPage] = lookupResult;
-        setSubjectNames(Object.fromEntries(subjectPage.items.map((s) => [s.id, s.name])));
+        const [subjectList, classPage, userList] = lookupResult;
+        setSubjectNames(Object.fromEntries(subjectList.map((s) => [s.id, s.name])));
         setClassNames(Object.fromEntries(classPage.items.map((c) => [c.id, c.name])));
-        setTeacherNames(Object.fromEntries(userPage.items.map((u) => [u.id, u.full_name])));
+        setTeacherNames(Object.fromEntries(userList.map((u) => [u.id, u.full_name])));
         setSessions(sortSessions(scheduleResult.records));
         setClassName(scheduleResult.label);
         setStatus("ready");
@@ -120,20 +108,20 @@ export function ScheduleTimeline({ me, audience }: ScheduleTimelineProps) {
     };
   }, [audience, me.user.id, reloadKey]);
 
-  const todayName = indonesianDayName(new Date());
-  const todaySessions = sessions.filter((record) => record.day_of_week.toLowerCase() === todayName);
+  const todayName = todayDayOfWeek();
+  const todaySessions = sessions.filter((record) => record.day_of_week === todayName);
 
   const grouped = React.useMemo(() => {
-    const groups = new Map<string, ScheduleRecord[]>();
+    const groups = new Map<number, ScheduleRecord[]>();
     for (const record of sessions) {
-      const day = record.day_of_week.toLowerCase();
+      const day = record.day_of_week;
       const list = groups.get(day) ?? [];
       list.push(record);
       groups.set(day, list);
     }
-    return DAY_ORDER.filter((day) => groups.has(day)).map((day) => ({
-      day,
-      records: groups.get(day) ?? [],
+    return DAYS_OF_WEEK.filter((day) => groups.has(day.value)).map((day) => ({
+      day: day.value as number,
+      records: groups.get(day.value) ?? [],
     }));
   }, [sessions]);
 
@@ -254,7 +242,7 @@ export function ScheduleTimeline({ me, audience }: ScheduleTimelineProps) {
           {grouped.map((group) => (
             <Card key={group.day}>
               <CardHeader className="items-center border-b border-outline-variant pb-3">
-                <CardTitle>{DAY_LABEL[group.day] ?? group.day}</CardTitle>
+                <CardTitle>{dayLabel(group.day, "long")}</CardTitle>
                 {group.day === todayName ? (
                   <StatusChip tone="primary">hari ini</StatusChip>
                 ) : (

@@ -43,8 +43,8 @@ from app.db.models import (
 from app.db.session import SessionLocal, create_all
 
 SEED_PASSWORD = "password123"
-ACADEMIC_YEAR = "2024/2025"
-SEMESTER = "ganjil"
+ACADEMIC_YEAR = "2026/2027"
+SEMESTER = f"{ACADEMIC_YEAR}-ganjil"
 
 
 def _hash(password: str) -> str:
@@ -321,7 +321,7 @@ def seed(session: Session) -> None:
     session.flush()
 
     # --- schedules (3-5 per class) ----------------------------------------
-    days = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"]
+    days = [1, 2, 3, 4, 5]
     schedules: list[Schedule] = []
     schedule_id = 1
     teachers = [4, 5]

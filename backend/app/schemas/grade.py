@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.academic import SemesterStr
 from app.db.models import GradeCategory
 
 
@@ -12,7 +13,7 @@ class GradeCreate(BaseModel):
 
     student_id: int
     subject_id: int
-    semester: str
+    semester: SemesterStr
     category: GradeCategory
     score: float = Field(ge=0, le=100)
     description: str | None = None
@@ -31,7 +32,7 @@ class GradeBulkCreate(BaseModel):
 
     class_id: int
     subject_id: int
-    semester: str
+    semester: SemesterStr
     category: GradeCategory
     entries: list[GradeEntry]
 

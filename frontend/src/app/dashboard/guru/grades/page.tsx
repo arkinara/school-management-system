@@ -15,6 +15,7 @@ import { cn } from "@/components/ui/cn";
 import {
   GRADE_CATEGORIES,
   bulkSaveGrades,
+  fetchAll,
   fetchClasses,
   fetchGrades,
   fetchStudents,
@@ -24,12 +25,11 @@ import {
   type StudentRecord,
   type SubjectRecord,
 } from "@/lib/endpoints";
+import { fetchActiveSemester, semesterLabel, semesterOptions, type Semester } from "@/lib/academic";
 import type { UserMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 
 type LoadStatus = "idle" | "loading" | "ready" | "error";
-
-const SEMESTERS = ["Ganjil 2025/2026", "Genap 2025/2026"];
 
 type ScoreMap = Record<number, Partial<Record<GradeCategory, string>>>;
 
@@ -52,7 +52,8 @@ function GradesContent({ me }: { me: UserMe }) {
   const [subjects, setSubjects] = React.useState<SubjectRecord[]>([]);
   const [classId, setClassId] = React.useState("");
   const [subjectId, setSubjectId] = React.useState("");
-  const [semester, setSemester] = React.useState(SEMESTERS[0]);
+  const [semester, setSemester] = React.useState<string>("");
+  const [activeSemester, setActiveSemester] = React.useState<Semester | null>(null);
   const [roster, setRoster] = React.useState<StudentRecord[]>([]);
   const [scores, setScores] = React.useState<ScoreMap>({});
   const [errors, setErrors] = React.useState<Record<string, string>>({});
@@ -67,13 +68,19 @@ function GradesContent({ me }: { me: UserMe }) {
 
   React.useEffect(() => {
     let active = true;
-    Promise.all([fetchClasses({ size: 100 }), fetchSubjects({ size: 200 })])
-      .then(([classPage, subjectPage]) => {
+    Promise.all([
+      fetchClasses({ size: 100 }),
+      fetchAll((p) => fetchSubjects(p)),
+      fetchActiveSemester().catch(() => "2026/2027-ganjil" as Semester),
+    ])
+      .then(([classPage, subjectList, activeSem]) => {
         if (!active) return;
         setClasses(classPage.items);
-        setSubjects(subjectPage.items);
+        setSubjects(subjectList);
         if (classPage.items[0]) setClassId(String(classPage.items[0].id));
-        if (subjectPage.items[0]) setSubjectId(String(subjectPage.items[0].id));
+        if (subjectList[0]) setSubjectId(String(subjectList[0].id));
+        setActiveSemester(activeSem);
+        setSemester(activeSem);
       })
       .catch(() => {
         if (active) setToast({ message: "Gagal memuat kelas/mapel.", tone: "error" });
@@ -88,15 +95,15 @@ function GradesContent({ me }: { me: UserMe }) {
     let active = true;
     setStatus("loading");
     Promise.all([
-      fetchStudents({ class_id: Number(classId), size: 200 }),
-      fetchGrades({ subject_id: Number(subjectId), semester, size: 500 }),
+      fetchAll((p) => fetchStudents({ class_id: Number(classId), ...p })),
+      fetchAll((p) => fetchGrades({ subject_id: Number(subjectId), semester, ...p })),
     ])
-      .then(([students, gradePage]) => {
+      .then(([students, grades]) => {
         if (!active) return;
-        setRoster(students.items);
+        setRoster(students);
         const next: ScoreMap = {};
-        for (const student of students.items) next[student.id] = {};
-        for (const grade of gradePage.items) {
+        for (const student of students) next[student.id] = {};
+        for (const grade of grades) {
           const bucket = next[grade.student_id];
           if (!bucket) continue;
           bucket[grade.category] = String(grade.score);
@@ -112,6 +119,8 @@ function GradesContent({ me }: { me: UserMe }) {
       active = false;
     };
   }, [classId, subjectId, semester, reloadKey]);
+
+  const semesterChoices = activeSemester ? semesterOptions(activeSemester) : [];
 
   const aggregate: Aggregate = React.useMemo(() => {
     const values: number[] = [];
@@ -340,9 +349,9 @@ function GradesContent({ me }: { me: UserMe }) {
                 onChange={(event) => setSemester(event.target.value)}
                 className={inputClass}
               >
-                {SEMESTERS.map((value) => (
+                {semesterChoices.map((value) => (
                   <option key={value} value={value}>
-                    {value}
+                    {semesterLabel(value)}
                   </option>
                 ))}
               </select>
@@ -353,7 +362,7 @@ function GradesContent({ me }: { me: UserMe }) {
         <div className="flex flex-wrap items-center gap-3 border-b border-outline-variant px-5 py-2.5">
           <ClipboardList className="h-4 w-4 text-muted-foreground" aria-hidden />
           <span className="text-2xs text-muted-foreground">
-            {className} · {subjectName} · {semester}
+            {className} · {subjectName} · {semesterLabel(semester)}
           </span>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <StatusChip tone="neutral">

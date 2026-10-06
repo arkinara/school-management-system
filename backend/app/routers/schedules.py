@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import time
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -32,34 +32,10 @@ router = APIRouter()
 _MANAGER_ROLES = (UserRole.ADMIN, UserRole.PRINCIPAL, UserRole.SUPER_ADMIN)
 _manage = require_role(*_MANAGER_ROLES)
 
-_DAY_ORDER = {
-    "senin": 0,
-    "selasa": 1,
-    "rabu": 2,
-    "kamis": 3,
-    "jumat": 4,
-    "sabtu": 5,
-    "minggu": 6,
-    "sen": 0,
-    "sel": 1,
-    "rab": 2,
-    "kam": 3,
-    "jum": 4,
-    "sab": 5,
-    "min": 6,
-    "monday": 0,
-    "tuesday": 1,
-    "wednesday": 2,
-    "thursday": 3,
-    "friday": 4,
-    "saturday": 5,
-    "sunday": 6,
-}
-
 
 def _day_rank():
-    """SQL CASE ranking a day label so weeks order Senin→Minggu."""
-    return case(_DAY_ORDER, value=func.lower(Schedule.day_of_week), else_=99)
+    """Column used to order weeks Senin→Minggu (ISO int, 1-7)."""
+    return Schedule.day_of_week
 
 
 def _can_manage_school(user: User, school: School | None) -> bool:
@@ -136,7 +112,7 @@ def _find_conflict(
     *,
     class_id: int,
     teacher_id: int,
-    day_of_week: str,
+    day_of_week: int,
     period_number: int,
     start_time: time,
     end_time: time,
@@ -206,7 +182,7 @@ def create_schedule(
         db,
         class_id=klass.id,
         teacher_id=payload.teacher_id,
-        day_of_week=payload.day_of_week,
+        day_of_week=int(payload.day_of_week),
         period_number=payload.period_number,
         start_time=payload.start_time,
         end_time=payload.end_time,
@@ -219,7 +195,7 @@ def create_schedule(
         class_id=klass.id,
         subject_id=payload.subject_id,
         teacher_id=payload.teacher_id,
-        day_of_week=payload.day_of_week,
+        day_of_week=int(payload.day_of_week),
         period_number=payload.period_number,
         start_time=payload.start_time,
         end_time=payload.end_time,
@@ -257,7 +233,7 @@ def create_schedule_bulk(
             db,
             class_id=klass.id,
             teacher_id=slot.teacher_id,
-            day_of_week=slot.day_of_week,
+            day_of_week=int(slot.day_of_week),
             period_number=slot.period_number,
             start_time=slot.start_time,
             end_time=slot.end_time,
@@ -290,7 +266,7 @@ def create_schedule_bulk(
                 class_id=klass.id,
                 subject_id=slot.subject_id,
                 teacher_id=slot.teacher_id,
-                day_of_week=slot.day_of_week,
+                day_of_week=int(slot.day_of_week),
                 period_number=slot.period_number,
                 start_time=slot.start_time,
                 end_time=slot.end_time,
@@ -313,7 +289,7 @@ def create_schedule_bulk(
 def list_schedules(
     class_id: int | None = Query(None),
     teacher_id: int | None = Query(None),
-    day_of_week: str | None = Query(None),
+    day_of_week: int | None = Query(None, ge=1, le=7),
     page: PageParams = Depends(PageParams),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -451,7 +427,7 @@ def update_schedule(
     data = payload.model_dump(exclude_unset=True)
     subject_id = data.get("subject_id", entry.subject_id)
     teacher_id = data.get("teacher_id", entry.teacher_id)
-    day_of_week = data.get("day_of_week", entry.day_of_week)
+    day_of_week = int(data.get("day_of_week", entry.day_of_week))
     period_number = data.get("period_number", entry.period_number)
     start_time = data.get("start_time", entry.start_time)
     end_time = data.get("end_time", entry.end_time)

@@ -25,6 +25,7 @@ import { Toast, ToastViewport } from "@/components/ui/Toast";
 import { cn } from "@/components/ui/cn";
 import {
   SPP_PAYMENT_METHODS,
+  fetchAll,
   fetchBillList,
   fetchClasses,
   fetchStudents,
@@ -83,11 +84,11 @@ function PaymentsContent() {
 
   React.useEffect(() => {
     let active = true;
-    Promise.all([fetchClasses({ size: 100 }), fetchStudents({ size: 500 })])
-      .then(([classPage, studentPage]) => {
+    Promise.all([fetchClasses({ size: 100 }), fetchAll((p) => fetchStudents(p))])
+      .then(([classPage, studentList]) => {
         if (!active) return;
         setClasses(classPage.items);
-        setStudents(Object.fromEntries(studentPage.items.map((item) => [item.id, item])));
+        setStudents(Object.fromEntries(studentList.map((item) => [item.id, item])));
       })
       .catch(() => {
         if (active) setToast({ message: "Gagal memuat data kelas/siswa.", tone: "error" });
@@ -100,14 +101,16 @@ function PaymentsContent() {
   React.useEffect(() => {
     let active = true;
     setStatus("loading");
-    fetchBillList({
-      size: 200,
-      class_id: classFilter ? Number(classFilter) : undefined,
-      period: periodFilter || undefined,
-    })
-      .then((page) => {
+    fetchAll((p) =>
+      fetchBillList({
+        ...p,
+        class_id: classFilter ? Number(classFilter) : undefined,
+        period: periodFilter || undefined,
+      })
+    )
+      .then((rows) => {
         if (!active) return;
-        setBills(page.items.filter((bill) => bill.status !== "paid"));
+        setBills(rows.filter((bill) => bill.status !== "paid"));
         setSelected(new Set());
         setStatus("ready");
       })

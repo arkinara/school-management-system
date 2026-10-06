@@ -24,6 +24,7 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { Skeleton, SkeletonCard, SkeletonList } from "@/components/ui/Skeleton";
 import { cn } from "@/components/ui/cn";
 import {
+  fetchAll,
   fetchAnnouncements,
   fetchAttendances,
   fetchClasses,
@@ -31,13 +32,13 @@ import {
   fetchParentChildren,
   fetchReportCards,
   getBills,
-  currentSemester,
   type AnnouncementRecord,
   type AttendanceRecord,
   type ChildSummary,
   type ClassRecord,
   type SppBill,
 } from "@/lib/endpoints";
+import { fetchActiveSemester, type Semester } from "@/lib/academic";
 import type { UserMe } from "@/lib/auth";
 
 type LoadStatus = "loading" | "ready" | "error";
@@ -142,6 +143,20 @@ function OrangTuaContent({ me }: { me: UserMe }) {
   }>({ status: "loading", items: [] });
   const [announcementKey, setAnnouncementKey] = React.useState(0);
 
+  const [activeSemester, setActiveSemester] = React.useState<Semester>("2026/2027-ganjil");
+
+  React.useEffect(() => {
+    let active = true;
+    fetchActiveSemester()
+      .then((semester) => {
+        if (active) setActiveSemester(semester);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
   React.useEffect(() => {
     setToday(
       new Intl.DateTimeFormat("id-ID", {
@@ -176,10 +191,10 @@ function OrangTuaContent({ me }: { me: UserMe }) {
     if (selectedId === null) return;
     let active = true;
     setChildData(EMPTY_CHILD);
-    const semester = currentSemester();
+    const semester = activeSemester;
     Promise.all([
       fetchGradeAggregate({ student_id: selectedId, semester }).catch(() => null),
-      fetchAttendances({ student_id: selectedId, size: 100 }),
+      fetchAll((p) => fetchAttendances({ student_id: selectedId, ...p })),
       fetchReportCards({ student_id: selectedId, semester, size: 1 }),
       getBills({ student_id: selectedId, size: 100 }),
     ])
@@ -191,10 +206,10 @@ function OrangTuaContent({ me }: { me: UserMe }) {
           sakit: 0,
           alpa: 0,
         };
-        for (const row of attendance.items as AttendanceRecord[]) {
+        for (const row of attendance as AttendanceRecord[]) {
           breakdown[row.status] += 1;
         }
-        const totalAttendance = attendance.total;
+        const totalAttendance = attendance.length;
         const rate =
           totalAttendance > 0 ? Math.round((breakdown.hadir / totalAttendance) * 100) : 0;
 
@@ -241,7 +256,7 @@ function OrangTuaContent({ me }: { me: UserMe }) {
     return () => {
       active = false;
     };
-  }, [selectedId, childKey]);
+  }, [selectedId, childKey, activeSemester]);
 
   React.useEffect(() => {
     let active = true;

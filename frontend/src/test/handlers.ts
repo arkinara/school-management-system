@@ -188,6 +188,14 @@ export const handlers = [
     return HttpResponse.json(principalUser);
   }),
 
+  http.get(`${API}/api/academic/active-semester`, () =>
+    HttpResponse.json({
+      semester: "2026/2027-ganjil",
+      academic_year: "2026/2027",
+      term: "ganjil",
+    })
+  ),
+
   http.get(`${API}/api/classes`, () => HttpResponse.json(page(classes, classes.length))),
 
   http.get(`${API}/api/subjects`, () => HttpResponse.json(page(subjects, subjects.length))),
@@ -225,7 +233,7 @@ export const handlers = [
     const url = new URL(request.url);
     if (url.searchParams.has("class_id")) {
       return HttpResponse.json(
-        page<AttendanceRecord>([], 0, Number(url.searchParams.get("size") ?? 200))
+        page<AttendanceRecord>([], 0, Number(url.searchParams.get("size") ?? 100))
       );
     }
     const rows: AttendanceRecord[] = Array.from({ length: 10 }, (_, index) => ({

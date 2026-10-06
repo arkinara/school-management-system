@@ -3,8 +3,21 @@
 from __future__ import annotations
 
 from datetime import time
+from enum import IntEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class DayOfWeekEnum(IntEnum):
+    """ISO weekday: Monday = 1 … Sunday = 7."""
+
+    MONDAY = 1
+    TUESDAY = 2
+    WEDNESDAY = 3
+    THURSDAY = 4
+    FRIDAY = 5
+    SATURDAY = 6
+    SUNDAY = 7
 
 
 class ScheduleBase(BaseModel):
@@ -12,7 +25,7 @@ class ScheduleBase(BaseModel):
 
     subject_id: int
     teacher_id: int
-    day_of_week: str = Field(min_length=1, max_length=16)
+    day_of_week: DayOfWeekEnum
     period_number: int = Field(ge=1)
     start_time: time
     end_time: time
@@ -46,7 +59,7 @@ class ScheduleUpdate(BaseModel):
 
     subject_id: int | None = None
     teacher_id: int | None = None
-    day_of_week: str | None = Field(default=None, min_length=1, max_length=16)
+    day_of_week: DayOfWeekEnum | None = None
     period_number: int | None = Field(default=None, ge=1)
     start_time: time | None = None
     end_time: time | None = None
@@ -59,7 +72,7 @@ class ScheduleOut(BaseModel):
     class_id: int
     subject_id: int
     teacher_id: int
-    day_of_week: str
+    day_of_week: DayOfWeekEnum
     period_number: int
     start_time: time
     end_time: time

@@ -6,6 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from app.academic import SemesterStr
 from app.db.models import ReportCardStatus
 
 
@@ -13,7 +14,7 @@ class ReportCardCompile(BaseModel):
     """Request to (re)compile a student's rapor for a semester."""
 
     student_id: int
-    semester: str
+    semester: SemesterStr
     kurikulum_version: str
 
 

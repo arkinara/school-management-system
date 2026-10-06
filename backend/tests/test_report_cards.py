@@ -108,7 +108,7 @@ def _add_smp_tenant(db_session: Session) -> None:
             id=100,
             student_id=20,
             subject_id=30,
-            semester="ganjil",
+            semester="2026/2027-ganjil",
             category=GradeCategory.FORMATIF,
             score=85,
             description="Baik",
@@ -137,7 +137,7 @@ def _link_parent(client: TestClient, student_id: int, parent_id: int) -> None:
     assert response.status_code == 201, response.text
 
 
-def _compile(client: TestClient, token: str, student_id: int, semester: str = "ganjil"):
+def _compile(client: TestClient, token: str, student_id: int, semester: str = "2026/2027-ganjil"):
     return client.post(
         "/api/report-cards/compile",
         headers=_auth(token),
@@ -172,7 +172,7 @@ def test_compile_is_idempotent(client: TestClient, db_session: Session) -> None:
     count = db_session.scalar(
         select(func.count())
         .select_from(ReportCard)
-        .where(ReportCard.student_id == 1, ReportCard.semester == "ganjil")
+        .where(ReportCard.student_id == 1, ReportCard.semester == "2026/2027-ganjil")
     )
     assert count == 1
 

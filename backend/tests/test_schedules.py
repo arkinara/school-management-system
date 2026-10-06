@@ -81,7 +81,7 @@ def test_principal_creates_schedule(client: TestClient, db_session: Session) -> 
             "class_id": 1,
             "subject_id": 1,
             "teacher_id": 4,
-            "day_of_week": "Senin",
+            "day_of_week": 1,
             "period_number": 5,
             "start_time": "10:00:00",
             "end_time": "10:45:00",
@@ -101,7 +101,7 @@ def test_teacher_cannot_create_schedule(client: TestClient, db_session: Session)
             "class_id": 1,
             "subject_id": 1,
             "teacher_id": 4,
-            "day_of_week": "Senin",
+            "day_of_week": 1,
             "period_number": 6,
             "start_time": "11:00:00",
             "end_time": "11:45:00",
@@ -118,7 +118,7 @@ def test_class_slot_conflict_returns_409(client: TestClient, db_session: Session
             "class_id": 1,
             "subject_id": 1,
             "teacher_id": 4,
-            "day_of_week": "Rabu",
+            "day_of_week": 3,
             "period_number": 1,
             "start_time": "07:00:00",
             "end_time": "07:45:00",
@@ -138,7 +138,7 @@ def test_teacher_double_booking_returns_409(
             "class_id": 3,
             "subject_id": 1,
             "teacher_id": 4,
-            "day_of_week": "Kamis",
+            "day_of_week": 4,
             "period_number": 5,
             "start_time": "08:00:00",
             "end_time": "08:45:00",
@@ -157,7 +157,7 @@ def test_adjacent_periods_do_not_conflict(
             "class_id": 1,
             "subject_id": 1,
             "teacher_id": 4,
-            "day_of_week": "Rabu",
+            "day_of_week": 3,
             "period_number": 4,
             "start_time": "07:45:00",
             "end_time": "08:30:00",
@@ -173,7 +173,7 @@ def test_missing_field_is_422(client: TestClient, db_session: Session) -> None:
         json={
             "class_id": 1,
             "subject_id": 1,
-            "day_of_week": "Senin",
+            "day_of_week": 1,
             "period_number": 9,
             "start_time": "14:00:00",
             "end_time": "14:45:00",
@@ -190,7 +190,7 @@ def test_nonexistent_class_is_404(client: TestClient, db_session: Session) -> No
             "class_id": 999,
             "subject_id": 1,
             "teacher_id": 4,
-            "day_of_week": "Senin",
+            "day_of_week": 1,
             "period_number": 1,
             "start_time": "06:00:00",
             "end_time": "06:45:00",
@@ -209,7 +209,7 @@ def test_bulk_create_and_rollback(client: TestClient, db_session: Session) -> No
                 {
                     "subject_id": 1,
                     "teacher_id": 4,
-                    "day_of_week": "Sabtu",
+                    "day_of_week": 6,
                     "period_number": 5,
                     "start_time": "10:00:00",
                     "end_time": "10:45:00",
@@ -217,7 +217,7 @@ def test_bulk_create_and_rollback(client: TestClient, db_session: Session) -> No
                 {
                     "subject_id": 2,
                     "teacher_id": 5,
-                    "day_of_week": "Sabtu",
+                    "day_of_week": 6,
                     "period_number": 6,
                     "start_time": "10:45:00",
                     "end_time": "11:30:00",
@@ -229,7 +229,7 @@ def test_bulk_create_and_rollback(client: TestClient, db_session: Session) -> No
     assert ok.json()["created"] == 2
 
     before = db_session.scalar(
-        select(func.count()).select_from(Schedule).where(Schedule.day_of_week == "Minggu")
+        select(func.count()).select_from(Schedule).where(Schedule.day_of_week == 7)
     )
     bad = client.post(
         "/api/schedules/bulk",
@@ -240,7 +240,7 @@ def test_bulk_create_and_rollback(client: TestClient, db_session: Session) -> No
                 {
                     "subject_id": 1,
                     "teacher_id": 4,
-                    "day_of_week": "Minggu",
+                    "day_of_week": 7,
                     "period_number": 5,
                     "start_time": "10:00:00",
                     "end_time": "10:45:00",
@@ -248,7 +248,7 @@ def test_bulk_create_and_rollback(client: TestClient, db_session: Session) -> No
                 {
                     "subject_id": 2,
                     "teacher_id": 5,
-                    "day_of_week": "Minggu",
+                    "day_of_week": 7,
                     "period_number": 5,
                     "start_time": "10:00:00",
                     "end_time": "10:45:00",
@@ -259,7 +259,7 @@ def test_bulk_create_and_rollback(client: TestClient, db_session: Session) -> No
     assert bad.status_code == 409
     db_session.expire_all()
     after = db_session.scalar(
-        select(func.count()).select_from(Schedule).where(Schedule.day_of_week == "Minggu")
+        select(func.count()).select_from(Schedule).where(Schedule.day_of_week == 7)
     )
     assert after == before
 
@@ -299,7 +299,7 @@ def test_update_rechecks_conflict(client: TestClient, db_session: Session) -> No
             "class_id": 1,
             "subject_id": 1,
             "teacher_id": 4,
-            "day_of_week": "Minggu",
+            "day_of_week": 7,
             "period_number": 5,
             "start_time": "10:00:00",
             "end_time": "10:45:00",
@@ -311,17 +311,17 @@ def test_update_rechecks_conflict(client: TestClient, db_session: Session) -> No
     conflict = client.patch(
         f"/api/schedules/{schedule_id}",
         headers=_auth(PRINCIPAL),
-        json={"day_of_week": "Rabu", "period_number": 1},
+        json={"day_of_week": 3, "period_number": 1},
     )
     assert conflict.status_code == 409
 
     moved = client.patch(
         f"/api/schedules/{schedule_id}",
         headers=_auth(PRINCIPAL),
-        json={"day_of_week": "Sabtu", "period_number": 8},
+        json={"day_of_week": 6, "period_number": 8},
     )
     assert moved.status_code == 200, moved.text
-    assert moved.json()["day_of_week"] == "Sabtu"
+    assert moved.json()["day_of_week"] == 6
 
 
 def test_delete_requires_management(client: TestClient, db_session: Session) -> None:
@@ -332,7 +332,7 @@ def test_delete_requires_management(client: TestClient, db_session: Session) -> 
             "class_id": 1,
             "subject_id": 1,
             "teacher_id": 4,
-            "day_of_week": "Minggu",
+            "day_of_week": 7,
             "period_number": 6,
             "start_time": "11:00:00",
             "end_time": "11:45:00",
@@ -355,7 +355,7 @@ def test_tenant_boundary_enforced(client: TestClient, db_session: Session) -> No
             "class_id": 10,
             "subject_id": 20,
             "teacher_id": 201,
-            "day_of_week": "Senin",
+            "day_of_week": 1,
             "period_number": 1,
             "start_time": "06:00:00",
             "end_time": "06:45:00",

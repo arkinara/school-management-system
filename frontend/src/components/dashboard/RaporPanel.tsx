@@ -19,11 +19,10 @@ import {
   type ReportCardRecord,
   type StudentRecord,
 } from "@/lib/endpoints";
+import { fetchActiveSemester, semesterLabel, semesterOptions, type Semester } from "@/lib/academic";
 import type { UserMe } from "@/lib/auth";
 
 type LoadStatus = "loading" | "ready" | "error";
-
-const SEMESTERS = ["Semester Genap 2025/2026", "Semester Ganjil 2025/2026"] as const;
 
 function formatScore(value: number): string {
   return value.toFixed(2).replace(".", ",");
@@ -149,13 +148,29 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
   const [children, setChildren] = React.useState<ChildSummary[]>([]);
   const [studentName, setStudentName] = React.useState(me.user.full_name);
   const [selectedStudentId, setSelectedStudentId] = React.useState<number | null>(null);
-  const [semester, setSemester] = React.useState<string>(SEMESTERS[0]);
+  const [semesters, setSemesters] = React.useState<Semester[]>([]);
+  const [semester, setSemester] = React.useState<string>("");
   const [available, setAvailable] = React.useState<Record<string, boolean>>({});
   const [records, setRecords] = React.useState<Record<string, ReportCardRecord | null>>({});
   const [rapor, setRapor] = React.useState<ReportCardRecord | null>(null);
   const [status, setStatus] = React.useState<LoadStatus>("loading");
   const [reloadKey, setReloadKey] = React.useState(0);
   const initializedFor = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    fetchActiveSemester()
+      .then((activeSemester) => {
+        if (!active) return;
+        const options = semesterOptions(activeSemester);
+        setSemesters(options);
+        setSemester((current) => current || options[0]);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   React.useEffect(() => {
     let active = true;
@@ -209,11 +224,11 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
   }, [audience, me.user.full_name, me.user.id, reloadKey]);
 
   React.useEffect(() => {
-    if (selectedStudentId === null) return;
+    if (selectedStudentId === null || semesters.length === 0) return;
     let active = true;
     setStatus("loading");
     Promise.all(
-      SEMESTERS.map((value) =>
+      semesters.map((value) =>
         getRapor({ studentId: selectedStudentId, semester: value })
           .then((record) => [value, record] as const)
           .catch(() => [value, null] as const)
@@ -232,7 +247,7 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
 
         if (initializedFor.current !== selectedStudentId) {
           initializedFor.current = selectedStudentId;
-          const firstAvailable = SEMESTERS.find((value) => availability[value]);
+          const firstAvailable = semesters.find((value) => availability[value]);
           if (firstAvailable) {
             setSemester(firstAvailable);
             return;
@@ -251,10 +266,10 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
     return () => {
       active = false;
     };
-  }, [selectedStudentId, semester, reloadKey]);
+  }, [selectedStudentId, semester, reloadKey, semesters]);
 
   const data = rapor?.compiled_data ?? null;
-  const hasAnyRecord = SEMESTERS.some((value) => records[value] != null);
+  const hasAnyRecord = semesters.some((value) => records[value] != null);
   const selectedRecord = records[semester] ?? null;
   const notPublished =
     status === "ready" && selectedRecord !== null && selectedRecord.status !== "published";
@@ -320,9 +335,9 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
               onChange={(event) => setSemester(event.target.value)}
               className={inputClass}
             >
-              {SEMESTERS.map((value) => (
+              {semesters.map((value) => (
                 <option key={value} value={value} disabled={available[value] === false}>
-                  {value}
+                  {semesterLabel(value)}
                   {available[value] === false ? " (belum tersedia)" : ""}
                 </option>
               ))}
@@ -365,14 +380,14 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
         <EmptyState
           icon={FileText}
           title="Rapor belum diterbitkan"
-          description={`Rapor ${studentName} untuk ${semester} masih berstatus draft dan belum dapat dilihat.`}
+          description={`Rapor ${studentName} untuk ${semesterLabel(semester)} masih berstatus draft dan belum dapat dilihat.`}
         />
       ) : rapor === null || data === null ? (
         hasAnyRecord ? (
           <EmptyState
             icon={FileText}
             title="Rapor belum diterbitkan"
-            description={`Rapor ${studentName} untuk ${semester} belum diterbitkan oleh sekolah.`}
+            description={`Rapor ${studentName} untuk ${semesterLabel(semester)} belum diterbitkan oleh sekolah.`}
           />
         ) : (
           <EmptyState
@@ -389,7 +404,7 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
               <div>
                 <CardTitle>{studentName}</CardTitle>
                 <p className="text-2xs text-muted-foreground">
-                  {rapor.semester} · Fase {data.fase} · {data.jenjang}
+                  {semesterLabel(rapor.semester)} · Fase {data.fase} · {data.jenjang}
                 </p>
               </div>
             </div>

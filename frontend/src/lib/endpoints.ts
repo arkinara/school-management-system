@@ -8,12 +8,36 @@
 
 import { apiFetch } from "./api";
 import type { UserMe } from "./auth";
+import { todayDayOfWeek } from "./days";
 
 export interface Paginated<T> {
   items: T[];
   total: number;
   page: number;
   size: number;
+}
+
+/**
+ * Page through a list endpoint until every row is fetched (or `maxItems`).
+ *
+ * The BE caps a single page at 100, so full-list consumers (roster pickers,
+ * rate/KPI calculations) must use this instead of requesting `size > 100`.
+ */
+export async function fetchAll<T>(
+  fetcher: (params: { page: number; size: number }) => Promise<Paginated<T>>,
+  options: { maxItems?: number; size?: number } = {}
+): Promise<T[]> {
+  const size = options.size ?? 100;
+  const max = options.maxItems ?? Infinity;
+  const all: T[] = [];
+  let page = 1;
+  while (all.length < max) {
+    const res = await fetcher({ page, size });
+    all.push(...res.items);
+    if (res.items.length < size || all.length >= res.total) break;
+    page++;
+  }
+  return all.slice(0, max);
 }
 
 export interface StudentRecord {
@@ -300,7 +324,7 @@ export interface ScheduleRecord {
   class_id: number;
   subject_id: number;
   teacher_id: number;
-  day_of_week: string;
+  day_of_week: number;
   period_number: number;
   start_time: string;
   end_time: string;
@@ -309,7 +333,7 @@ export interface ScheduleRecord {
 export interface ScheduleInput {
   subject_id: number;
   teacher_id: number;
-  day_of_week: string;
+  day_of_week: number;
   period_number: number;
   start_time: string;
   end_time: string;
@@ -329,7 +353,7 @@ export function getTeacherSchedule(teacherId: number): Promise<ScheduleRecord[]>
 export function getTodaySchedule(
   params: { classId?: number; teacherId?: number } = {}
 ): Promise<ScheduleRecord[]> {
-  const day = indonesianDayName(new Date());
+  const day = todayDayOfWeek();
   return apiFetch<Paginated<ScheduleRecord>>(
     `/api/schedules${toQuery({
       class_id: params.classId,
@@ -345,7 +369,7 @@ export function fetchSchedules(
   params: {
     class_id?: number;
     teacher_id?: number;
-    day_of_week?: string;
+    day_of_week?: number;
     page?: number;
     size?: number;
   } = {}
@@ -362,12 +386,6 @@ export function bulkSaveSchedules(input: {
     method: "POST",
     body: JSON.stringify(input),
   });
-}
-
-/** Monday-first Indonesian weekday name, lowercased to match the API. */
-export function indonesianDayName(date: Date): string {
-  const days = ["minggu", "senin", "selasa", "rabu", "kamis", "jumat", "sabtu"];
-  return days[date.getDay()];
 }
 
 /** A teacher/user display name lookup record. */
@@ -653,14 +671,6 @@ export function fetchDashboardCounts(
     teachers: teachers.total,
     classes: classes.total,
   }));
-}
-
-/** Current academic semester label derived from the calendar (Jul→Ganjil). */
-export function currentSemester(date: Date = new Date()): string {
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  if (month >= 6) return `Semester Ganjil ${year}/${year + 1}`;
-  return `Semester Genap ${year - 1}/${year}`;
 }
 
 /* ==========================================================================

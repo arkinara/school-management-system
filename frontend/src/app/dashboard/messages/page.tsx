@@ -26,6 +26,7 @@ import { ApiError } from "@/lib/api";
 import {
   addThreadParticipant,
   createMessageThread,
+  fetchAll,
   fetchMessages,
   fetchThreads,
   fetchUsers,
@@ -427,8 +428,8 @@ function MessagesContent({ me }: { me: UserMe }) {
 
   React.useEffect(() => {
     let active = true;
-    fetchUsers({ size: 200 })
-      .then((page) => active && setUsers(page.items))
+    fetchAll((p) => fetchUsers(p))
+      .then((list) => active && setUsers(list))
       .catch(() => undefined);
     return () => {
       active = false;
@@ -461,10 +462,10 @@ function MessagesContent({ me }: { me: UserMe }) {
     }
     let active = true;
     setMessageStatus("loading");
-    fetchMessages(activeId, { size: 200 })
-      .then((page) => {
+    fetchAll((p) => fetchMessages(activeId, p))
+      .then((list) => {
         if (!active) return;
-        setMessages(page.items);
+        setMessages(list);
         setMessageStatus("ready");
         void loadThreads(true);
       })

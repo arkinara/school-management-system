@@ -81,7 +81,7 @@ describe("SppPaymentsPage", () => {
   it("shows an empty state when there are no outstanding bills", async () => {
     server.use(
       http.get(`${API}/api/spp/bills`, () =>
-        HttpResponse.json({ items: [], total: 0, page: 1, size: 200 })
+        HttpResponse.json({ items: [], total: 0, page: 1, size: 100 })
       )
     );
     render(<SppPaymentsPage />);
