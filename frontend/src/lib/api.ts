@@ -5,14 +5,22 @@
  * Better Auth library, so the token is persisted client-side and attached as a
  * Bearer header on every request. The token is mirrored into a non-sensitive
  * cookie so `middleware.ts` can gate routes before React mounts.
+ *
+ * Ticket #40: the short-lived access token (15m) is paired with a long-lived
+ * refresh token (7d). `apiFetch` transparently refreshes once on a 401 and
+ * retries the request; it never loops. Better Auth with httpOnly cookies is
+ * deferred to #45 — until then both tokens live in localStorage (a known
+ * limitation).
  */
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const TOKEN_STORAGE_KEY = "sms_auth_token";
+const REFRESH_TOKEN_STORAGE_KEY = "sms_refresh_token";
 export const TOKEN_COOKIE_NAME = "sms_auth_token";
-const TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+export const REFRESH_TOKEN_COOKIE_NAME = "sms_refresh_token";
+const TOKEN_MAX_AGE_SECONDS = 60 * 15;
+const REFRESH_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
 /** Thrown when the backend answers 401; callers usually reset to sign-in. */
 export class UnauthorizedError extends Error {
@@ -28,11 +36,7 @@ export class ApiError extends Error {
   detail: string;
   fieldErrors?: Record<string, string>;
 
-  constructor(
-    status: number,
-    detail: string,
-    fieldErrors?: Record<string, string>
-  ) {
+  constructor(status: number, detail: string, fieldErrors?: Record<string, string>) {
     super(detail);
     this.name = "ApiError";
     this.status = status;
@@ -60,9 +64,7 @@ function parseDetail(detail: unknown): string {
   if (Array.isArray(detail)) {
     const messages = detail
       .map((item) =>
-        typeof item === "object" && item !== null
-          ? (item as { msg?: unknown }).msg
-          : undefined
+        typeof item === "object" && item !== null ? (item as { msg?: unknown }).msg : undefined
       )
       .filter((msg): msg is string => typeof msg === "string");
     if (messages.length > 0) return messages.join(", ");
@@ -70,68 +72,156 @@ function parseDetail(detail: unknown): string {
   return "Terjadi kesalahan pada server.";
 }
 
-export function getToken(): string | null {
+function readStorage(key: string): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+    return window.localStorage.getItem(key);
   } catch {
     return null;
   }
 }
 
-export function setToken(token: string): void {
+function writeStorage(key: string, value: string): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    window.localStorage.setItem(key, value);
   } catch {
     // Storage may be unavailable (private mode); the cookie still carries it.
   }
+}
+
+function removeStorage(key: string): void {
+  if (typeof window === "undefined") return;
   try {
-    document.cookie = `${TOKEN_COOKIE_NAME}=${token}; path=/; max-age=${TOKEN_MAX_AGE_SECONDS}; samesite=lax`;
+    window.localStorage.removeItem(key);
+  } catch {
+    // Ignore.
+  }
+}
+
+function writeCookie(name: string, value: string, maxAgeSeconds: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    document.cookie = `${name}=${value}; path=/; max-age=${maxAgeSeconds}; samesite=lax`;
   } catch {
     // Ignore cookie write failures.
   }
 }
 
-export function clearToken(): void {
+function clearCookie(name: string): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-  } catch {
-    // Ignore.
-  }
-  try {
-    document.cookie = `${TOKEN_COOKIE_NAME}=; path=/; max-age=0; samesite=lax`;
+    document.cookie = `${name}=; path=/; max-age=0; samesite=lax`;
   } catch {
     // Ignore.
   }
 }
 
+export function getToken(): string | null {
+  return readStorage(TOKEN_STORAGE_KEY);
+}
+
+export function setToken(token: string): void {
+  writeStorage(TOKEN_STORAGE_KEY, token);
+  writeCookie(TOKEN_COOKIE_NAME, token, TOKEN_MAX_AGE_SECONDS);
+}
+
+export function getRefreshToken(): string | null {
+  return readStorage(REFRESH_TOKEN_STORAGE_KEY);
+}
+
+export function setRefreshToken(token: string): void {
+  writeStorage(REFRESH_TOKEN_STORAGE_KEY, token);
+  writeCookie(REFRESH_TOKEN_COOKIE_NAME, token, REFRESH_MAX_AGE_SECONDS);
+}
+
+export function hasRefreshToken(): boolean {
+  return getRefreshToken() !== null;
+}
+
+export function clearToken(): void {
+  removeStorage(TOKEN_STORAGE_KEY);
+  removeStorage(REFRESH_TOKEN_STORAGE_KEY);
+  clearCookie(TOKEN_COOKIE_NAME);
+  clearCookie(REFRESH_TOKEN_COOKIE_NAME);
+}
+
+export interface RefreshedTokens {
+  access_token: string;
+  refresh_token: string | null;
+}
+
 /**
- * Fetch a backend path with JSON handling and auth.
+ * Exchange the stored refresh token for a fresh token pair.
  *
- * Prepends the API base URL, attaches the Bearer token when present, clears the
- * token and throws `UnauthorizedError` on 401, and throws `ApiError` on any
- * other non-2xx response. `204 No Content` resolves to `undefined`.
+ * Uses a bare `fetch` (not `apiFetch`) so a failed refresh can never recurse.
+ * On any failure the stored tokens are cleared and `UnauthorizedError` is
+ * thrown, letting callers redirect to sign-in.
  */
-export async function apiFetch<T>(
-  path: string,
-  opts: RequestInit = {}
-): Promise<T> {
-  const headers = new Headers(opts.headers);
-  const token = getToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  if (opts.body !== undefined && !(opts.body instanceof FormData)) {
-    if (!headers.has("Content-Type")) {
-      headers.set("Content-Type", "application/json");
-    }
-  }
+export async function refreshTokens(): Promise<RefreshedTokens> {
+  const current = getRefreshToken();
+  if (!current) throw new UnauthorizedError("No refresh token");
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, { ...opts, headers });
+    res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(current),
+    });
   } catch {
     throw new ApiError(0, "Tidak dapat menghubungi server. Coba lagi.");
+  }
+
+  if (!res.ok) {
+    clearToken();
+    throw new UnauthorizedError();
+  }
+
+  const data = (await res.json()) as {
+    access_token: string;
+    refresh_token?: string | null;
+  };
+  setToken(data.access_token);
+  const nextRefresh = data.refresh_token ?? null;
+  if (nextRefresh) setRefreshToken(nextRefresh);
+  return { access_token: data.access_token, refresh_token: nextRefresh };
+}
+
+/**
+ * Fetch a backend path with JSON handling and auth.
+ *
+ * Prepends the API base URL, attaches the Bearer token when present, and on a
+ * 401 with a stored refresh token refreshes once and retries exactly once.
+ * A still-failing request clears the tokens and throws `UnauthorizedError`.
+ * `204 No Content` resolves to `undefined`.
+ */
+export async function apiFetch<T>(path: string, opts: RequestInit = {}): Promise<T> {
+  const doFetch = async (): Promise<Response> => {
+    const headers = new Headers(opts.headers);
+    const token = getToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    if (opts.body !== undefined && !(opts.body instanceof FormData)) {
+      if (!headers.has("Content-Type")) {
+        headers.set("Content-Type", "application/json");
+      }
+    }
+    try {
+      return await fetch(`${API_BASE_URL}${path}`, { ...opts, headers });
+    } catch {
+      throw new ApiError(0, "Tidak dapat menghubungi server. Coba lagi.");
+    }
+  };
+
+  let res = await doFetch();
+
+  if (res.status === 401 && !path.includes("/api/auth/refresh") && hasRefreshToken()) {
+    try {
+      await refreshTokens();
+      res = await doFetch();
+    } catch {
+      // Refresh failed: fall through to the shared 401 handling below.
+    }
   }
 
   if (res.status === 401) {
@@ -150,11 +240,7 @@ export async function apiFetch<T>(
       typeof payload === "object" && payload !== null && "detail" in payload
         ? (payload as { detail: unknown }).detail
         : undefined;
-    throw new ApiError(
-      res.status,
-      parseDetail(detail),
-      parseFieldErrors(detail)
-    );
+    throw new ApiError(res.status, parseDetail(detail), parseFieldErrors(detail));
   }
 
   if (res.status === 204) return undefined as T;

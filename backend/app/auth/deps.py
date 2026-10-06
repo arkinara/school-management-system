@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.audit import log_audit_event
@@ -16,7 +17,7 @@ from app.auth.jwt import (
     TokenExpiredError,
     decode_access_token_strict,
 )
-from app.db.models import User, UserRole
+from app.db.models import TokenDenylist, User, UserRole
 from app.db.session import get_db
 from app.middleware.scope import enforce_tenant_scope
 
@@ -47,6 +48,13 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid token",
         ) from exc
+
+    jti = payload.get("jti")
+    if jti and db.scalar(select(TokenDenylist).where(TokenDenylist.jti == jti)) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="token revoked",
+        )
 
     raw_id = payload.get("user_id", payload.get("sub"))
     if raw_id is None:

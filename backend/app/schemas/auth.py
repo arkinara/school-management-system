@@ -18,6 +18,7 @@ class TokenPayload(BaseModel):
     tenant_id: int | None = None
     school_id: int | None = None
     role: str | None = None
+    jti: str | None = None
     exp: int | None = None
 
 
@@ -56,4 +57,5 @@ class UserMe(BaseModel):
 class AuthResponse(BaseModel):
     user: UserOut
     access_token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"

@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+import uuid
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
 from passlib.hash import bcrypt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.audit import log_audit_event
-from app.auth.deps import get_current_user
-from app.auth.jwt import create_access_token
-from app.db.models import AuditLog, School, User, UserRole
+from app.auth.cleanup import cleanup_expired_tokens
+from app.auth.deps import get_current_user, oauth2_scheme, require_role
+from app.auth.jwt import (
+    create_access_token,
+    create_refresh_token,
+    decode_access_token,
+    decode_refresh_token,
+)
+from app.db.models import School, TokenDenylist, User, UserRole
 from app.db.session import get_db
 from app.schemas.auth import (
     AuthResponse,
@@ -60,6 +69,15 @@ def _token_for(user: User) -> str:
         user.school_id,
         str(user.role),
     )
+
+
+def _refresh_token_for(user: User) -> str:
+    return create_refresh_token(user.id, str(uuid.uuid4()))
+
+
+def _expires_at(exp: int) -> datetime:
+    """Convert a JWT ``exp`` claim into the naive UTC datetime columns store."""
+    return datetime.fromtimestamp(exp, tz=timezone.utc).replace(tzinfo=None)
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
@@ -115,6 +133,7 @@ def register(payload: UserRegister, db: Session = Depends(get_db)) -> AuthRespon
     return AuthResponse(
         user=UserOut.model_validate(user),
         access_token=_token_for(user),
+        refresh_token=_refresh_token_for(user),
         token_type="bearer",
     )
 
@@ -140,29 +159,102 @@ def login(payload: UserLogin, request: Request, db: Session = Depends(get_db)) -
     return AuthResponse(
         user=UserOut.model_validate(user),
         access_token=_token_for(user),
+        refresh_token=_refresh_token_for(user),
         token_type="bearer",
     )
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(
+    request: Request,
     user: User = Depends(get_current_user),
+    token: str | None = Depends(oauth2_scheme),
+    refresh_token: str | None = Body(default=None),
     db: Session = Depends(get_db),
 ) -> Response:
-    """Stateless JWT logout: no server session to invalidate, record audit event."""
-    db.add(
-        AuditLog(
-            actor_id=user.id,
-            actor_role=str(user.role),
-            action="logout",
-            tenant_id=user.tenant_id,
-            school_id=user.school_id,
-            reason=None,
-            bypassed=False,
+    """Revoke the caller's tokens until expiry and record an audit event.
+
+    The access token is always revoked. When the client also supplies its
+    refresh token, that token is revoked too, so a logged-out session cannot be
+    silently revived via ``POST /auth/refresh``.
+    """
+    revoked: list[TokenDenylist] = []
+
+    access_payload = decode_access_token(token) if token else None
+    if access_payload and access_payload.get("jti") and access_payload.get("exp") is not None:
+        revoked.append(
+            TokenDenylist(
+                jti=access_payload["jti"],
+                user_id=user.id,
+                expires_at=_expires_at(int(access_payload["exp"])),
+            )
         )
+
+    refresh_payload = decode_refresh_token(refresh_token) if refresh_token else None
+    if refresh_payload and refresh_payload.get("jti") and refresh_payload.get("exp") is not None:
+        revoked.append(
+            TokenDenylist(
+                jti=refresh_payload["jti"],
+                user_id=user.id,
+                expires_at=_expires_at(int(refresh_payload["exp"])),
+            )
+        )
+
+    for entry in revoked:
+        db.add(entry)
+    if revoked:
+        db.commit()
+
+    log_audit_event(
+        db,
+        user=user,
+        action="logout",
+        entity_type="user",
+        entity_id=user.id,
+        request=request,
     )
-    db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/refresh", response_model=AuthResponse)
+def refresh(
+    refresh_token: str = Body(...),
+    db: Session = Depends(get_db),
+) -> AuthResponse:
+    """Exchange a valid refresh token for a fresh access + refresh pair."""
+    payload = decode_refresh_token(refresh_token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid refresh token",
+        )
+    jti = payload.get("jti")
+    if jti and db.scalar(select(TokenDenylist).where(TokenDenylist.jti == jti)) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="refresh token revoked",
+        )
+    user = db.get(User, int(payload["sub"]))
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="user not found",
+        )
+    return AuthResponse(
+        user=UserOut.model_validate(user),
+        access_token=_token_for(user),
+        refresh_token=_refresh_token_for(user),
+        token_type="bearer",
+    )
+
+
+@router.post("/cleanup-tokens")
+def cleanup_tokens(
+    _admin: User = Depends(require_role(UserRole.ADMIN, UserRole.SUPER_ADMIN)),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    """Purge expired denylist rows (admin-only; call from a cron in prod)."""
+    return {"deleted": cleanup_expired_tokens(db)}
 
 
 @router.get("/me", response_model=UserMe)

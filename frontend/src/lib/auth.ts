@@ -12,20 +12,18 @@
 import {
   apiFetch,
   clearToken,
+  getRefreshToken,
   getToken,
+  hasRefreshToken,
+  refreshTokens,
+  setRefreshToken,
   setToken,
   UnauthorizedError,
 } from "./api";
 
-export { getToken, setToken, clearToken };
+export { getToken, setToken, clearToken, getRefreshToken, refreshTokens };
 
-export type UserRole =
-  | "principal"
-  | "teacher"
-  | "student"
-  | "parent"
-  | "admin"
-  | "super_admin";
+export type UserRole = "principal" | "teacher" | "student" | "parent" | "admin" | "super_admin";
 
 export interface User {
   id: number;
@@ -40,6 +38,7 @@ export interface User {
 export interface AuthResponse {
   user: User;
   access_token: string;
+  refresh_token?: string | null;
   token_type: "bearer";
 }
 
@@ -85,9 +84,7 @@ export const SEED_SCHOOLS: SchoolOption[] = [
   { id: 1, name: "SDN Menteng 01", tenantId: 1, jenjang: "SD" },
 ];
 
-export const SEED_TENANTS: TenantOption[] = [
-  { id: 1, name: "TK Menteng Ceria", jenjang: "SD" },
-];
+export const SEED_TENANTS: TenantOption[] = [{ id: 1, name: "TK Menteng Ceria", jenjang: "SD" }];
 
 const ONBOARDED_SCHOOL_KEY = "sms_onboarded_school_id";
 
@@ -106,11 +103,7 @@ interface BackendRegister {
 }
 
 /** POST /api/auth/login — authenticates and returns a JWT. */
-export async function login({
-  email,
-  password,
-  tenantId,
-}: LoginInput): Promise<AuthResponse> {
+export async function login({ email, password, tenantId }: LoginInput): Promise<AuthResponse> {
   const body: BackendLogin = { email, password };
   if (tenantId !== undefined) body.tenant_id = tenantId;
   return apiFetch<AuthResponse>("/api/auth/login", {
@@ -140,10 +133,15 @@ export async function register({
   });
 }
 
-/** POST /api/auth/logout — records the audit event, then clears the token. */
+/** POST /api/auth/logout — revokes the token server-side, then clears local auth. */
 export async function logout(): Promise<void> {
+  const refresh = getRefreshToken();
   try {
-    await apiFetch<void>("/api/auth/logout", { method: "POST" });
+    await apiFetch<void>("/api/auth/logout", {
+      method: "POST",
+      // The backend expects a bare JSON string holding the refresh token.
+      body: refresh ? JSON.stringify(refresh) : undefined,
+    });
   } catch (err) {
     if (!(err instanceof UnauthorizedError)) {
       // Network hiccups must not trap the user in a signed-in UI.
@@ -157,6 +155,9 @@ export async function logout(): Promise<void> {
 /** GET /api/auth/me — returns the profile, or null when the token is invalid. */
 export async function getMe(): Promise<UserMe | null> {
   try {
+    if (!getToken() && hasRefreshToken()) {
+      await refreshTokens();
+    }
     return await apiFetch<UserMe>("/api/auth/me");
   } catch (err) {
     if (err instanceof UnauthorizedError) return null;
@@ -169,9 +170,10 @@ export function isAuthenticated(): boolean {
   return getToken() !== null;
 }
 
-/** Persist the token returned by login/register. */
+/** Persist the token pair returned by login/register/refresh. */
 export function persistAuth(res: AuthResponse): void {
   setToken(res.access_token);
+  if (res.refresh_token) setRefreshToken(res.refresh_token);
 }
 
 /** The school/tenant chosen during onboarding, persisted for this device. */
@@ -210,9 +212,7 @@ export function clearOnboardedSchoolId(): void {
  * school_id and this device has not yet recorded a pick. The local flag keeps
  * the v1 flow from bouncing until a follow-up PATCH `/auth/me/school` lands.
  */
-export function needsOnboarding(
-  me: Pick<UserMe, "school_id"> | null
-): boolean {
+export function needsOnboarding(me: Pick<UserMe, "school_id"> | null): boolean {
   if (me === null) return false;
   if (me.school_id !== null) return false;
   return getOnboardedSchoolId() === null;

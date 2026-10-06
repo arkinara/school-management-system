@@ -436,3 +436,19 @@ class AuditLog(Base):
     reason: Mapped[str | None] = mapped_column(String(512), nullable=True)
     bypassed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class TokenDenylist(Base):
+    """Revoked JWTs, keyed by ``jti`` and retained until the token expires.
+
+    A row here means the token (access or refresh) must not be accepted again.
+    ``cleanup_expired_tokens`` removes rows only once ``expires_at`` has passed,
+    so a revoked token can never be resurrected before its natural expiry.
+    """
+
+    __tablename__ = "token_denylist"
+
+    jti: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    revoked_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)

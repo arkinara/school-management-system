@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+import uuid
 from datetime import timedelta
+from pathlib import Path
 
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
@@ -100,3 +105,33 @@ def test_get_current_user_expired(db_session: Session, session_factory: sessionm
     response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 401
     assert response.json()["detail"] == "token expired"
+
+
+def test_token_has_jti() -> None:
+    token = create_access_token(3, 1, 1, "principal")
+    payload = decode_access_token(token)
+    assert payload is not None
+    jti = payload.get("jti")
+    assert isinstance(jti, str)
+    # A UUID4 keeps the jti unique and unguessable.
+    uuid.UUID(jti)
+
+
+def test_jwt_secret_required_outside_dev() -> None:
+    """Importing the jwt module in prod without JWT_SECRET must raise."""
+    backend_dir = Path(__file__).resolve().parents[1]
+    env = dict(os.environ)
+    env.pop("JWT_SECRET", None)
+    env.pop("JWT_REFRESH_SECRET", None)
+    env["ENVIRONMENT"] = "prod"
+    env["PYTHONPATH"] = str(backend_dir)
+
+    result = subprocess.run(
+        [sys.executable, "-c", "import app.auth.jwt"],
+        cwd=str(backend_dir),
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "JWT_SECRET" in (result.stderr + result.stdout)

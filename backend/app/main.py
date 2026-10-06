@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, select
+from sqlalchemy import func, inspect, select
 from sqlalchemy.orm import Session
 
+from app.auth.cleanup import cleanup_expired_tokens
 from app.db import models  # noqa: F401  (registers all models on Base.metadata)
 from app.db.models import Class, Student, Tenant, User
 from app.db.seed import main as seed_main
-from app.db.session import SessionLocal, create_all, get_db
+from app.db.session import SessionLocal, create_all, engine, get_db
 from app.middleware.scope import TenantScopeMiddleware
 from app.routers import (
     announcements,
@@ -34,14 +36,37 @@ from app.routers import (
     users,
 )
 
+logger = logging.getLogger("app.main")
+
 
 def _auto_seed_enabled() -> bool:
     return os.getenv("SCHOOL_MS_AUTO_SEED", "1") != "0"
 
 
+def validate_config() -> None:
+    """Fail fast when a production deployment is missing its JWT secret."""
+    if os.getenv("ENVIRONMENT") not in ("dev", "test") and not os.getenv("JWT_SECRET"):
+        raise RuntimeError("JWT_SECRET required in non-dev environment")
+
+
+def _cleanup_tokens_on_startup() -> None:
+    """Best-effort purge of expired denylist rows once the table exists."""
+    try:
+        if "token_denylist" not in inspect(engine).get_table_names():
+            return
+        db = SessionLocal()
+        try:
+            cleanup_expired_tokens(db)
+        finally:
+            db.close()
+    except Exception:  # noqa: BLE001 - cleanup must never block startup
+        logger.exception("startup token cleanup failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Bootstrap the dev DB with schema + seed data when empty."""
+    validate_config()
     if _auto_seed_enabled():
         create_all()
         db = SessionLocal()
@@ -51,6 +76,7 @@ async def lifespan(app: FastAPI):
             db.close()
         if existing == 0:
             seed_main()
+    _cleanup_tokens_on_startup()
     yield
 
 

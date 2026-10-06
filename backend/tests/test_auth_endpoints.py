@@ -2,20 +2,24 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from passlib.hash import bcrypt
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.auth.cleanup import cleanup_expired_tokens
 from app.auth.deps import get_current_user, require_any_authenticated_user, require_role
 from app.auth.jwt import create_access_token, decode_access_token
-from app.db.models import JenjangType, Tenant, User, UserRole
+from app.db.models import JenjangType, Tenant, TokenDenylist, User, UserRole
 from app.db.seed import SEED_PASSWORD
 from app.db.session import get_db
 
 TEACHER_EMAIL = "siti@menteng.sch.id"
 STUDENT_EMAIL = "dewi@menteng.sch.id"
 PRINCIPAL_EMAIL = "budi@menteng.sch.id"
+SUPER_ADMIN_EMAIL = "superadmin@menteng.sch.id"
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -334,3 +338,119 @@ def test_require_role_allows_and_denies(db_session: Session, session_factory: se
 
 def test_require_any_authenticated_user_alias() -> None:
     assert require_any_authenticated_user is get_current_user
+
+
+# ---------------------------------------------------------------------------
+# token revocation (ticket #40)
+# ---------------------------------------------------------------------------
+
+
+def test_logout_denylists_token_and_me_returns_401(
+    client: TestClient, db_session: Session
+) -> None:
+    login_body = _login(client)
+    token = login_body["access_token"]
+
+    response = client.post("/api/auth/logout", headers=_auth(token))
+    assert response.status_code == 204
+
+    claims = decode_access_token(token)
+    assert claims is not None
+    entry = db_session.get(TokenDenylist, claims["jti"])
+    assert entry is not None
+    assert entry.user_id == login_body["user"]["id"]
+
+    after = client.get("/api/auth/me", headers=_auth(token))
+    assert after.status_code == 401
+    assert after.json()["detail"] == "token revoked"
+
+
+def test_logout_revokes_access_token(client: TestClient, db_session: Session) -> None:
+    token = _login(client)["access_token"]
+    assert client.post("/api/auth/logout", headers=_auth(token)).status_code == 204
+    assert client.get("/api/auth/me", headers=_auth(token)).status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# refresh (ticket #40)
+# ---------------------------------------------------------------------------
+
+
+def test_login_returns_refresh_token(client: TestClient, db_session: Session) -> None:
+    body = _login(client)
+    assert body.get("refresh_token")
+    assert body["refresh_token"] != body["access_token"]
+
+
+def test_refresh_returns_new_tokens(client: TestClient, db_session: Session) -> None:
+    body = _login(client)
+    refresh = body["refresh_token"]
+
+    response = client.post("/api/auth/refresh", json=refresh)
+    assert response.status_code == 200, response.text
+    new = response.json()
+    assert new["access_token"] != body["access_token"]
+    assert new["refresh_token"]
+    assert new["refresh_token"] != refresh
+
+    me = client.get("/api/auth/me", headers=_auth(new["access_token"]))
+    assert me.status_code == 200, me.text
+
+
+def test_refresh_revoked_token_fails(client: TestClient, db_session: Session) -> None:
+    body = _login(client)
+    token = body["access_token"]
+    refresh = body["refresh_token"]
+
+    # Logout revokes both the access token and the supplied refresh token.
+    assert client.post("/api/auth/logout", headers=_auth(token), json=refresh).status_code == 204
+
+    response = client.post("/api/auth/refresh", json=refresh)
+    assert response.status_code == 401
+
+
+def test_refresh_invalid_token_returns_401(client: TestClient) -> None:
+    response = client.post("/api/auth/refresh", json="not-a-real-token")
+    assert response.status_code == 401
+
+
+def test_refresh_rejects_access_token(client: TestClient, db_session: Session) -> None:
+    access = _login(client)["access_token"]
+    response = client.post("/api/auth/refresh", json=access)
+    assert response.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# denylist cleanup (ticket #40)
+# ---------------------------------------------------------------------------
+
+
+def test_cleanup_expired_tokens(db_session: Session) -> None:
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    db_session.add(
+        TokenDenylist(jti="expired-jti", user_id=None, expires_at=now - timedelta(hours=1))
+    )
+    db_session.add(
+        TokenDenylist(jti="live-jti", user_id=None, expires_at=now + timedelta(hours=1))
+    )
+    db_session.commit()
+
+    deleted = cleanup_expired_tokens(db_session)
+    assert deleted == 1
+    assert db_session.get(TokenDenylist, "expired-jti") is None
+    assert db_session.get(TokenDenylist, "live-jti") is not None
+
+
+def test_cleanup_tokens_endpoint_requires_admin(client: TestClient, db_session: Session) -> None:
+    token = _login(client)["access_token"]
+    response = client.post("/api/auth/cleanup-tokens", headers=_auth(token))
+    assert response.status_code == 403
+
+
+def test_cleanup_tokens_endpoint_allows_super_admin(
+    client: TestClient, db_session: Session
+) -> None:
+    token = _login(client, SUPER_ADMIN_EMAIL)["access_token"]
+    response = client.post("/api/auth/cleanup-tokens", headers=_auth(token))
+    assert response.status_code == 200
+    assert response.json()["deleted"] >= 0
