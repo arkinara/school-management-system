@@ -22,10 +22,7 @@ import { StatusChip, type ChipTone } from "@/components/ui/StatusChip";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { cn } from "@/components/ui/cn";
 import { useNotifications } from "@/lib/notifications";
-import type {
-  AppNotification,
-  NotificationSource,
-} from "@/lib/endpoints";
+import type { AppNotification, NotificationSource } from "@/lib/endpoints";
 
 type FilterKey = "all" | NotificationSource;
 
@@ -75,15 +72,12 @@ function relativeTime(value: string): string {
 
 function NotificationsContent() {
   const router = useRouter();
-  const { notifications, unreadCount, status, refresh, markRead, markAllRead } =
-    useNotifications();
+  const { notifications, unreadCount, status, refresh, markRead, markAllRead } = useNotifications();
   const [filter, setFilter] = React.useState<FilterKey>("all");
 
   const visible = React.useMemo(
     () =>
-      filter === "all"
-        ? notifications
-        : notifications.filter((item) => item.source === filter),
+      filter === "all" ? notifications : notifications.filter((item) => item.source === filter),
     [notifications, filter]
   );
 
@@ -96,22 +90,13 @@ function NotificationsContent() {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-foreground">
-            Notifikasi
-          </h1>
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">Notifikasi</h1>
           <p className="text-xs text-muted-foreground">
-            {unreadCount > 0
-              ? `${unreadCount} item belum dibaca`
-              : "Semua notifikasi sudah dibaca"}
+            {unreadCount > 0 ? `${unreadCount} item belum dibaca` : "Semua notifikasi sudah dibaca"}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outlined"
-            icon={RotateCcw}
-            type="button"
-            onClick={refresh}
-          >
+          <Button variant="outlined" icon={RotateCcw} type="button" onClick={refresh}>
             Muat ulang
           </Button>
           <Button
@@ -125,11 +110,7 @@ function NotificationsContent() {
         </div>
       </div>
 
-      <div
-        role="tablist"
-        aria-label="Saringan notifikasi"
-        className="flex flex-wrap gap-2"
-      >
+      <div role="tablist" aria-label="Saringan notifikasi" className="flex flex-wrap gap-2">
         {FILTERS.map((option) => {
           const active = filter === option.key;
           return (
@@ -246,9 +227,7 @@ function NotificationsContent() {
                     <span
                       className={cn(
                         "mt-2 h-2.5 w-2.5 shrink-0 rounded-full",
-                        item.read
-                          ? "border border-outline-variant bg-transparent"
-                          : "bg-primary"
+                        item.read ? "border border-outline-variant bg-transparent" : "bg-primary"
                       )}
                       aria-label={item.read ? "Sudah dibaca" : "Belum dibaca"}
                       title={item.read ? "Sudah dibaca" : "Belum dibaca"}

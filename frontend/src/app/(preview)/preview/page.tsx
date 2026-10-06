@@ -11,9 +11,30 @@ import { StatusChip, statusTone, type ChipTone } from "@/components/ui/StatusChi
 import { navByRole } from "@/components/ui/nav-items";
 
 const metrics = [
-  { key: "siswa", label: "Total Siswa", value: 482, icon: Users, delta: { value: "+12", direction: "up" as const }, hint: "Tahun ajaran 2024/2025" },
-  { key: "hadir", label: "Kehadiran Hari Ini", value: "96.2%", icon: CalendarCheck, delta: { value: "+1.4", direction: "up" as const }, hint: "Target 95%" },
-  { key: "spp", label: "SPP Terkumpul", value: "91%", icon: Wallet, delta: { value: "-2.1", direction: "down" as const }, hint: "43 tunggakan" },
+  {
+    key: "siswa",
+    label: "Total Siswa",
+    value: 482,
+    icon: Users,
+    delta: { value: "+12", direction: "up" as const },
+    hint: "Tahun ajaran 2024/2025",
+  },
+  {
+    key: "hadir",
+    label: "Kehadiran Hari Ini",
+    value: "96.2%",
+    icon: CalendarCheck,
+    delta: { value: "+1.4", direction: "up" as const },
+    hint: "Target 95%",
+  },
+  {
+    key: "spp",
+    label: "SPP Terkumpul",
+    value: "91%",
+    icon: Wallet,
+    delta: { value: "-2.1", direction: "down" as const },
+    hint: "43 tunggakan",
+  },
 ];
 
 const statuses: Array<{ label: string; tone: ChipTone }> = [
@@ -75,7 +96,11 @@ export default function PreviewPage() {
         </Card>
       </main>
 
-      <BottomNav items={navByRole.principal} active={active} onNavigate={(item) => setActive(item.key)} />
+      <BottomNav
+        items={navByRole.principal}
+        active={active}
+        onNavigate={(item) => setActive(item.key)}
+      />
     </div>
   );
 }

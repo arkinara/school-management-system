@@ -52,12 +52,7 @@ interface ToastState {
   undo?: () => void;
 }
 
-const COMPOSER_ROLES: UserRole[] = [
-  "teacher",
-  "admin",
-  "principal",
-  "super_admin",
-];
+const COMPOSER_ROLES: UserRole[] = ["teacher", "admin", "principal", "super_admin"];
 const MODERATOR_ROLES: UserRole[] = ["admin", "principal", "super_admin"];
 
 const FILTERS: { key: FilterKey; label: string }[] = [
@@ -130,9 +125,7 @@ function Composer({
   const isEdit = editing !== null;
   const [title, setTitle] = React.useState(editing?.title ?? "");
   const [body, setBody] = React.useState(editing?.body ?? "");
-  const [audience, setAudience] = React.useState<AnnouncementAudience>(
-    editing?.audience ?? "all"
-  );
+  const [audience, setAudience] = React.useState<AnnouncementAudience>(editing?.audience ?? "all");
   const [classId, setClassId] = React.useState<string>(
     editing?.target_class_id ? String(editing.target_class_id) : ""
   );
@@ -142,9 +135,7 @@ function Composer({
     return me.tenant_id ? String(me.tenant_id) : "";
   });
   const [errors, setErrors] = React.useState<Record<string, string>>({});
-  const [submitting, setSubmitting] = React.useState<"draft" | "publish" | null>(
-    null
-  );
+  const [submitting, setSubmitting] = React.useState<"draft" | "publish" | null>(null);
 
   const titleRef = React.useRef<HTMLInputElement>(null);
   const bodyRef = React.useRef<HTMLTextAreaElement>(null);
@@ -156,13 +147,10 @@ function Composer({
     if (!title.trim()) next.title = "Judul wajib diisi.";
     if (!body.trim()) next.body = "Isi pengumuman wajib diisi.";
     if (audience === "class" && !classId) next.classId = "Pilih kelas tujuan.";
-    if (audience === "jenjang" && !tenantId)
-      next.tenantId = "Pilih jenjang tujuan.";
+    if (audience === "jenjang" && !tenantId) next.tenantId = "Pilih jenjang tujuan.";
     setErrors(next);
 
-    const first = (["title", "body", "classId", "tenantId"] as const).find(
-      (key) => next[key]
-    );
+    const first = (["title", "body", "classId", "tenantId"] as const).find((key) => next[key]);
     if (first === "title") titleRef.current?.focus();
     else if (first === "body") bodyRef.current?.focus();
     else if (first === "classId") classRef.current?.focus();
@@ -178,10 +166,8 @@ function Composer({
       title: title.trim(),
       body: body.trim(),
       audience,
-      target_class_id:
-        audience === "class" && classId ? Number(classId) : undefined,
-      target_tenant_id:
-        audience === "jenjang" && tenantId ? Number(tenantId) : undefined,
+      target_class_id: audience === "class" && classId ? Number(classId) : undefined,
+      target_tenant_id: audience === "jenjang" && tenantId ? Number(tenantId) : undefined,
     };
     try {
       if (isEdit && editing) {
@@ -191,9 +177,7 @@ function Composer({
         }
         onUpdated(record);
         onToast({
-          message: publish
-            ? "Pengumuman diperbarui dan diterbitkan."
-            : "Perubahan draft disimpan.",
+          message: publish ? "Pengumuman diperbarui dan diterbitkan." : "Perubahan draft disimpan.",
           tone: "success",
         });
       } else {
@@ -201,19 +185,14 @@ function Composer({
         if (publish) record = await publishAnnouncement(record.id);
         onCreated(record);
         onToast({
-          message: publish
-            ? "Pengumuman diterbitkan."
-            : "Draft pengumuman disimpan.",
+          message: publish ? "Pengumuman diterbitkan." : "Draft pengumuman disimpan.",
           tone: "success",
         });
       }
       onCancel();
     } catch (err) {
       onToast({
-        message:
-          err instanceof ApiError
-            ? err.detail
-            : "Gagal menyimpan pengumuman.",
+        message: err instanceof ApiError ? err.detail : "Gagal menyimpan pengumuman.",
         tone: "error",
       });
     } finally {
@@ -249,12 +228,7 @@ function Composer({
             placeholder="Contoh: Libur semester ganjil"
           />
         </FormField>
-        <FormField
-          label="Isi Pengumuman"
-          htmlFor="ann-body"
-          required
-          error={errors.body}
-        >
+        <FormField label="Isi Pengumuman" htmlFor="ann-body" required error={errors.body}>
           <textarea
             id="ann-body"
             ref={bodyRef}
@@ -277,12 +251,7 @@ function Composer({
         </FormField>
 
         {audience === "class" && (
-          <FormField
-            label="Kelas Tujuan"
-            htmlFor="ann-class"
-            required
-            error={errors.classId}
-          >
+          <FormField label="Kelas Tujuan" htmlFor="ann-class" required error={errors.classId}>
             <select
               id="ann-class"
               ref={classRef}
@@ -302,12 +271,7 @@ function Composer({
         )}
 
         {audience === "jenjang" && (
-          <FormField
-            label="Jenjang Tujuan"
-            htmlFor="ann-tenant"
-            required
-            error={errors.tenantId}
-          >
+          <FormField label="Jenjang Tujuan" htmlFor="ann-tenant" required error={errors.tenantId}>
             <select
               id="ann-tenant"
               ref={tenantRef}
@@ -396,31 +360,19 @@ function AnnouncementCard({
           className="mt-1 h-4 w-4 accent-[hsl(var(--primary))]"
         />
       )}
-      <button
-        type="button"
-        onClick={onOpen}
-        className="min-w-0 flex-1 text-left"
-      >
+      <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-base font-semibold leading-tight text-foreground">
             {item.title}
           </span>
-          <StatusChip tone={isDraft ? "neutral" : "success"}>
-            {statusLabel(item.status)}
-          </StatusChip>
-          <StatusChip tone="primary">
-            {audienceLabel(item.audience)}
-          </StatusChip>
+          <StatusChip tone={isDraft ? "neutral" : "success"}>{statusLabel(item.status)}</StatusChip>
+          <StatusChip tone="primary">{audienceLabel(item.audience)}</StatusChip>
         </div>
-        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-          {excerpt(item.body)}
-        </p>
+        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{excerpt(item.body)}</p>
         <p className="mt-2 flex flex-wrap items-center gap-x-2 text-2xs text-muted-foreground">
           <span>{authorName}</span>
           <span aria-hidden>·</span>
-          <span className="font-mono tabular-nums">
-            {formatDateTime(item.published_at)}
-          </span>
+          <span className="font-mono tabular-nums">{formatDateTime(item.published_at)}</span>
         </p>
       </button>
       {selectable && isDraft && (
@@ -481,9 +433,7 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
     Promise.all([fetchUsers({ size: 200 }), fetchClasses({ size: 100 })])
       .then(([users, classPage]) => {
         if (!active) return;
-        setAuthors(
-          Object.fromEntries(users.items.map((user) => [user.id, user.full_name]))
-        );
+        setAuthors(Object.fromEntries(users.items.map((user) => [user.id, user.full_name])));
         setClasses(classPage.items);
       })
       .catch(() => {
@@ -537,9 +487,7 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
 
   const visible = React.useMemo(() => {
     if (filter === "important") {
-      return items.filter(
-        (item) => item.audience === "all" && item.status === "published"
-      );
+      return items.filter((item) => item.audience === "all" && item.status === "published");
     }
     return items;
   }, [filter, items]);
@@ -549,8 +497,7 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
     [visible]
   );
   const selectable = canModerate && draftItems.length > 0;
-  const allSelected =
-    selectable && selected.size > 0 && selected.size === draftItems.length;
+  const allSelected = selectable && selected.size > 0 && selected.size === draftItems.length;
 
   function authorName(id: number): string {
     return authors[id] ?? `Staf #${id}`;
@@ -583,8 +530,7 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
       setToast({ message: "Pengumuman diterbitkan.", tone: "success" });
     } catch (err) {
       setToast({
-        message:
-          err instanceof ApiError ? err.detail : "Gagal menerbitkan pengumuman.",
+        message: err instanceof ApiError ? err.detail : "Gagal menerbitkan pengumuman.",
         tone: "error",
       });
     } finally {
@@ -621,8 +567,7 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
       });
     } catch (err) {
       setToast({
-        message:
-          err instanceof ApiError ? err.detail : "Gagal menghapus pengumuman.",
+        message: err instanceof ApiError ? err.detail : "Gagal menghapus pengumuman.",
         tone: "error",
       });
     } finally {
@@ -654,8 +599,7 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
       });
     } catch (err) {
       setToast({
-        message:
-          err instanceof ApiError ? err.detail : "Gagal menarik pengumuman.",
+        message: err instanceof ApiError ? err.detail : "Gagal menarik pengumuman.",
         tone: "error",
       });
     } finally {
@@ -689,20 +633,13 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-foreground">
-            Pengumuman
-          </h1>
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">Pengumuman</h1>
           <p className="text-xs text-muted-foreground">
             Papan informasi sekolah · disaring sesuai audiens Anda
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outlined"
-            icon={RotateCcw}
-            type="button"
-            onClick={() => refresh(false)}
-          >
+          <Button variant="outlined" icon={RotateCcw} type="button" onClick={() => refresh(false)}>
             Muat ulang
           </Button>
           {canCompose && (
@@ -720,11 +657,7 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
         </div>
       </div>
 
-      <div
-        role="tablist"
-        aria-label="Saringan pengumuman"
-        className="flex flex-wrap gap-2"
-      >
+      <div role="tablist" aria-label="Saringan pengumuman" className="flex flex-wrap gap-2">
         {FILTERS.map((option) => {
           const active = filter === option.key;
           return (
@@ -765,9 +698,7 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
 
       {selectable && selected.size > 0 && (
         <Card className="flex flex-wrap items-center gap-3 px-5 py-3">
-          <span className="text-sm text-foreground">
-            {selected.size} draft dipilih
-          </span>
+          <span className="text-sm text-foreground">{selected.size} draft dipilih</span>
           <div className="ml-auto flex items-center gap-2">
             <Button
               variant="outlined"
@@ -812,11 +743,7 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
                 type="checkbox"
                 checked={allSelected}
                 onChange={() =>
-                  setSelected(
-                    allSelected
-                      ? new Set()
-                      : new Set(draftItems.map((item) => item.id))
-                  )
+                  setSelected(allSelected ? new Set() : new Set(draftItems.map((item) => item.id)))
                 }
                 className="h-4 w-4 accent-[hsl(var(--primary))]"
               />
@@ -842,11 +769,7 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
               title="Gagal memuat pengumuman"
               description="Tidak dapat mengambil daftar pengumuman. Periksa koneksi lalu coba lagi."
               action={
-                <Button
-                  variant="tonal"
-                  icon={RotateCcw}
-                  onClick={() => refresh(false)}
-                >
+                <Button variant="tonal" icon={RotateCcw} onClick={() => refresh(false)}>
                   Coba lagi
                 </Button>
               }
@@ -955,9 +878,7 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
               <StatusChip tone={detailIsDraft ? "neutral" : "success"}>
                 {statusLabel(detail.status)}
               </StatusChip>
-              <StatusChip tone="primary">
-                {audienceLabel(detail.audience)}
-              </StatusChip>
+              <StatusChip tone="primary">{audienceLabel(detail.audience)}</StatusChip>
             </div>
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
               {detail.body}
@@ -965,9 +886,7 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
             <div className="flex items-center gap-3 border-t border-outline-variant pt-3">
               <Avatar name={authorName(detail.author_id)} size="sm" />
               <div className="text-xs text-muted-foreground">
-                <p className="font-medium text-foreground">
-                  {authorName(detail.author_id)}
-                </p>
+                <p className="font-medium text-foreground">{authorName(detail.author_id)}</p>
                 <p className="font-mono tabular-nums">
                   {detailIsDraft
                     ? "Belum diterbitkan"
@@ -985,11 +904,7 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
           <Toast
             message={toast.message}
             tone={toast.tone}
-            action={
-              toast.undo
-                ? { label: "Urungkan", onClick: toast.undo }
-                : undefined
-            }
+            action={toast.undo ? { label: "Urungkan", onClick: toast.undo } : undefined}
             onDismiss={() => setToast(null)}
           />
         )}

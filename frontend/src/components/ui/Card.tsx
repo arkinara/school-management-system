@@ -24,7 +24,11 @@ export function Card({ interactive, className, children, ...props }: CardProps) 
   );
 }
 
-export function CardHeader({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+export function CardHeader({
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div className={cn("flex items-start justify-between gap-3 px-5 pt-5", className)} {...props}>
       {children}
@@ -32,7 +36,11 @@ export function CardHeader({ className, children, ...props }: React.HTMLAttribut
   );
 }
 
-export function CardTitle({ className, children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+export function CardTitle({
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3 className={cn("text-base font-semibold leading-tight", className)} {...props}>
       {children}
@@ -48,7 +56,11 @@ export function CardBody({ className, children, ...props }: React.HTMLAttributes
   );
 }
 
-export function CardActions({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+export function CardActions({
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div className={cn("flex items-center justify-end gap-2 px-5 pb-4", className)} {...props}>
       {children}

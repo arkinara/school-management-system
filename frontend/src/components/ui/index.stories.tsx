@@ -37,7 +37,9 @@ import { navByRole } from "./nav-items";
 function Story({ name, children }: { name: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-3 border-b border-outline-variant py-6">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{name}</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        {name}
+      </h2>
       <div className="flex flex-wrap items-start gap-4">{children}</div>
     </section>
   );
@@ -63,7 +65,11 @@ export function ComponentGallery() {
 
   const columns: Column<Siswa>[] = [
     { key: "nama", header: "Nama", sortable: true },
-    { key: "status", header: "Status", cell: (r) => <StatusChip tone="success">{r.status}</StatusChip> },
+    {
+      key: "status",
+      header: "Status",
+      cell: (r) => <StatusChip tone="success">{r.status}</StatusChip>,
+    },
   ];
 
   return (
@@ -97,10 +103,18 @@ export function ComponentGallery() {
       </Story>
 
       <Story name="StatusChip — absensi / rapor / SPP">
-        <StatusChip tone="success" dot>hadir</StatusChip>
-        <StatusChip tone="warning" dot>izin</StatusChip>
-        <StatusChip tone="info" dot>sakit</StatusChip>
-        <StatusChip tone="danger" dot>alpa</StatusChip>
+        <StatusChip tone="success" dot>
+          hadir
+        </StatusChip>
+        <StatusChip tone="warning" dot>
+          izin
+        </StatusChip>
+        <StatusChip tone="info" dot>
+          sakit
+        </StatusChip>
+        <StatusChip tone="danger" dot>
+          alpa
+        </StatusChip>
         <StatusChip tone="neutral">draft</StatusChip>
         <StatusChip tone="success">published</StatusChip>
         <StatusChip tone="danger">overdue</StatusChip>
@@ -121,8 +135,18 @@ export function ComponentGallery() {
       </Story>
 
       <Story name="MetricCard">
-        <MetricCard label="Total Siswa" value={482} icon={Users} delta={{ value: "+12", direction: "up" }} />
-        <MetricCard label="Kehadiran Hari Ini" value="94%" icon={CalendarCheck} delta={{ value: "-2%", direction: "down" }} />
+        <MetricCard
+          label="Total Siswa"
+          value={482}
+          icon={Users}
+          delta={{ value: "+12", direction: "up" }}
+        />
+        <MetricCard
+          label="Kehadiran Hari Ini"
+          value="94%"
+          icon={CalendarCheck}
+          delta={{ value: "-2%", direction: "down" }}
+        />
         <MetricCard label="SPP Terkumpul" value="Rp 128jt" icon={Wallet} hint="Bulan September" />
       </Story>
 
@@ -161,7 +185,9 @@ export function ComponentGallery() {
           description="Rapor akan terlihat oleh siswa dan orang tua. Tindakan ini tidak dapat dibatalkan."
           actions={
             <>
-              <Button variant="text" onClick={() => setDialogOpen(false)}>Batal</Button>
+              <Button variant="text" onClick={() => setDialogOpen(false)}>
+                Batal
+              </Button>
               <Button onClick={() => setDialogOpen(false)}>Terbitkan</Button>
             </>
           }
@@ -193,14 +219,24 @@ export function ComponentGallery() {
           icon={FileSearch}
           title="Belum ada rapor"
           description="Rapor akan muncul di sini setelah wali kelas menerbitkannya."
-          action={<Button variant="tonal" icon={FileText}>Pelajari selengkapnya</Button>}
+          action={
+            <Button variant="tonal" icon={FileText}>
+              Pelajari selengkapnya
+            </Button>
+          }
         />
       </Story>
 
       <Story name="Skeleton — list / table / card">
-        <div className="w-64"><SkeletonList /></div>
-        <div className="w-80"><SkeletonTable /></div>
-        <div className="w-64"><SkeletonCard /></div>
+        <div className="w-64">
+          <SkeletonList />
+        </div>
+        <div className="w-80">
+          <SkeletonTable />
+        </div>
+        <div className="w-64">
+          <SkeletonCard />
+        </div>
       </Story>
 
       <Story name="SearchBar (debounced)">
@@ -209,7 +245,12 @@ export function ComponentGallery() {
 
       <Story name="FormField — default / helper / error">
         <FormField label="Email" htmlFor="s-email" required helper="Gunakan email sekolah">
-          <input id="s-email" type="email" className={inputClass} placeholder="nama@sekolah.sch.id" />
+          <input
+            id="s-email"
+            type="email"
+            className={inputClass}
+            placeholder="nama@sekolah.sch.id"
+          />
         </FormField>
         <FormField label="NISN" htmlFor="s-nisn" error="NISN harus 10 digit">
           <input id="s-nisn" aria-invalid className={inputClass} defaultValue="123" />
@@ -217,7 +258,9 @@ export function ComponentGallery() {
       </Story>
 
       <Story name="Toast (with undo)">
-        <Button onClick={() => setShowToast(true)} icon={ClipboardList}>Simpan absensi</Button>
+        <Button onClick={() => setShowToast(true)} icon={ClipboardList}>
+          Simpan absensi
+        </Button>
         {showToast && (
           <ToastViewport>
             <Toast

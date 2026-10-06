@@ -1,9 +1,11 @@
 """Tenant/school scoping: ASGI context middleware + hard-scope enforcement.
 
-The ASGI middleware is non-blocking: it decodes the bearer token and attaches
-``request.state.user``/``tenant_id``/``school_id``/``role`` so downstream
-dependencies and routers can enforce scope. :func:`enforce_tenant_scope` is the
-hard gate domain routers call to reject cross-tenant/cross-school access.
+The ASGI middleware is intentionally a no-op beyond setting default (empty)
+``request.state`` values: it never opens a database session. The authenticated
+user and its tenant/school scope are resolved lazily in
+:func:`app.auth.deps.get_current_user` via the injected ``get_db`` session,
+which tests can override. :func:`enforce_tenant_scope` is the hard gate domain
+routers call to reject cross-tenant/cross-school access.
 """
 
 from __future__ import annotations
@@ -11,18 +13,15 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import HTTPException, status
-from jose import JWTError, jwt
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.types import ASGIApp
 
-from app.auth.jwt import JWT_ALGORITHM, JWT_SECRET
 from app.db.models import User, UserRole
-from app.db.session import SessionLocal
 
 
 class TenantScopeMiddleware(BaseHTTPMiddleware):
-    """Attach verified JWT claims (and the User, when resolvable) to the request."""
+    """Set default scope state; real auth/scope is resolved in dependencies."""
 
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
@@ -32,28 +31,6 @@ class TenantScopeMiddleware(BaseHTTPMiddleware):
         request.state.tenant_id = None
         request.state.school_id = None
         request.state.role = None
-
-        auth_header = request.headers.get("Authorization", "")
-        if auth_header.lower().startswith("bearer "):
-            token = auth_header.split(" ", 1)[1].strip()
-            try:
-                payload: dict[str, Any] = jwt.decode(
-                    token, JWT_SECRET, algorithms=[JWT_ALGORITHM]
-                )
-            except JWTError:
-                payload = {}
-            if payload:
-                request.state.tenant_id = payload.get("tenant_id")
-                request.state.school_id = payload.get("school_id")
-                request.state.role = payload.get("role")
-                user_id = payload.get("user_id")
-                if user_id is not None:
-                    db = SessionLocal()
-                    try:
-                        request.state.user = db.get(User, int(user_id))
-                    finally:
-                        db.close()
-
         return await call_next(request)
 
 

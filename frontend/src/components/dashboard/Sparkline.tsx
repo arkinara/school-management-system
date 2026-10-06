@@ -34,9 +34,7 @@ export function Sparkline({
     return [Number(x.toFixed(2)), Number(y.toFixed(2))] as const;
   });
 
-  const line = coords
-    .map(([x, y], index) => `${index === 0 ? "M" : "L"}${x} ${y}`)
-    .join(" ");
+  const line = coords.map(([x, y], index) => `${index === 0 ? "M" : "L"}${x} ${y}`).join(" ");
   const area = `${line} L${width} ${height} L0 ${height} Z`;
 
   return (

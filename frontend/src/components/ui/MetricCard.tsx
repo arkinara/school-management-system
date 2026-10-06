@@ -12,7 +12,15 @@ export interface MetricCardProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 /** KPI tile: label + big number + optional delta + icon. */
-export function MetricCard({ label, value, delta, icon: Icon, hint, className, ...props }: MetricCardProps) {
+export function MetricCard({
+  label,
+  value,
+  delta,
+  icon: Icon,
+  hint,
+  className,
+  ...props
+}: MetricCardProps) {
   return (
     <div
       className={cn(
@@ -30,7 +38,9 @@ export function MetricCard({ label, value, delta, icon: Icon, hint, className, .
         )}
       </div>
       <div className="mt-3 flex items-end gap-2">
-        <span className="font-mono text-3xl font-semibold leading-none tabular-nums text-foreground">{value}</span>
+        <span className="font-mono text-3xl font-semibold leading-none tabular-nums text-foreground">
+          {value}
+        </span>
         {delta && (
           <span
             className={cn(

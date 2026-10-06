@@ -28,6 +28,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False
 
 
 def get_current_user(
+    request: Request,
     token: str | None = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
@@ -69,6 +70,10 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="user not found",
         )
+    request.state.user = user
+    request.state.tenant_id = user.tenant_id
+    request.state.school_id = user.school_id
+    request.state.role = user.role
     return user
 
 

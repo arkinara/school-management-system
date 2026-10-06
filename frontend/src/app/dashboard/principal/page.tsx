@@ -57,13 +57,7 @@ function last7Days(): string[] {
   return days;
 }
 
-function WidgetError({
-  title,
-  onRetry,
-}: {
-  title: string;
-  onRetry: () => void;
-}) {
+function WidgetError({ title, onRetry }: { title: string; onRetry: () => void }) {
   return (
     <EmptyState
       icon={AlertCircle}
@@ -167,10 +161,7 @@ function PrincipalContent({ me }: { me: UserMe }) {
     };
   }, [isSuperAdmin]);
 
-  const scope = React.useMemo(
-    () => (schoolId === null ? {} : { school_id: schoolId }),
-    [schoolId]
-  );
+  const scope = React.useMemo(() => (schoolId === null ? {} : { school_id: schoolId }), [schoolId]);
 
   React.useEffect(() => {
     let active = true;
@@ -272,11 +263,7 @@ function PrincipalContent({ me }: { me: UserMe }) {
     let active = true;
     setTrend({ status: "loading", points: [] });
     const days = last7Days();
-    Promise.all(
-      days.map((date) =>
-        fetchAttendancesForRate(date).catch(() => null)
-      )
-    )
+    Promise.all(days.map((date) => fetchAttendancesForRate(date).catch(() => null)))
       .then((rates) => {
         if (!active) return;
         const points = rates.filter((v): v is number => v !== null);
@@ -315,8 +302,7 @@ function PrincipalContent({ me }: { me: UserMe }) {
   const attendanceCounts = attendance.summary?.counts ?? {};
   const hadir = attendanceCounts.hadir ?? 0;
   const attendanceTotal = attendance.summary?.total ?? 0;
-  const attendanceRate =
-    attendanceTotal > 0 ? Math.round((hadir / attendanceTotal) * 100) : 0;
+  const attendanceRate = attendanceTotal > 0 ? Math.round((hadir / attendanceTotal) * 100) : 0;
   const attendanceBreakdown = {
     hadir,
     izin: attendanceCounts.izin ?? 0,
@@ -341,13 +327,7 @@ function PrincipalContent({ me }: { me: UserMe }) {
             {today ? ` · ${today}` : ""}
           </p>
         </div>
-        {isSuperAdmin && (
-          <SchoolPicker
-            schools={schools}
-            value={schoolId}
-            onChange={setSchoolId}
-          />
-        )}
+        {isSuperAdmin && <SchoolPicker schools={schools} value={schoolId} onChange={setSchoolId} />}
       </div>
 
       <section
@@ -367,11 +347,7 @@ function PrincipalContent({ me }: { me: UserMe }) {
               label="Total Siswa"
               value={counts.students ?? 0}
               icon={Users}
-              hint={
-                counts.status === "error"
-                  ? "Gagal memuat data"
-                  : "Terdaftar di sekolah Anda"
-              }
+              hint={counts.status === "error" ? "Gagal memuat data" : "Terdaftar di sekolah Anda"}
             />
             <MetricCard
               label="Kehadiran Hari Ini"
@@ -452,9 +428,7 @@ function PrincipalContent({ me }: { me: UserMe }) {
         <Card>
           <CardHeader>
             <CardTitle>Penginputan Nilai</CardTitle>
-            <span className="text-2xs text-muted-foreground">
-              {currentSemester()}
-            </span>
+            <span className="text-2xs text-muted-foreground">{currentSemester()}</span>
           </CardHeader>
           <CardBody>
             {gradeEntry.status === "loading" ? (
@@ -490,10 +464,7 @@ function PrincipalContent({ me }: { me: UserMe }) {
             {trend.status === "loading" ? (
               <SkeletonList rows={2} />
             ) : trend.status === "error" ? (
-              <WidgetError
-                title="Gagal memuat tren"
-                onRetry={() => setTrendKey((k) => k + 1)}
-              />
+              <WidgetError title="Gagal memuat tren" onRetry={() => setTrendKey((k) => k + 1)} />
             ) : (
               <>
                 <Sparkline
@@ -566,22 +537,13 @@ function PrincipalContent({ me }: { me: UserMe }) {
         ) : (
           <ul className="divide-y divide-outline-variant">
             {announcements.items.map((item) => (
-              <li
-                key={item.id}
-                className="flex flex-wrap items-center gap-3 px-5 py-3"
-              >
+              <li key={item.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {item.title}
-                  </p>
-                  <p className="truncate text-2xs text-muted-foreground">
-                    {item.body}
-                  </p>
+                  <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
+                  <p className="truncate text-2xs text-muted-foreground">{item.body}</p>
                 </div>
                 <span className="shrink-0 text-2xs text-muted-foreground">
-                  {item.published_at
-                    ? new Date(item.published_at).toLocaleDateString("id-ID")
-                    : ""}
+                  {item.published_at ? new Date(item.published_at).toLocaleDateString("id-ID") : ""}
                 </span>
               </li>
             ))}

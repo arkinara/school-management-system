@@ -156,12 +156,7 @@ export function fetchMe(): Promise<UserMe> {
 
 export type AttendanceStatus = "hadir" | "izin" | "sakit" | "alpa";
 
-export const ATTENDANCE_STATUSES: AttendanceStatus[] = [
-  "hadir",
-  "izin",
-  "sakit",
-  "alpa",
-];
+export const ATTENDANCE_STATUSES: AttendanceStatus[] = ["hadir", "izin", "sakit", "alpa"];
 
 export interface AttendanceRecord {
   id: number;
@@ -195,9 +190,7 @@ export function fetchAttendances(
     size?: number;
   } = {}
 ): Promise<Paginated<AttendanceRecord>> {
-  return apiFetch<Paginated<AttendanceRecord>>(
-    `/api/attendances${toQuery(params)}`
-  );
+  return apiFetch<Paginated<AttendanceRecord>>(`/api/attendances${toQuery(params)}`);
 }
 
 /** POST /api/attendances/bulk — one row per student for a class/date. */
@@ -611,9 +604,7 @@ export function fetchReportCards(
     size?: number;
   } = {}
 ): Promise<Paginated<ReportCardRecord>> {
-  return apiFetch<Paginated<ReportCardRecord>>(
-    `/api/report-cards${toQuery(params)}`
-  );
+  return apiFetch<Paginated<ReportCardRecord>>(`/api/report-cards${toQuery(params)}`);
 }
 
 /** GET /api/report-cards/{id} — a single rapor (drafts hidden from parents). */
@@ -713,15 +704,11 @@ export function fetchAnnouncements(
     size?: number;
   } = {}
 ): Promise<Paginated<AnnouncementRecord>> {
-  return apiFetch<Paginated<AnnouncementRecord>>(
-    `/api/announcements${toQuery(params)}`
-  );
+  return apiFetch<Paginated<AnnouncementRecord>>(`/api/announcements${toQuery(params)}`);
 }
 
 /** POST /api/announcements — create a draft announcement (staff only). */
-export function createAnnouncement(
-  input: AnnouncementInput
-): Promise<AnnouncementRecord> {
+export function createAnnouncement(input: AnnouncementInput): Promise<AnnouncementRecord> {
   return apiFetch<AnnouncementRecord>("/api/announcements", {
     method: "POST",
     body: JSON.stringify(input),
@@ -791,15 +778,11 @@ export interface MessageThreadInput {
 export function fetchThreads(
   params: { page?: number; size?: number } = {}
 ): Promise<Paginated<MessageThreadRecord>> {
-  return apiFetch<Paginated<MessageThreadRecord>>(
-    `/api/message-threads${toQuery(params)}`
-  );
+  return apiFetch<Paginated<MessageThreadRecord>>(`/api/message-threads${toQuery(params)}`);
 }
 
 /** POST /api/message-threads — open a new thread (caller auto-added). */
-export function createMessageThread(
-  input: MessageThreadInput
-): Promise<MessageThreadRecord> {
+export function createMessageThread(input: MessageThreadInput): Promise<MessageThreadRecord> {
   return apiFetch<MessageThreadRecord>("/api/message-threads", {
     method: "POST",
     body: JSON.stringify(input),
@@ -817,10 +800,7 @@ export function fetchMessages(
 }
 
 /** POST /api/message-threads/{threadId}/messages — append a reply. */
-export function sendMessage(
-  threadId: number,
-  body: string
-): Promise<MessageRecord> {
+export function sendMessage(threadId: number, body: string): Promise<MessageRecord> {
   return apiFetch<MessageRecord>(`/api/message-threads/${threadId}/messages`, {
     method: "POST",
     body: JSON.stringify({ body }),
@@ -832,21 +812,17 @@ export function addThreadParticipant(
   threadId: number,
   userId: number
 ): Promise<MessageThreadRecord> {
-  return apiFetch<MessageThreadRecord>(
-    `/api/message-threads/${threadId}/participants`,
-    { method: "POST", body: JSON.stringify({ user_id: userId }) }
-  );
+  return apiFetch<MessageThreadRecord>(`/api/message-threads/${threadId}/participants`, {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId }),
+  });
 }
 
 /** DELETE /api/message-threads/{threadId}/participants/{userId} — leave. */
-export function removeThreadParticipant(
-  threadId: number,
-  userId: number
-): Promise<void> {
-  return apiFetch<void>(
-    `/api/message-threads/${threadId}/participants/${userId}`,
-    { method: "DELETE" }
-  );
+export function removeThreadParticipant(threadId: number, userId: number): Promise<void> {
+  return apiFetch<void>(`/api/message-threads/${threadId}/participants/${userId}`, {
+    method: "DELETE",
+  });
 }
 
 /* ==========================================================================
@@ -854,11 +830,7 @@ export function removeThreadParticipant(
    ========================================================================== */
 
 export type NotificationSource = "absensi" | "spp" | "komunikasi";
-export type NotificationType =
-  | "attendance"
-  | "payment"
-  | "announcement"
-  | "message";
+export type NotificationType = "attendance" | "payment" | "announcement" | "message";
 
 export interface AppNotification {
   /** Stable key derived from the underlying event, e.g. `announcement:12`. */
@@ -908,9 +880,7 @@ export async function markNotificationRead(id: string): Promise<void> {
 }
 
 /** Persist read markers for every supplied event id. */
-export async function markAllNotificationsRead(
-  ids: string[]
-): Promise<void> {
+export async function markAllNotificationsRead(ids: string[]): Promise<void> {
   const existing = new Set(getReadNotificationIds());
   for (const id of ids) existing.add(id);
   writeReadIds([...existing]);
@@ -937,10 +907,12 @@ function statusLabel(status: string): string {
  * independently so one failing domain degrades gracefully instead of blanking
  * the whole feed. Read state is layered on from local markers.
  */
-export async function fetchNotifications(params: {
-  currentUserId?: number;
-  unreadOnly?: boolean;
-} = {}): Promise<AppNotification[]> {
+export async function fetchNotifications(
+  params: {
+    currentUserId?: number;
+    unreadOnly?: boolean;
+  } = {}
+): Promise<AppNotification[]> {
   const readIds = new Set(getReadNotificationIds());
   const notifications: AppNotification[] = [];
 

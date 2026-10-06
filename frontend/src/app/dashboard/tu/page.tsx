@@ -80,13 +80,7 @@ function formatRupiah(amount: number): string {
   }).format(amount);
 }
 
-function WidgetError({
-  title,
-  onRetry,
-}: {
-  title: string;
-  onRetry: () => void;
-}) {
+function WidgetError({ title, onRetry }: { title: string; onRetry: () => void }) {
   return (
     <EmptyState
       icon={AlertCircle}
@@ -129,8 +123,7 @@ function TuContent({ me }: { me: UserMe }) {
   }>({ status: "loading", rows: [] });
   const [billsKey, setBillsKey] = React.useState(0);
 
-  const [urgentStatus, setUrgentStatus] =
-    React.useState<LoadStatus>("loading");
+  const [urgentStatus, setUrgentStatus] = React.useState<LoadStatus>("loading");
   const [urgent, setUrgent] = React.useState<UrgentAnnouncement[]>([]);
   const [urgentKey, setUrgentKey] = React.useState(0);
 
@@ -195,12 +188,8 @@ function TuContent({ me }: { me: UserMe }) {
     ])
       .then(([billPage, studentPage, classPage]) => {
         if (!active) return;
-        const studentMap = new Map<number, StudentRecord>(
-          studentPage.items.map((s) => [s.id, s])
-        );
-        const classMap = new Map<number, ClassRecord>(
-          classPage.items.map((k) => [k.id, k])
-        );
+        const studentMap = new Map<number, StudentRecord>(studentPage.items.map((s) => [s.id, s]));
+        const classMap = new Map<number, ClassRecord>(classPage.items.map((k) => [k.id, k]));
         const now = new Date();
         const rows: OverdueRow[] = (billPage.items as SppBill[]).map((bill) => {
           const student = studentMap.get(bill.student_id);
@@ -210,7 +199,7 @@ function TuContent({ me }: { me: UserMe }) {
             nis: student?.nis ?? String(bill.student_id),
             name: student?.full_name ?? `Siswa #${bill.student_id}`,
             className: bill.class_id
-              ? classMap.get(bill.class_id)?.name ?? `Kelas ${bill.class_id}`
+              ? (classMap.get(bill.class_id)?.name ?? `Kelas ${bill.class_id}`)
               : "—",
             amount: bill.balance > 0 ? bill.balance : bill.amount,
             dueDays: days,
@@ -272,8 +261,7 @@ function TuContent({ me }: { me: UserMe }) {
 
   React.useEffect(() => {
     if (selectAllRef.current) {
-      selectAllRef.current.indeterminate =
-        selected.size > 0 && selected.size < rows.length;
+      selectAllRef.current.indeterminate = selected.size > 0 && selected.size < rows.length;
     }
   }, [selected, rows.length]);
 
@@ -349,8 +337,7 @@ function TuContent({ me }: { me: UserMe }) {
   }, [overview.overdueCount, overview.students, urgent.length]);
 
   const totalOverdue = rows.filter((row) => row.status === "overdue").length;
-  const kpiHint =
-    overview.status === "error" ? "Gagal memuat data" : undefined;
+  const kpiHint = overview.status === "error" ? "Gagal memuat data" : undefined;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
@@ -359,9 +346,7 @@ function TuContent({ me }: { me: UserMe }) {
           <h1 className="text-lg font-semibold tracking-tight text-foreground">
             Operasional Hari Ini
           </h1>
-          <p className="text-xs text-muted-foreground">
-            Tata Usaha{today ? ` · ${today}` : ""}
-          </p>
+          <p className="text-xs text-muted-foreground">Tata Usaha{today ? ` · ${today}` : ""}</p>
         </div>
         <Link
           href="/dashboard/tu/spp/generate"
@@ -452,10 +437,7 @@ function TuContent({ me }: { me: UserMe }) {
                       {groupTasks.map((task) => {
                         const Icon = task.icon;
                         return (
-                          <li
-                            key={task.id}
-                            className="flex flex-wrap items-center gap-3 px-5 py-3"
-                          >
+                          <li key={task.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-container text-primary-container-foreground">
                               <Icon className="h-4 w-4" aria-hidden />
                             </span>
@@ -516,17 +498,10 @@ function TuContent({ me }: { me: UserMe }) {
           ) : (
             <ul className="divide-y divide-outline-variant">
               {urgent.map((item) => (
-                <li
-                  key={item.id}
-                  className="flex flex-wrap items-center gap-3 px-5 py-3"
-                >
+                <li key={item.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {item.title}
-                    </p>
-                    <p className="truncate text-2xs text-muted-foreground">
-                      {item.audience}
-                    </p>
+                    <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
+                    <p className="truncate text-2xs text-muted-foreground">{item.audience}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                     <button
@@ -583,10 +558,7 @@ function TuContent({ me }: { me: UserMe }) {
           </div>
         ) : bills.status === "error" ? (
           <div className="p-4">
-            <WidgetError
-              title="Gagal memuat tunggakan"
-              onRetry={() => setBillsKey((k) => k + 1)}
-            />
+            <WidgetError title="Gagal memuat tunggakan" onRetry={() => setBillsKey((k) => k + 1)} />
           </div>
         ) : rows.length === 0 ? (
           <div className="p-4">
@@ -648,10 +620,7 @@ function TuContent({ me }: { me: UserMe }) {
                             <ChevronDown className="h-3.5 w-3.5" aria-hidden />
                           )
                         ) : (
-                          <ChevronsUpDown
-                            className="h-3.5 w-3.5 opacity-50"
-                            aria-hidden
-                          />
+                          <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" aria-hidden />
                         )}
                       </button>
                     </th>
@@ -673,25 +642,16 @@ function TuContent({ me }: { me: UserMe }) {
                     <td className="px-4 py-2.5 font-mono text-xs tabular-nums text-muted-foreground">
                       {row.nis}
                     </td>
-                    <td className="px-4 py-2.5 font-medium text-foreground">
-                      {row.name}
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground">
-                      {row.className}
-                    </td>
+                    <td className="px-4 py-2.5 font-medium text-foreground">{row.name}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{row.className}</td>
                     <td
                       data-value={row.amount}
                       className="px-4 py-2.5 text-right font-mono tabular-nums text-foreground"
                     >
                       {formatRupiah(row.amount)}
                     </td>
-                    <td
-                      data-value={row.status === "overdue" ? 1 : 0}
-                      className="px-4 py-2.5"
-                    >
-                      <StatusChip
-                        tone={row.status === "overdue" ? "danger" : "warning"}
-                      >
+                    <td data-value={row.status === "overdue" ? 1 : 0} className="px-4 py-2.5">
+                      <StatusChip tone={row.status === "overdue" ? "danger" : "warning"}>
                         {row.status === "overdue"
                           ? `${row.dueDays} hari lewat`
                           : "belum jatuh tempo"}
@@ -705,8 +665,8 @@ function TuContent({ me }: { me: UserMe }) {
         )}
 
         <p className="border-t border-outline-variant px-5 py-2 text-2xs text-muted-foreground">
-          Menampilkan <span className="font-mono tabular-nums">{rows.length}</span>{" "}
-          tagihan menunggak. Klik judul kolom untuk mengurutkan.
+          Menampilkan <span className="font-mono tabular-nums">{rows.length}</span> tagihan
+          menunggak. Klik judul kolom untuk mengurutkan.
         </p>
       </Card>
     </div>
@@ -714,9 +674,5 @@ function TuContent({ me }: { me: UserMe }) {
 }
 
 export default function TuDashboardPage() {
-  return (
-    <DashboardShell role="admin">
-      {(me) => <TuContent me={me} />}
-    </DashboardShell>
-  );
+  return <DashboardShell role="admin">{(me) => <TuContent me={me} />}</DashboardShell>;
 }

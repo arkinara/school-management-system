@@ -1,15 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  AlertCircle,
-  CalendarDays,
-  Check,
-  Plus,
-  RotateCcw,
-  Save,
-  Trash2,
-} from "lucide-react";
+import { AlertCircle, CalendarDays, Check, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -79,18 +71,14 @@ function JadwalConfigContent() {
   const [subjects, setSubjects] = React.useState<SubjectRecord[]>([]);
   const [teachers, setTeachers] = React.useState<TeacherOption[]>([]);
   const [classId, setClassId] = React.useState("");
-  const [pool, setPool] = React.useState<{ subjectId: number; teacherId: number }[]>(
-    []
-  );
+  const [pool, setPool] = React.useState<{ subjectId: number; teacherId: number }[]>([]);
   const [grid, setGrid] = React.useState<Record<string, Slot>>({});
   const [loadStatus, setLoadStatus] = React.useState<LoadStatus>("loading");
   const [gridLoading, setGridLoading] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [errors, setErrors] = React.useState<string[]>([]);
   const [cellError, setCellError] = React.useState<string | null>(null);
-  const [activeCell, setActiveCell] = React.useState<{ day: string; period: number } | null>(
-    null
-  );
+  const [activeCell, setActiveCell] = React.useState<{ day: string; period: number } | null>(null);
   const [draft, setDraft] = React.useState<{
     subjectId: string;
     teacherId: string;
@@ -150,8 +138,7 @@ function JadwalConfigContent() {
         setGrid(next);
       })
       .catch(() => {
-        if (active)
-          setToast({ message: "Gagal memuat jadwal kelas.", tone: "error" });
+        if (active) setToast({ message: "Gagal memuat jadwal kelas.", tone: "error" });
       })
       .finally(() => {
         if (active) setGridLoading(false);
@@ -185,11 +172,7 @@ function JadwalConfigContent() {
     setPool((current) => [...current, { subjectId: 0, teacherId: 0 }]);
   }
 
-  function updatePoolEntry(
-    index: number,
-    field: "subjectId" | "teacherId",
-    value: number
-  ) {
+  function updatePoolEntry(index: number, field: "subjectId" | "teacherId", value: number) {
     setPool((current) =>
       current.map((entry, i) => (i === index ? { ...entry, [field]: value } : entry))
     );
@@ -254,8 +237,7 @@ function JadwalConfigContent() {
   async function save() {
     const nextErrors: string[] = [];
     if (!classId) nextErrors.push("Kelas belum dipilih.");
-    if (Object.keys(grid).length === 0)
-      nextErrors.push("Belum ada slot jadwal yang diisi.");
+    if (Object.keys(grid).length === 0) nextErrors.push("Belum ada slot jadwal yang diisi.");
     if (nextErrors.length > 0) {
       setErrors(nextErrors);
       return;
@@ -285,13 +267,10 @@ function JadwalConfigContent() {
       });
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setErrors([
-          "Konflik jadwal: guru/kelas sudah terisi pada hari dan jam tersebut.",
-        ]);
+        setErrors(["Konflik jadwal: guru/kelas sudah terisi pada hari dan jam tersebut."]);
         setToast({ message: "Konflik jadwal terdeteksi.", tone: "error" });
       } else {
-        const detail =
-          err instanceof ApiError ? err.detail : "Gagal menyimpan jadwal.";
+        const detail = err instanceof ApiError ? err.detail : "Gagal menyimpan jadwal.";
         setToast({ message: detail, tone: "error" });
       }
     } finally {
@@ -368,9 +347,7 @@ function JadwalConfigContent() {
                 </span>
                 {label}
               </button>
-              {value < 3 && (
-                <span className="h-px w-4 bg-outline-variant" aria-hidden />
-              )}
+              {value < 3 && <span className="h-px w-4 bg-outline-variant" aria-hidden />}
             </li>
           );
         })}
@@ -404,11 +381,7 @@ function JadwalConfigContent() {
               </select>
             </FormField>
             <div className="mt-4 flex justify-end">
-              <Button
-                type="button"
-                onClick={() => setStep(2)}
-                disabled={!classId}
-              >
+              <Button type="button" onClick={() => setStep(2)} disabled={!classId}>
                 Lanjut
               </Button>
             </div>
@@ -506,13 +479,9 @@ function JadwalConfigContent() {
             <CardTitle>Grid Jadwal · {selectedClass?.name ?? "Kelas"}</CardTitle>
             <div className="flex items-center gap-2">
               {conflicts.size > 0 && (
-                <StatusChip tone="danger">
-                  {conflicts.size} slot bentrok
-                </StatusChip>
+                <StatusChip tone="danger">{conflicts.size} slot bentrok</StatusChip>
               )}
-              <span className="text-2xs text-muted-foreground">
-                Klik sel untuk mengisi
-              </span>
+              <span className="text-2xs text-muted-foreground">Klik sel untuk mengisi</span>
             </div>
           </CardHeader>
 
@@ -567,10 +536,7 @@ function JadwalConfigContent() {
                         const slot = grid[key];
                         const conflict = conflicts.has(key);
                         return (
-                          <td
-                            key={key}
-                            className="border-l border-outline-variant p-1 align-top"
-                          >
+                          <td key={key} className="border-l border-outline-variant p-1 align-top">
                             <button
                               type="button"
                               onClick={() => openCell(day.value, period)}
@@ -589,9 +555,7 @@ function JadwalConfigContent() {
                                   <span className="text-2xs font-semibold">
                                     {subjectName(slot.subjectId)}
                                   </span>
-                                  <span className="text-2xs">
-                                    {teacherName(slot.teacherId)}
-                                  </span>
+                                  <span className="text-2xs">{teacherName(slot.teacherId)}</span>
                                   <span className="font-mono text-2xs tabular-nums">
                                     {slot.start}–{slot.end}
                                   </span>
@@ -727,11 +691,7 @@ function JadwalConfigContent() {
 
       <ToastViewport>
         {toast && (
-          <Toast
-            message={toast.message}
-            tone={toast.tone}
-            onDismiss={() => setToast(null)}
-          />
+          <Toast message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />
         )}
       </ToastViewport>
     </div>

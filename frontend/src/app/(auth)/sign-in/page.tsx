@@ -7,10 +7,7 @@ import { Eye, EyeOff, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { FormField, inputClass } from "@/components/ui/FormField";
 import { cn } from "@/components/ui/cn";
-import {
-  ApiError,
-  UnauthorizedError,
-} from "@/lib/api";
+import { ApiError, UnauthorizedError } from "@/lib/api";
 import { login, persistAuth, routeAfterAuth, SEED_TENANTS } from "@/lib/auth";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -106,9 +103,7 @@ export default function SignInPage() {
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           Selamat Datang Kembali
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Masuk ke akun sekolah Anda
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Masuk ke akun sekolah Anda</p>
       </div>
 
       <form
@@ -162,10 +157,7 @@ export default function SignInPage() {
             aria-invalid={errors.email ? true : undefined}
             aria-describedby={errors.email ? "email-error" : "email-helper"}
             placeholder="nama@sekolah.sch.id"
-            className={cn(
-              inputClass,
-              errors.email && "border-destructive"
-            )}
+            className={cn(inputClass, errors.email && "border-destructive")}
           />
         </FormField>
 
@@ -213,11 +205,7 @@ export default function SignInPage() {
             )}
           </button>
           {errors.password && (
-            <p
-              id="password-error"
-              role="alert"
-              className="mt-1 text-xs text-destructive"
-            >
+            <p id="password-error" role="alert" className="mt-1 text-xs text-destructive">
               {errors.password}
             </p>
           )}

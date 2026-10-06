@@ -39,7 +39,13 @@ export interface StatusChipProps extends React.HTMLAttributes<HTMLSpanElement> {
   children: React.ReactNode;
 }
 
-export function StatusChip({ tone = "neutral", dot, className, children, ...props }: StatusChipProps) {
+export function StatusChip({
+  tone = "neutral",
+  dot,
+  className,
+  children,
+  ...props
+}: StatusChipProps) {
   return (
     <span
       className={cn(

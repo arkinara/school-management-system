@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+import atexit
 import os
+import shutil
+import tempfile
 
 os.environ.setdefault("SCHOOL_MS_AUTO_SEED", "0")
 os.environ.setdefault("JWT_SECRET", "test-secret")
+os.environ.setdefault("ENVIRONMENT", "test")
+
+# Point the app-level engine at a throwaway DB *before* importing the app so the
+# real ``backend/school_ms.db`` is never created or written during tests.
+_TEST_DB_DIR = tempfile.mkdtemp(prefix="school-ms-tests-")
+os.environ["DATABASE_URL"] = f"sqlite:///{os.path.join(_TEST_DB_DIR, 'test.db')}"
+atexit.register(shutil.rmtree, _TEST_DB_DIR, ignore_errors=True)
 
 from collections.abc import Iterator  # noqa: E402
 

@@ -48,7 +48,10 @@ export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: nu
 /** Placeholder matching the Card shape. */
 export function SkeletonCard() {
   return (
-    <div className="rounded-lg border border-outline-variant bg-surface-container-low p-5" aria-busy>
+    <div
+      className="rounded-lg border border-outline-variant bg-surface-container-low p-5"
+      aria-busy
+    >
       <Skeleton className="h-4 w-1/2" />
       <Skeleton className="mt-4 h-8 w-1/3" />
       <Skeleton className="mt-3 h-3 w-2/3" />

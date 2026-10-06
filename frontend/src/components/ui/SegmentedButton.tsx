@@ -30,10 +30,7 @@ export function SegmentedButton<T extends string = string>({
     <div
       role="radiogroup"
       aria-label={props["aria-label"]}
-      className={cn(
-        "inline-flex overflow-hidden rounded-full border border-outline",
-        className
-      )}
+      className={cn("inline-flex overflow-hidden rounded-full border border-outline", className)}
     >
       {options.map((opt, i) => {
         const selected = opt.value === value;

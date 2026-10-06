@@ -12,7 +12,13 @@ export interface EmptyStateProps {
 }
 
 /** Friendly empty state: illustration + heading + description + CTA. */
-export function EmptyState({ icon: Icon = Inbox, title, description, action, className }: EmptyStateProps) {
+export function EmptyState({
+  icon: Icon = Inbox,
+  title,
+  description,
+  action,
+  className,
+}: EmptyStateProps) {
   return (
     <div
       className={cn(

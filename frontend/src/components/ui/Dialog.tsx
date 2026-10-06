@@ -15,7 +15,15 @@ export interface DialogProps {
 }
 
 /** M3 modal dialog with scrim, header, body, and actions. */
-export function Dialog({ open, onClose, title, description, children, actions, className }: DialogProps) {
+export function Dialog({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  actions,
+  className,
+}: DialogProps) {
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();

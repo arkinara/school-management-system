@@ -83,13 +83,7 @@ function prettyTime(time: string): string {
   return time.slice(0, 5).replace(":", ".");
 }
 
-function WidgetError({
-  title,
-  onRetry,
-}: {
-  title: string;
-  onRetry: () => void;
-}) {
+function WidgetError({ title, onRetry }: { title: string; onRetry: () => void }) {
   return (
     <EmptyState
       icon={AlertCircle}
@@ -176,9 +170,7 @@ function GuruContent({ me }: { me: UserMe }) {
         }
 
         const day = indonesianDayName(new Date());
-        const todayRows = scheduleRows.filter(
-          (row) => row.day_of_week.toLowerCase() === day
-        );
+        const todayRows = scheduleRows.filter((row) => row.day_of_week.toLowerCase() === day);
         const takenClassIds = new Set(
           attendance.items.map((row: AttendanceRecord) => row.class_id)
         );
@@ -196,8 +188,7 @@ function GuruContent({ me }: { me: UserMe }) {
               startTime: prettyTime(row.start_time),
               endTime: prettyTime(row.end_time),
               className: classMap.get(row.class_id)?.name ?? `Kelas ${row.class_id}`,
-              subject:
-                subjectMap.get(row.subject_id)?.name ?? `Mapel ${row.subject_id}`,
+              subject: subjectMap.get(row.subject_id)?.name ?? `Mapel ${row.subject_id}`,
               classId: row.class_id,
               subjectId: row.subject_id,
               status,
@@ -213,9 +204,7 @@ function GuruContent({ me }: { me: UserMe }) {
         const counts = attendance.counts ?? {};
         const attendanceTotal = attendance.total;
         const attendanceRate =
-          attendanceTotal > 0
-            ? Math.round(((counts.hadir ?? 0) / attendanceTotal) * 100)
-            : 0;
+          attendanceTotal > 0 ? Math.round(((counts.hadir ?? 0) / attendanceTotal) * 100) : 0;
 
         setSchedule({
           status: "ready",
@@ -252,9 +241,7 @@ function GuruContent({ me }: { me: UserMe }) {
       .then(({ scheduleRows, grades }) => {
         if (!active) return;
         const gradedKeys = new Set(
-          grades.items.map(
-            (grade: GradeRecord) => `${grade.student_id}:${grade.subject_id}`
-          )
+          grades.items.map((grade: GradeRecord) => `${grade.student_id}:${grade.subject_id}`)
         );
         const seen = new Set<string>();
         const items: GradeQueueItem[] = [];
@@ -270,11 +257,8 @@ function GuruContent({ me }: { me: UserMe }) {
           if (pendingCount === 0) continue;
           items.push({
             id: key,
-            className:
-              schedule.classes.get(row.class_id)?.name ?? `Kelas ${row.class_id}`,
-            subject:
-              schedule.subjects.get(row.subject_id)?.name ??
-              `Mapel ${row.subject_id}`,
+            className: schedule.classes.get(row.class_id)?.name ?? `Kelas ${row.class_id}`,
+            subject: schedule.subjects.get(row.subject_id)?.name ?? `Mapel ${row.subject_id}`,
             classId: row.class_id,
             subjectId: row.subject_id,
             pendingCount,
@@ -316,10 +300,7 @@ function GuruContent({ me }: { me: UserMe }) {
       studentCount: schedule.studentsByClass.get(session.classId)?.length ?? 0,
     }));
 
-  const pendingCount = gradeQueue.items.reduce(
-    (sum, item) => sum + item.pendingCount,
-    0
-  );
+  const pendingCount = gradeQueue.items.reduce((sum, item) => sum + item.pendingCount, 0);
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
@@ -470,9 +451,7 @@ function GuruContent({ me }: { me: UserMe }) {
             <CardHeader className="items-center border-b border-outline-variant pb-3">
               <CardTitle>Absensi Perlu Diisi</CardTitle>
               {attendanceQueue.length > 0 ? (
-                <StatusChip tone="warning">
-                  {attendanceQueue.length} tertunda
-                </StatusChip>
+                <StatusChip tone="warning">{attendanceQueue.length} tertunda</StatusChip>
               ) : (
                 <StatusChip tone="success">selesai</StatusChip>
               )}
@@ -492,10 +471,7 @@ function GuruContent({ me }: { me: UserMe }) {
             ) : (
               <ul className="divide-y divide-outline-variant">
                 {attendanceQueue.map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex items-center gap-3 px-5 py-3"
-                  >
+                  <li key={item.id} className="flex items-center gap-3 px-5 py-3">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-foreground">
                         Kelas {item.className} · {item.subject}
@@ -545,14 +521,8 @@ function GuruContent({ me }: { me: UserMe }) {
             ) : (
               <ul className="divide-y divide-outline-variant">
                 {gradeQueue.items.map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex items-center gap-3 px-5 py-3"
-                  >
-                    <span
-                      className="h-9 w-1 shrink-0 rounded-full bg-warning"
-                      aria-hidden
-                    />
+                  <li key={item.id} className="flex items-center gap-3 px-5 py-3">
+                    <span className="h-9 w-1 shrink-0 rounded-full bg-warning" aria-hidden />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-foreground">
                         {item.subject} · {item.className}
@@ -622,9 +592,5 @@ function GuruContent({ me }: { me: UserMe }) {
 }
 
 export default function GuruDashboardPage() {
-  return (
-    <DashboardShell role="teacher">
-      {(me) => <GuruContent me={me} />}
-    </DashboardShell>
-  );
+  return <DashboardShell role="teacher">{(me) => <GuruContent me={me} />}</DashboardShell>;
 }

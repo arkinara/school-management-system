@@ -21,11 +21,7 @@ export const metadata: Metadata = {
   description: "Dashboard sistem manajemen sekolah — data-dense, multi-tenant.",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id" className={`${firaSans.variable} ${firaCode.variable}`}>
       <body>{children}</body>

@@ -6,13 +6,7 @@ import { Building2, GraduationCap, School } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { cn } from "@/components/ui/cn";
-import {
-  getMe,
-  setOnboardedSchoolId,
-  SEED_SCHOOLS,
-  SEED_TENANTS,
-  type UserMe,
-} from "@/lib/auth";
+import { getMe, setOnboardedSchoolId, SEED_SCHOOLS, SEED_TENANTS, type UserMe } from "@/lib/auth";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -140,12 +134,7 @@ export default function OnboardingPage() {
               </p>
             )}
 
-            <Button
-              type="button"
-              onClick={onConfirm}
-              loading={submitting}
-              className="mt-5 w-full"
-            >
+            <Button type="button" onClick={onConfirm} loading={submitting} className="mt-5 w-full">
               Lanjutkan
             </Button>
 

@@ -9,12 +9,7 @@ import { FormField, inputClass } from "@/components/ui/FormField";
 import { SegmentedButton, type Segment } from "@/components/ui/SegmentedButton";
 import { cn } from "@/components/ui/cn";
 import { ApiError } from "@/lib/api";
-import {
-  persistAuth,
-  register,
-  SEED_SCHOOLS,
-  type UserRole,
-} from "@/lib/auth";
+import { persistAuth, register, SEED_SCHOOLS, type UserRole } from "@/lib/auth";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -26,12 +21,7 @@ const ROLE_OPTIONS: Segment<UserRole>[] = [
   { value: "admin", label: "Tata Usaha" },
 ];
 
-const SCHOOL_REQUIRED_ROLES: UserRole[] = [
-  "teacher",
-  "student",
-  "parent",
-  "admin",
-];
+const SCHOOL_REQUIRED_ROLES: UserRole[] = ["teacher", "student", "parent", "admin"];
 
 type FieldErrors = {
   fullName?: string;
@@ -161,9 +151,7 @@ export default function SignUpPage() {
         <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-e2">
           <GraduationCap className="h-6 w-6" aria-hidden />
         </span>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Buat Akun
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Buat Akun</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Daftarkan diri Anda untuk mengakses sistem sekolah
         </p>
@@ -260,17 +248,13 @@ export default function SignUpPage() {
           {!errors.password && strength.label && (
             <p className="mt-1 text-xs text-muted-foreground">
               Kekuatan sandi:{" "}
-              <span className={cn("font-medium", strength.tone)}>
-                {strength.label}
-              </span>
+              <span className={cn("font-medium", strength.tone)}>{strength.label}</span>
             </p>
           )}
         </FormField>
 
         <div className="mb-4">
-          <span className="mb-1.5 block text-sm font-medium text-foreground">
-            Peran
-          </span>
+          <span className="mb-1.5 block text-sm font-medium text-foreground">Peran</span>
           <SegmentedButton
             options={ROLE_OPTIONS}
             value={role}
@@ -299,11 +283,7 @@ export default function SignUpPage() {
             onChange={(e) => setSchoolId(e.target.value)}
             aria-invalid={errors.school ? true : undefined}
             aria-describedby={errors.school ? "school-error" : "school-helper"}
-            className={cn(
-              inputClass,
-              "appearance-none",
-              errors.school && "border-destructive"
-            )}
+            className={cn(inputClass, "appearance-none", errors.school && "border-destructive")}
           >
             <option value="">Pilih sekolah</option>
             {SEED_SCHOOLS.map((s) => (

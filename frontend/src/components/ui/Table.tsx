@@ -65,7 +65,9 @@ export function Table<Row>({
                   <th
                     key={col.key}
                     scope="col"
-                    aria-sort={active ? (sort!.direction === "asc" ? "ascending" : "descending") : undefined}
+                    aria-sort={
+                      active ? (sort!.direction === "asc" ? "ascending" : "descending") : undefined
+                    }
                     className={cn(
                       "border-b border-outline-variant font-semibold text-muted-foreground",
                       pad,

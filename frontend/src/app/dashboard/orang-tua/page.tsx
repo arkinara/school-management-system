@@ -84,13 +84,7 @@ function formatRupiah(amount: number): string {
   }).format(amount);
 }
 
-function WidgetError({
-  title,
-  onRetry,
-}: {
-  title: string;
-  onRetry: () => void;
-}) {
+function WidgetError({ title, onRetry }: { title: string; onRetry: () => void }) {
   return (
     <EmptyState
       icon={AlertCircle}
@@ -105,11 +99,7 @@ function WidgetError({
   );
 }
 
-function AttendanceBreakdownList({
-  attendance,
-}: {
-  attendance: AttendanceBreakdown;
-}) {
+function AttendanceBreakdownList({ attendance }: { attendance: AttendanceBreakdown }) {
   const rows: { label: string; value: number; tone: string }[] = [
     { label: "Hadir", value: attendance.hadir, tone: "bg-success" },
     { label: "Izin", value: attendance.izin, tone: "bg-info" },
@@ -137,12 +127,9 @@ function AttendanceBreakdownList({
 }
 
 function OrangTuaContent({ me }: { me: UserMe }) {
-  const [childrenStatus, setChildrenStatus] =
-    React.useState<LoadStatus>("loading");
+  const [childrenStatus, setChildrenStatus] = React.useState<LoadStatus>("loading");
   const [children, setChildren] = React.useState<ChildSummary[]>([]);
-  const [classMap, setClassMap] = React.useState<Map<number, ClassRecord>>(
-    new Map()
-  );
+  const [classMap, setClassMap] = React.useState<Map<number, ClassRecord>>(new Map());
   const [childrenKey, setChildrenKey] = React.useState(0);
   const [selectedId, setSelectedId] = React.useState<number | null>(null);
   const [childData, setChildData] = React.useState<ChildData>(EMPTY_CHILD);
@@ -169,10 +156,7 @@ function OrangTuaContent({ me }: { me: UserMe }) {
   React.useEffect(() => {
     let active = true;
     setChildrenStatus("loading");
-    Promise.all([
-      fetchParentChildren(me.user.id),
-      fetchClasses({ size: 100 }),
-    ])
+    Promise.all([fetchParentChildren(me.user.id), fetchClasses({ size: 100 })])
       .then(([kids, classPage]) => {
         if (!active) return;
         setChildren(kids);
@@ -194,9 +178,7 @@ function OrangTuaContent({ me }: { me: UserMe }) {
     setChildData(EMPTY_CHILD);
     const semester = currentSemester();
     Promise.all([
-      fetchGradeAggregate({ student_id: selectedId, semester }).catch(
-        () => null
-      ),
+      fetchGradeAggregate({ student_id: selectedId, semester }).catch(() => null),
       fetchAttendances({ student_id: selectedId, size: 100 }),
       fetchReportCards({ student_id: selectedId, semester, size: 1 }),
       getBills({ student_id: selectedId, size: 100 }),
@@ -214,9 +196,7 @@ function OrangTuaContent({ me }: { me: UserMe }) {
         }
         const totalAttendance = attendance.total;
         const rate =
-          totalAttendance > 0
-            ? Math.round((breakdown.hadir / totalAttendance) * 100)
-            : 0;
+          totalAttendance > 0 ? Math.round((breakdown.hadir / totalAttendance) * 100) : 0;
 
         let grades: GradeBarItem[] = [];
         let average: number | null = null;
@@ -282,9 +262,7 @@ function OrangTuaContent({ me }: { me: UserMe }) {
   const overdue = childData.bills.find((bill) => bill.status === "overdue");
   const paidCount = childData.bills.filter((bill) => bill.status === "paid").length;
   const paidPct =
-    childData.bills.length > 0
-      ? Math.round((paidCount / childData.bills.length) * 100)
-      : 0;
+    childData.bills.length > 0 ? Math.round((paidCount / childData.bills.length) * 100) : 0;
 
   if (childrenStatus === "loading") {
     return (
@@ -312,10 +290,7 @@ function OrangTuaContent({ me }: { me: UserMe }) {
   if (childrenStatus === "error") {
     return (
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
-        <WidgetError
-          title="Gagal memuat data anak"
-          onRetry={() => setChildrenKey((k) => k + 1)}
-        />
+        <WidgetError title="Gagal memuat data anak" onRetry={() => setChildrenKey((k) => k + 1)} />
       </div>
     );
   }
@@ -327,9 +302,7 @@ function OrangTuaContent({ me }: { me: UserMe }) {
           <h1 className="text-lg font-semibold tracking-tight text-foreground">
             Selamat pagi, {me.user.full_name.split(" ")[0]}
           </h1>
-          <p className="text-xs text-muted-foreground">
-            Orang Tua{today ? ` · ${today}` : ""}
-          </p>
+          <p className="text-xs text-muted-foreground">Orang Tua{today ? ` · ${today}` : ""}</p>
         </div>
         <EmptyState
           icon={ClipboardList}
@@ -341,7 +314,7 @@ function OrangTuaContent({ me }: { me: UserMe }) {
   }
 
   const className = child.class_id
-    ? classMap.get(child.class_id)?.name ?? `Kelas ${child.class_id}`
+    ? (classMap.get(child.class_id)?.name ?? `Kelas ${child.class_id}`)
     : "—";
 
   return (
@@ -377,7 +350,7 @@ function OrangTuaContent({ me }: { me: UserMe }) {
           children.map((item) => {
             const on = item.id === child.id;
             const itemClass = item.class_id
-              ? classMap.get(item.class_id)?.name ?? `Kelas ${item.class_id}`
+              ? (classMap.get(item.class_id)?.name ?? `Kelas ${item.class_id}`)
               : "—";
             return (
               <button
@@ -425,10 +398,7 @@ function OrangTuaContent({ me }: { me: UserMe }) {
         </div>
       )}
 
-      <section
-        aria-label="Ringkasan anak"
-        className="grid grid-cols-1 gap-3 sm:grid-cols-3"
-      >
+      <section aria-label="Ringkasan anak" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {childData.status === "loading" ? (
           <>
             <SkeletonCard />
@@ -447,9 +417,7 @@ function OrangTuaContent({ me }: { me: UserMe }) {
             <MetricCard
               label="Rata-rata"
               value={
-                childData.average !== null
-                  ? childData.average.toFixed(1).replace(".", ",")
-                  : "—"
+                childData.average !== null ? childData.average.toFixed(1).replace(".", ",") : "—"
               }
               icon={TrendingUp}
               hint={`Semester ini · ${child.full_name}`}
@@ -540,21 +508,14 @@ function OrangTuaContent({ me }: { me: UserMe }) {
             <>
               <ul className="divide-y divide-outline-variant">
                 {childData.bills.map((bill) => (
-                  <li
-                    key={bill.id}
-                    className="flex items-center justify-between gap-2 px-5 py-2.5"
-                  >
+                  <li key={bill.id} className="flex items-center justify-between gap-2 px-5 py-2.5">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {bill.label}
-                      </p>
+                      <p className="truncate text-sm font-medium text-foreground">{bill.label}</p>
                       <p className="font-mono text-2xs tabular-nums text-muted-foreground">
                         {formatRupiah(bill.amount)}
                       </p>
                     </div>
-                    <StatusChip
-                      tone={bill.status === "paid" ? "success" : "danger"}
-                    >
+                    <StatusChip tone={bill.status === "paid" ? "success" : "danger"}>
                       {bill.status === "paid"
                         ? "lunas"
                         : bill.status === "overdue"
@@ -618,22 +579,13 @@ function OrangTuaContent({ me }: { me: UserMe }) {
           <ul className="divide-y divide-outline-variant">
             {announcements.items.map((item) => (
               <li key={item.id} className="flex gap-3 px-5 py-3">
-                <span
-                  className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary"
-                  aria-hidden
-                />
+                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {item.title}
-                  </p>
-                  <p className="mt-0.5 text-2xs text-muted-foreground">
-                    {item.body}
-                  </p>
+                  <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
+                  <p className="mt-0.5 text-2xs text-muted-foreground">{item.body}</p>
                 </div>
                 <span className="shrink-0 text-2xs text-muted-foreground">
-                  {item.published_at
-                    ? new Date(item.published_at).toLocaleDateString("id-ID")
-                    : ""}
+                  {item.published_at ? new Date(item.published_at).toLocaleDateString("id-ID") : ""}
                 </span>
               </li>
             ))}
@@ -645,9 +597,5 @@ function OrangTuaContent({ me }: { me: UserMe }) {
 }
 
 export default function OrangTuaDashboardPage() {
-  return (
-    <DashboardShell role="parent">
-      {(me) => <OrangTuaContent me={me} />}
-    </DashboardShell>
-  );
+  return <DashboardShell role="parent">{(me) => <OrangTuaContent me={me} />}</DashboardShell>;
 }

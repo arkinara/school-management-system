@@ -93,9 +93,7 @@ export const principalMock: PrincipalDashboardData = {
 };
 
 /** Formats an attendance breakdown turn into donut segments. */
-export function attendanceSegments(
-  attendance: AttendanceBreakdown
-): DonutDatum[] {
+export function attendanceSegments(attendance: AttendanceBreakdown): DonutDatum[] {
   return [
     { label: "Hadir", value: attendance.hadir, tone: "success" },
     { label: "Izin", value: attendance.izin, tone: "info" },
@@ -480,19 +478,12 @@ export const siswaMock: SiswaDashboardData = {
  * A rapor is only ever shown as published when the backend says so; a missing
  * or unknown status degrades to draft so the widget is never ambiguous.
  */
-export function normalizeRaporStatus(
-  status: RaporSummary["status"]
-): "published" | "draft" {
+export function normalizeRaporStatus(status: RaporSummary["status"]): "published" | "draft" {
   return status === "published" ? "published" : "draft";
 }
 
 /** Renders a session time range, degrading to a fallback for bad data. */
-export function formatSessionTime(
-  startTime: string | null,
-  endTime: string | null
-): string {
+export function formatSessionTime(startTime: string | null, endTime: string | null): string {
   if (!startTime || !endTime) return "Waktu TBD";
   return `${startTime}–${endTime}`;
 }
-
-

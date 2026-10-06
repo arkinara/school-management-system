@@ -62,13 +62,7 @@ function formatTime(time: string | null): string {
   return time ? time.slice(0, 5).replace(":", ".") : "";
 }
 
-function WidgetError({
-  title,
-  onRetry,
-}: {
-  title: string;
-  onRetry: () => void;
-}) {
+function WidgetError({ title, onRetry }: { title: string; onRetry: () => void }) {
   return (
     <EmptyState
       icon={AlertCircle}
@@ -145,8 +139,7 @@ function SiswaContent({ me }: { me: UserMe }) {
     ])
       .then(([students, classes, subjects, teachers]) => {
         if (!active) return;
-        const student =
-          students.items.find((item) => item.user_id === me.user.id) ?? null;
+        const student = students.items.find((item) => item.user_id === me.user.id) ?? null;
         setProfile({
           status: "ready",
           student,
@@ -186,11 +179,8 @@ function SiswaContent({ me }: { me: UserMe }) {
               id: String(row.id),
               startTime: row.start_time,
               endTime: row.end_time,
-              subject:
-                profile.subjects.get(row.subject_id)?.name ??
-                `Mapel ${row.subject_id}`,
-              teacher:
-                profile.teachers.get(row.teacher_id)?.full_name ?? "Guru",
+              subject: profile.subjects.get(row.subject_id)?.name ?? `Mapel ${row.subject_id}`,
+              teacher: profile.teachers.get(row.teacher_id)?.full_name ?? "Guru",
               status,
             };
           });
@@ -213,9 +203,7 @@ function SiswaContent({ me }: { me: UserMe }) {
       .then((page) => {
         if (!active) return;
         const total = page.total;
-        const hadir = page.items.filter(
-          (row: AttendanceRecord) => row.status === "hadir"
-        ).length;
+        const hadir = page.items.filter((row: AttendanceRecord) => row.status === "hadir").length;
         setAttendance({
           status: "ready",
           rate: total > 0 ? Math.round((hadir / total) * 100) : 0,
@@ -273,15 +261,11 @@ function SiswaContent({ me }: { me: UserMe }) {
     })) ?? [];
   const average =
     raporGrades.length > 0
-      ? (
-          raporGrades.reduce((sum, item) => sum + item.value, 0) /
-          raporGrades.length
-        )
+      ? (raporGrades.reduce((sum, item) => sum + item.value, 0) / raporGrades.length)
           .toFixed(1)
           .replace(".", ",")
       : "—";
-  const raporStatus =
-    rapor.status === "ready" && rapor.record !== null ? "published" : "draft";
+  const raporStatus = rapor.status === "ready" && rapor.record !== null ? "published" : "draft";
 
   if (profile.status === "error") {
     return (
@@ -324,10 +308,7 @@ function SiswaContent({ me }: { me: UserMe }) {
         </Link>
       </div>
 
-      <section
-        aria-label="Ringkasan saya"
-        className="grid grid-cols-1 gap-3 sm:grid-cols-3"
-      >
+      <section aria-label="Ringkasan saya" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {profile.status === "loading" ? (
           <>
             <SkeletonCard />
@@ -405,14 +386,11 @@ function SiswaContent({ me }: { me: UserMe }) {
                         {session.subject}
                       </p>
                       <p className="truncate text-2xs text-muted-foreground">
-                        {session.teacher} ·{" "}
-                        {formatTime(session.startTime) || "--.--"}–
+                        {session.teacher} · {formatTime(session.startTime) || "--.--"}–
                         {formatTime(session.endTime) || "--.--"}
                       </p>
                     </div>
-                    {session.status === "now" && (
-                      <StatusChip tone="primary">sekarang</StatusChip>
-                    )}
+                    {session.status === "now" && <StatusChip tone="primary">sekarang</StatusChip>}
                   </li>
                 ))}
               </ol>
@@ -464,10 +442,7 @@ function SiswaContent({ me }: { me: UserMe }) {
             {rapor.status === "loading" ? (
               <SkeletonList rows={4} />
             ) : rapor.status === "error" ? (
-              <WidgetError
-                title="Gagal memuat rapor"
-                onRetry={() => setRaporKey((k) => k + 1)}
-              />
+              <WidgetError title="Gagal memuat rapor" onRetry={() => setRaporKey((k) => k + 1)} />
             ) : (
               <>
                 <p className="mb-3 text-2xs text-muted-foreground">
@@ -481,10 +456,7 @@ function SiswaContent({ me }: { me: UserMe }) {
                   />
                 ) : (
                   <>
-                    <ProgressBars
-                      items={raporGrades}
-                      ariaLabel="Nilai per mata pelajaran"
-                    />
+                    <ProgressBars items={raporGrades} ariaLabel="Nilai per mata pelajaran" />
                     <p className="mt-3 border-t border-outline-variant pt-2 text-2xs text-muted-foreground">
                       Rapor sudah diterbitkan dan dapat dilihat pada halaman rapor.
                     </p>
@@ -525,12 +497,8 @@ function SiswaContent({ me }: { me: UserMe }) {
             <ul className="divide-y divide-outline-variant">
               {announcements.items.map((item) => (
                 <li key={item.id} className="px-5 py-3">
-                  <p className="text-sm font-medium text-foreground">
-                    {item.title}
-                  </p>
-                  <p className="mt-0.5 text-2xs text-muted-foreground">
-                    {item.body}
-                  </p>
+                  <p className="text-sm font-medium text-foreground">{item.title}</p>
+                  <p className="mt-0.5 text-2xs text-muted-foreground">{item.body}</p>
                   <p className="mt-1 text-2xs text-muted-foreground">
                     {item.published_at
                       ? new Date(item.published_at).toLocaleDateString("id-ID")
@@ -547,9 +515,5 @@ function SiswaContent({ me }: { me: UserMe }) {
 }
 
 export default function SiswaDashboardPage() {
-  return (
-    <DashboardShell role="student">
-      {(me) => <SiswaContent me={me} />}
-    </DashboardShell>
-  );
+  return <DashboardShell role="student">{(me) => <SiswaContent me={me} />}</DashboardShell>;
 }

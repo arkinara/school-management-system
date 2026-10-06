@@ -76,9 +76,9 @@ function PaymentsContent() {
     tone: "success" | "error";
     undo?: () => void;
   } | null>(null);
-  const [receipt, setReceipt] = React.useState<
-    { billId: number; payment: SppPayment }[] | null
-  >(null);
+  const [receipt, setReceipt] = React.useState<{ billId: number; payment: SppPayment }[] | null>(
+    null
+  );
   const selectAllRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
@@ -87,13 +87,10 @@ function PaymentsContent() {
       .then(([classPage, studentPage]) => {
         if (!active) return;
         setClasses(classPage.items);
-        setStudents(
-          Object.fromEntries(studentPage.items.map((item) => [item.id, item]))
-        );
+        setStudents(Object.fromEntries(studentPage.items.map((item) => [item.id, item])));
       })
       .catch(() => {
-        if (active)
-          setToast({ message: "Gagal memuat data kelas/siswa.", tone: "error" });
+        if (active) setToast({ message: "Gagal memuat data kelas/siswa.", tone: "error" });
       });
     return () => {
       active = false;
@@ -137,8 +134,7 @@ function PaymentsContent() {
 
   React.useEffect(() => {
     if (selectAllRef.current) {
-      selectAllRef.current.indeterminate =
-        selected.size > 0 && selected.size < visibleBills.length;
+      selectAllRef.current.indeterminate = selected.size > 0 && selected.size < visibleBills.length;
     }
   }, [selected, visibleBills.length]);
 
@@ -258,8 +254,7 @@ function PaymentsContent() {
         },
       });
     } catch (err) {
-      const detail =
-        err instanceof ApiError ? err.detail : "Gagal mencatat pembayaran.";
+      const detail = err instanceof ApiError ? err.detail : "Gagal mencatat pembayaran.";
       setToast({ message: detail, tone: "error" });
       setReloadKey((current) => current + 1);
     } finally {
@@ -267,12 +262,13 @@ function PaymentsContent() {
     }
   }
 
-  const totalOutstanding = visibleBills.reduce(
-    (sum, bill) => sum + bill.balance,
-    0
-  );
+  const totalOutstanding = visibleBills.reduce((sum, bill) => sum + bill.balance, 0);
 
-  const columns: { key: SortKey | "student" | "status" | "select"; header: string; align?: "left" | "right" }[] = [
+  const columns: {
+    key: SortKey | "student" | "status" | "select";
+    header: string;
+    align?: "left" | "right";
+  }[] = [
     { key: "select", header: "" },
     { key: "student", header: "Siswa" },
     { key: "period", header: "Periode" },
@@ -301,12 +297,7 @@ function PaymentsContent() {
           >
             Muat ulang
           </Button>
-          <Button
-            icon={Receipt}
-            type="button"
-            onClick={openModal}
-            disabled={selected.size === 0}
-          >
+          <Button icon={Receipt} type="button" onClick={openModal} disabled={selected.size === 0}>
             Catat Pembayaran ({selected.size})
           </Button>
         </div>
@@ -341,12 +332,8 @@ function PaymentsContent() {
             </FormField>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <StatusChip tone="warning">
-              {visibleBills.length} tagihan belum lunas
-            </StatusChip>
-            <StatusChip tone="danger">
-              Total {formatRupiah(totalOutstanding)}
-            </StatusChip>
+            <StatusChip tone="warning">{visibleBills.length} tagihan belum lunas</StatusChip>
+            <StatusChip tone="danger">Total {formatRupiah(totalOutstanding)}</StatusChip>
           </div>
         </CardHeader>
 
@@ -388,18 +375,14 @@ function PaymentsContent() {
                     <input
                       ref={selectAllRef}
                       type="checkbox"
-                      checked={
-                        selected.size > 0 && selected.size === visibleBills.length
-                      }
+                      checked={selected.size > 0 && selected.size === visibleBills.length}
                       onChange={toggleAll}
                       aria-label="Pilih semua tagihan"
                       className="h-4 w-4 accent-[hsl(var(--primary))]"
                     />
                   </th>
                   {columns.slice(1).map((col) => {
-                    const sortable = ["student", "period", "amount", "balance"].includes(
-                      col.key
-                    );
+                    const sortable = ["student", "period", "amount", "balance"].includes(col.key);
                     const sortKey = col.key === "student" ? "name" : col.key;
                     const active = sort.key === sortKey;
                     return (
@@ -407,11 +390,7 @@ function PaymentsContent() {
                         key={col.key}
                         scope="col"
                         aria-sort={
-                          active
-                            ? sort.direction === "asc"
-                              ? "ascending"
-                              : "descending"
-                            : "none"
+                          active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"
                         }
                         className={cn(
                           "border-b border-outline-variant px-4 py-2.5 font-semibold text-muted-foreground",
@@ -432,10 +411,7 @@ function PaymentsContent() {
                                 <ChevronDown className="h-3.5 w-3.5" aria-hidden />
                               )
                             ) : (
-                              <ChevronsUpDown
-                                className="h-3.5 w-3.5 opacity-50"
-                                aria-hidden
-                              />
+                              <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" aria-hidden />
                             )}
                           </button>
                         ) : (
@@ -479,9 +455,7 @@ function PaymentsContent() {
                         {formatRupiah(bill.balance)}
                       </td>
                       <td className="px-4 py-2.5">
-                        <StatusChip
-                          tone={bill.status === "overdue" ? "danger" : "warning"}
-                        >
+                        <StatusChip tone={bill.status === "overdue" ? "danger" : "warning"}>
                           {bill.status === "overdue" ? "menunggak" : "belum lunas"}
                         </StatusChip>
                       </td>
@@ -563,9 +537,7 @@ function PaymentsContent() {
                           step={1000}
                           inputMode="numeric"
                           value={draft.amount}
-                          onChange={(event) =>
-                            updateDraft(id, { amount: event.target.value })
-                          }
+                          onChange={(event) => updateDraft(id, { amount: event.target.value })}
                           aria-invalid={Boolean(errors[`amount:${id}`])}
                           className={cn(inputClass, "font-mono tabular-nums")}
                         />
@@ -579,9 +551,7 @@ function PaymentsContent() {
                           id={`pay-receipt-${id}`}
                           type="text"
                           value={draft.receipt_no}
-                          onChange={(event) =>
-                            updateDraft(id, { receipt_no: event.target.value })
-                          }
+                          onChange={(event) => updateDraft(id, { receipt_no: event.target.value })}
                           aria-invalid={Boolean(errors[`receipt:${id}`])}
                           className={cn(inputClass, "font-mono")}
                         />
@@ -631,15 +601,13 @@ function PaymentsContent() {
                 <dl className="mt-2 grid grid-cols-2 gap-1 text-2xs text-muted-foreground">
                   <div>
                     <dt>Periode</dt>
-                    <dd className="font-medium text-foreground">
-                      {bill?.period ?? "-"}
-                    </dd>
+                    <dd className="font-medium text-foreground">{bill?.period ?? "-"}</dd>
                   </div>
                   <div>
                     <dt>Metode</dt>
                     <dd className="font-medium text-foreground">
-                      {SPP_PAYMENT_METHODS.find((m) => m.value === payment.method)
-                        ?.label ?? payment.method}
+                      {SPP_PAYMENT_METHODS.find((m) => m.value === payment.method)?.label ??
+                        payment.method}
                     </dd>
                   </div>
                   <div>

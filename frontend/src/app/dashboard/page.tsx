@@ -4,13 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { GraduationCap, LogOut, Construction } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import {
-  getMe,
-  logout,
-  needsOnboarding,
-  type UserMe,
-  type UserRole,
-} from "@/lib/auth";
+import { getMe, logout, needsOnboarding, type UserMe, type UserRole } from "@/lib/auth";
 
 /** Role → its home dashboard. Roles without an entry get the placeholder. */
 const ROLE_HOME: Partial<Record<UserRole, string>> = {
@@ -101,18 +95,13 @@ export default function DashboardPage() {
           <div className="flex items-start gap-3 rounded-lg border border-dashed border-outline-variant bg-surface-1 p-4">
             <Construction className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
             <p className="text-sm text-muted-foreground">
-              Dasbor {ROLE_LABEL[me.role]} sedang disiapkan dan akan tersedia pada
-              rilis berikutnya.
+              Dasbor {ROLE_LABEL[me.role]} sedang disiapkan dan akan tersedia pada rilis berikutnya.
             </p>
           </div>
         )}
 
         {!error && !me && (
-          <p
-            className="text-sm text-muted-foreground"
-            role="status"
-            aria-live="polite"
-          >
+          <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
             Memuat dasbor...
           </p>
         )}

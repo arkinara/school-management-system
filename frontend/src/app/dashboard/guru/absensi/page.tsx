@@ -1,14 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  AlertCircle,
-  CalendarCheck,
-  Check,
-  RotateCcw,
-  Save,
-  Users,
-} from "lucide-react";
+import { AlertCircle, CalendarCheck, Check, RotateCcw, Save, Users } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -69,19 +62,13 @@ function AbsensiContent({ me }: { me: UserMe }) {
   const [classId, setClassId] = React.useState("");
   const [date, setDate] = React.useState(today);
   const [roster, setRoster] = React.useState<StudentRecord[]>([]);
-  const [statusMap, setStatusMap] = React.useState<
-    Record<number, AttendanceStatus>
-  >({});
+  const [statusMap, setStatusMap] = React.useState<Record<number, AttendanceStatus>>({});
   const [noteMap, setNoteMap] = React.useState<Record<number, string>>({});
-  const [existing, setExisting] = React.useState<Record<number, AttendanceRecord>>(
-    {}
-  );
+  const [existing, setExisting] = React.useState<Record<number, AttendanceRecord>>({});
   const [status, setStatus] = React.useState<LoadStatus>("idle");
   const [reloadKey, setReloadKey] = React.useState(0);
   const [saving, setSaving] = React.useState(false);
-  const [errors, setErrors] = React.useState<{ classId?: string; date?: string }>(
-    {}
-  );
+  const [errors, setErrors] = React.useState<{ classId?: string; date?: string }>({});
   const [toast, setToast] = React.useState<{
     message: string;
     tone: "success" | "error";
@@ -98,9 +85,7 @@ function AbsensiContent({ me }: { me: UserMe }) {
     let active = true;
     Promise.all([
       fetchClasses({ size: 100 }),
-      me.role === "teacher"
-        ? getTeacherSchedule(me.user.id).catch(() => [])
-        : Promise.resolve([]),
+      me.role === "teacher" ? getTeacherSchedule(me.user.id).catch(() => []) : Promise.resolve([]),
     ])
       .then(([res, schedule]) => {
         if (!active) return;
@@ -108,8 +93,7 @@ function AbsensiContent({ me }: { me: UserMe }) {
         const list =
           me.role === "teacher"
             ? res.items.filter(
-                (klass) =>
-                  klass.wali_kelas_id === me.user.id || taught.has(klass.id)
+                (klass) => klass.wali_kelas_id === me.user.id || taught.has(klass.id)
               )
             : res.items;
         setClasses(list);
@@ -253,13 +237,11 @@ function AbsensiContent({ me }: { me: UserMe }) {
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setToast({
-          message:
-            "Sebagian absensi sudah tercatat. Muat ulang kelas lalu ulangi koreksi.",
+          message: "Sebagian absensi sudah tercatat. Muat ulang kelas lalu ulangi koreksi.",
           tone: "error",
         });
       } else {
-        const detail =
-          err instanceof ApiError ? err.detail : "Gagal menyimpan absensi.";
+        const detail = err instanceof ApiError ? err.detail : "Gagal menyimpan absensi.";
         setToast({ message: detail, tone: "error" });
       }
     } finally {
@@ -305,9 +287,7 @@ function AbsensiContent({ me }: { me: UserMe }) {
             <p className="text-sm font-medium text-foreground">
               {student.full_name ?? `Siswa #${student.id}`}
             </p>
-            <p className="font-mono text-2xs tabular-nums text-muted-foreground">
-              {student.nis}
-            </p>
+            <p className="font-mono text-2xs tabular-nums text-muted-foreground">{student.nis}</p>
           </div>
         );
       },
@@ -339,11 +319,7 @@ function AbsensiContent({ me }: { me: UserMe }) {
               [student.id]: event.target.value,
             }))
           }
-          placeholder={
-            (statusMap[student.id] ?? "hadir") === "hadir"
-              ? "—"
-              : "Keterangan opsional"
-          }
+          placeholder={(statusMap[student.id] ?? "hadir") === "hadir" ? "—" : "Keterangan opsional"}
           aria-label={`Catatan ${student.full_name ?? student.nis}`}
           className={cn(inputClass, "min-h-[32px] w-full min-w-[12rem] px-2 text-xs")}
         />
@@ -369,9 +345,7 @@ function AbsensiContent({ me }: { me: UserMe }) {
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-foreground">
-            Input Absensi
-          </h1>
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">Input Absensi</h1>
           <p className="text-xs text-muted-foreground">
             Guru · tandai kehadiran per kelas dan tanggal
           </p>
@@ -471,9 +445,7 @@ function AbsensiContent({ me }: { me: UserMe }) {
             </StatusChip>
           ))}
           {editedAfterSubmissionDay && (
-            <StatusChip tone="warning">
-              mode koreksi · edit setelah hari H
-            </StatusChip>
+            <StatusChip tone="warning">mode koreksi · edit setelah hari H</StatusChip>
           )}
           <span className="ml-auto hidden text-2xs text-muted-foreground sm:block">
             Fokus baris lalu tekan{" "}
@@ -522,11 +494,7 @@ function AbsensiContent({ me }: { me: UserMe }) {
             />
           </div>
         ) : (
-          <Table
-            columns={columns}
-            rows={roster}
-            rowKey={(student) => String(student.id)}
-          />
+          <Table columns={columns} rows={roster} rowKey={(student) => String(student.id)} />
         )}
       </Card>
 

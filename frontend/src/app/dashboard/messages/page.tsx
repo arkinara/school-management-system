@@ -128,8 +128,7 @@ function NewThreadDialog({
         if (!search.trim()) return true;
         const needle = search.toLowerCase();
         return (
-          user.full_name.toLowerCase().includes(needle) ||
-          user.email.toLowerCase().includes(needle)
+          user.full_name.toLowerCase().includes(needle) || user.email.toLowerCase().includes(needle)
         );
       }),
     [users, me.user.id, search]
@@ -173,10 +172,7 @@ function NewThreadDialog({
       onClose();
     } catch (err) {
       onToast({
-        message:
-          err instanceof ApiError
-            ? err.detail
-            : "Gagal membuat percakapan baru.",
+        message: err instanceof ApiError ? err.detail : "Gagal membuat percakapan baru.",
         tone: "error",
       });
     } finally {
@@ -202,11 +198,7 @@ function NewThreadDialog({
       }
     >
       <div className="flex flex-col gap-4">
-        <div
-          id="new-thread-participants"
-          tabIndex={-1}
-          className="flex flex-col gap-1.5"
-        >
+        <div id="new-thread-participants" tabIndex={-1} className="flex flex-col gap-1.5">
           <span className="text-sm font-medium text-foreground">
             Peserta
             <span className="ml-0.5 text-destructive" aria-hidden>
@@ -262,12 +254,7 @@ function NewThreadDialog({
           )}
         </div>
 
-        <FormField
-          label="Subjek"
-          htmlFor="new-thread-subject"
-          required
-          error={errors.subject}
-        >
+        <FormField label="Subjek" htmlFor="new-thread-subject" required error={errors.subject}>
           <input
             id="new-thread-subject"
             ref={subjectRef}
@@ -279,12 +266,7 @@ function NewThreadDialog({
           />
         </FormField>
 
-        <FormField
-          label="Pesan Pertama"
-          htmlFor="new-thread-body"
-          required
-          error={errors.body}
-        >
+        <FormField label="Pesan Pertama" htmlFor="new-thread-body" required error={errors.body}>
           <textarea
             id="new-thread-body"
             ref={bodyRef}
@@ -330,8 +312,7 @@ function AddParticipantDialog({
   }, [open]);
 
   const candidates = users.filter(
-    (user) =>
-      user.id !== meId && !existing.includes(user.id) && user.role !== "student"
+    (user) => user.id !== meId && !existing.includes(user.id) && user.role !== "student"
   );
 
   async function submit() {
@@ -384,9 +365,7 @@ function AddParticipantDialog({
                 />
                 <Avatar name={user.full_name} size="sm" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm text-foreground">
-                    {user.full_name}
-                  </span>
+                  <span className="block truncate text-sm text-foreground">{user.full_name}</span>
                   <span className="block truncate text-2xs text-muted-foreground">
                     {ROLE_LABEL[user.role] ?? user.role} · {user.email}
                   </span>
@@ -505,9 +484,7 @@ function MessagesContent({ me }: { me: UserMe }) {
   const sortedThreads = React.useMemo(
     () =>
       [...threads].sort(
-        (a, b) =>
-          new Date(threadTimestamp(b)).getTime() -
-          new Date(threadTimestamp(a)).getTime()
+        (a, b) => new Date(threadTimestamp(b)).getTime() - new Date(threadTimestamp(a)).getTime()
       ),
     [threads]
   );
@@ -531,21 +508,16 @@ function MessagesContent({ me }: { me: UserMe }) {
       const record = await sendMessage(threadId, text);
       setMessages((current) =>
         current.map((message) =>
-          message.id === tempId
-            ? { ...record, local: false, failed: false }
-            : message
+          message.id === tempId ? { ...record, local: false, failed: false } : message
         )
       );
       updateThreadPreview(threadId, record);
     } catch (err) {
       setMessages((current) =>
-        current.map((message) =>
-          message.id === tempId ? { ...message, failed: true } : message
-        )
+        current.map((message) => (message.id === tempId ? { ...message, failed: true } : message))
       );
       setToast({
-        message:
-          err instanceof ApiError ? err.detail : "Pesan gagal terkirim.",
+        message: err instanceof ApiError ? err.detail : "Pesan gagal terkirim.",
         tone: "error",
       });
     }
@@ -573,9 +545,7 @@ function MessagesContent({ me }: { me: UserMe }) {
 
   async function retry(message: LocalMessage) {
     setMessages((current) =>
-      current.map((item) =>
-        item.id === message.id ? { ...item, failed: false } : item
-      )
+      current.map((item) => (item.id === message.id ? { ...item, failed: false } : item))
     );
     await deliver(message.thread_id, message.id, message.body);
   }
@@ -597,8 +567,7 @@ function MessagesContent({ me }: { me: UserMe }) {
       setToast({ message: `${user.full_name} ditambahkan.`, tone: "success" });
     } catch (err) {
       setToast({
-        message:
-          err instanceof ApiError ? err.detail : "Gagal menambah peserta.",
+        message: err instanceof ApiError ? err.detail : "Gagal menambah peserta.",
         tone: "error",
       });
     }
@@ -614,8 +583,7 @@ function MessagesContent({ me }: { me: UserMe }) {
       setToast({ message: "Anda keluar dari percakapan.", tone: "success" });
     } catch (err) {
       setToast({
-        message:
-          err instanceof ApiError ? err.detail : "Gagal keluar dari percakapan.",
+        message: err instanceof ApiError ? err.detail : "Gagal keluar dari percakapan.",
         tone: "error",
       });
     }
@@ -630,9 +598,7 @@ function MessagesContent({ me }: { me: UserMe }) {
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-foreground">
-            Pesan
-          </h1>
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">Pesan</h1>
           <p className="text-xs text-muted-foreground">
             Komunikasi langsung antara orang tua dan guru
           </p>
@@ -653,12 +619,7 @@ function MessagesContent({ me }: { me: UserMe }) {
       </div>
 
       <div className="grid min-h-[65vh] grid-cols-1 gap-3 lg:grid-cols-[20rem_1fr]">
-        <Card
-          className={cn(
-            "flex min-h-0 flex-col",
-            activeId !== null && "hidden lg:flex"
-          )}
-        >
+        <Card className={cn("flex min-h-0 flex-col", activeId !== null && "hidden lg:flex")}>
           <CardHeader className="items-center border-b border-outline-variant pb-3">
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-primary" aria-hidden />
@@ -680,11 +641,7 @@ function MessagesContent({ me }: { me: UserMe }) {
                 title="Gagal memuat percakapan"
                 description="Periksa koneksi lalu coba lagi."
                 action={
-                  <Button
-                    variant="tonal"
-                    icon={RotateCcw}
-                    onClick={() => void loadThreads(false)}
-                  >
+                  <Button variant="tonal" icon={RotateCcw} onClick={() => void loadThreads(false)}>
                     Coba lagi
                   </Button>
                 }
@@ -702,9 +659,7 @@ function MessagesContent({ me }: { me: UserMe }) {
             <ul className="flex-1 divide-y divide-outline-variant overflow-y-auto">
               {sortedThreads.map((thread) => {
                 const unread = isUnread(thread, me.user.id);
-                const others = thread.participant_ids.filter(
-                  (id) => id !== me.user.id
-                );
+                const others = thread.participant_ids.filter((id) => id !== me.user.id);
                 return (
                   <li key={thread.id}>
                     <button
@@ -717,16 +672,14 @@ function MessagesContent({ me }: { me: UserMe }) {
                       )}
                     >
                       <span className="flex shrink-0 -space-x-2">
-                        {(others.length > 0 ? others : [me.user.id])
-                          .slice(0, 3)
-                          .map((id) => (
-                            <Avatar
-                              key={id}
-                              name={nameFor(id)}
-                              size="sm"
-                              className="ring-2 ring-surface-container-low"
-                            />
-                          ))}
+                        {(others.length > 0 ? others : [me.user.id]).slice(0, 3).map((id) => (
+                          <Avatar
+                            key={id}
+                            name={nameFor(id)}
+                            size="sm"
+                            className="ring-2 ring-surface-container-low"
+                          />
+                        ))}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-2">
@@ -752,9 +705,7 @@ function MessagesContent({ me }: { me: UserMe }) {
                         </span>
                         {thread.last_message && (
                           <span className="mt-0.5 block truncate text-2xs text-muted-foreground">
-                            {thread.last_message.sender_id === me.user.id
-                              ? "Anda: "
-                              : ""}
+                            {thread.last_message.sender_id === me.user.id ? "Anda: " : ""}
                             {excerpt(thread.last_message.body)}
                           </span>
                         )}
@@ -802,9 +753,7 @@ function MessagesContent({ me }: { me: UserMe }) {
                       ))}
                   </span>
                   <div className="min-w-0">
-                    <CardTitle className="truncate">
-                      {participantNames(activeThread)}
-                    </CardTitle>
+                    <CardTitle className="truncate">{participantNames(activeThread)}</CardTitle>
                     <p className="truncate text-2xs text-muted-foreground">
                       {activeThread.subject}
                     </p>
@@ -912,13 +861,9 @@ function MessagesContent({ me }: { me: UserMe }) {
                           {own && !message.failed && (
                             <span
                               className={cn(
-                                message.read_at
-                                  ? "text-primary"
-                                  : "text-muted-foreground"
+                                message.read_at ? "text-primary" : "text-muted-foreground"
                               )}
-                              aria-label={
-                                message.read_at ? "Sudah dibaca" : "Terkirim"
-                              }
+                              aria-label={message.read_at ? "Sudah dibaca" : "Terkirim"}
                               title={message.read_at ? "Sudah dibaca" : "Terkirim"}
                             >
                               <CheckCheck className="h-3.5 w-3.5" aria-hidden />
@@ -1004,11 +949,7 @@ function MessagesContent({ me }: { me: UserMe }) {
 
       <ToastViewport>
         {toast && (
-          <Toast
-            message={toast.message}
-            tone={toast.tone}
-            onDismiss={() => setToast(null)}
-          />
+          <Toast message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />
         )}
       </ToastViewport>
     </div>

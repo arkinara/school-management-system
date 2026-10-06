@@ -1,13 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  AlertCircle,
-  ClipboardList,
-  RotateCcw,
-  Save,
-  Upload,
-} from "lucide-react";
+import { AlertCircle, ClipboardList, RotateCcw, Save, Upload } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -82,8 +76,7 @@ function GradesContent({ me }: { me: UserMe }) {
         if (subjectPage.items[0]) setSubjectId(String(subjectPage.items[0].id));
       })
       .catch(() => {
-        if (active)
-          setToast({ message: "Gagal memuat kelas/mapel.", tone: "error" });
+        if (active) setToast({ message: "Gagal memuat kelas/mapel.", tone: "error" });
       });
     return () => {
       active = false;
@@ -189,9 +182,7 @@ function GradesContent({ me }: { me: UserMe }) {
             if (raw.trim() === "") return null;
             return { student_id: student.id, score: Number(raw) };
           })
-          .filter((entry): entry is { student_id: number; score: number } =>
-            entry !== null
-          );
+          .filter((entry): entry is { student_id: number; score: number } => entry !== null);
         if (entries.length === 0) continue;
         const result = await bulkSaveGrades({
           class_id: Number(classId),
@@ -203,10 +194,7 @@ function GradesContent({ me }: { me: UserMe }) {
         created += result.created;
       }
       setToast({
-        message:
-          created > 0
-            ? `${created} nilai tersimpan`
-            : "Tidak ada nilai baru untuk disimpan",
+        message: created > 0 ? `${created} nilai tersimpan` : "Tidak ada nilai baru untuk disimpan",
         tone: "success",
       });
     } catch (err) {
@@ -217,10 +205,8 @@ function GradesContent({ me }: { me: UserMe }) {
     }
   }
 
-  const subjectName =
-    subjects.find((s) => String(s.id) === subjectId)?.name ?? "Mata pelajaran";
-  const className =
-    classes.find((c) => String(c.id) === classId)?.name ?? "Kelas";
+  const subjectName = subjects.find((s) => String(s.id) === subjectId)?.name ?? "Mata pelajaran";
+  const className = classes.find((c) => String(c.id) === classId)?.name ?? "Kelas";
 
   const columns: Column<StudentRecord>[] = [
     {
@@ -231,9 +217,7 @@ function GradesContent({ me }: { me: UserMe }) {
           <p className="text-sm font-medium text-foreground">
             {student.full_name ?? `Siswa #${student.id}`}
           </p>
-          <p className="font-mono text-2xs tabular-nums text-muted-foreground">
-            {student.nis}
-          </p>
+          <p className="font-mono text-2xs tabular-nums text-muted-foreground">{student.nis}</p>
         </div>
       ),
     },
@@ -254,9 +238,7 @@ function GradesContent({ me }: { me: UserMe }) {
               max={100}
               inputMode="decimal"
               value={scores[student.id]?.[category.value] ?? ""}
-              onChange={(event) =>
-                setScore(student.id, category.value, event.target.value)
-              }
+              onChange={(event) => setScore(student.id, category.value, event.target.value)}
               aria-label={`${category.label} ${student.full_name ?? student.nis}`}
               aria-invalid={invalid}
               placeholder="—"
@@ -282,9 +264,7 @@ function GradesContent({ me }: { me: UserMe }) {
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-foreground">
-            Input Nilai
-          </h1>
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">Input Nilai</h1>
           <p className="text-xs text-muted-foreground">
             Guru · nilai per kelas, mata pelajaran, dan kategori
           </p>
@@ -380,9 +360,7 @@ function GradesContent({ me }: { me: UserMe }) {
               Rata-rata {aggregate.count ? aggregate.average.toFixed(1) : "—"}
             </StatusChip>
             <StatusChip tone="info">Min {aggregate.count ? aggregate.min : "—"}</StatusChip>
-            <StatusChip tone="success">
-              Max {aggregate.count ? aggregate.max : "—"}
-            </StatusChip>
+            <StatusChip tone="success">Max {aggregate.count ? aggregate.max : "—"}</StatusChip>
             <span className="font-mono text-2xs tabular-nums text-muted-foreground">
               {aggregate.count} nilai
             </span>
@@ -427,21 +405,13 @@ function GradesContent({ me }: { me: UserMe }) {
             />
           </div>
         ) : (
-          <Table
-            columns={columns}
-            rows={roster}
-            rowKey={(student) => String(student.id)}
-          />
+          <Table columns={columns} rows={roster} rowKey={(student) => String(student.id)} />
         )}
       </Card>
 
       <ToastViewport>
         {toast && (
-          <Toast
-            message={toast.message}
-            tone={toast.tone}
-            onDismiss={() => setToast(null)}
-          />
+          <Toast message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />
         )}
       </ToastViewport>
     </div>

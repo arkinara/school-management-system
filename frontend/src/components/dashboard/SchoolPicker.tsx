@@ -21,12 +21,7 @@ export interface SchoolPickerProps {
  * Yayasan-only school selector for the shared dashboard shell. Groups schools
  * by tenant and degrades to a disabled chip when no schools are available.
  */
-export function SchoolPicker({
-  schools,
-  value,
-  onChange,
-  className,
-}: SchoolPickerProps) {
+export function SchoolPicker({ schools, value, onChange, className }: SchoolPickerProps) {
   if (schools.length === 0) {
     return (
       <span

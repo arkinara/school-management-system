@@ -21,12 +21,7 @@ export interface ProgressBarsProps {
  * CSS bullet/bar list — no chart library. Each row pairs a label with a
  * value and an optional target tick so progress is readable as text too.
  */
-export function ProgressBars({
-  items,
-  max = 100,
-  ariaLabel,
-  className,
-}: ProgressBarsProps) {
+export function ProgressBars({ items, max = 100, ariaLabel, className }: ProgressBarsProps) {
   return (
     <ul className={cn("flex flex-col gap-3", className)} aria-label={ariaLabel}>
       {items.map((item) => {
@@ -44,10 +39,7 @@ export function ProgressBars({
               </span>
             </div>
             <div className="relative mt-1 h-2 w-full overflow-hidden rounded-full bg-surface-3">
-              <div
-                className="h-full rounded-full bg-primary"
-                style={{ width: `${pct}%` }}
-              />
+              <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
               {targetPct !== undefined && (
                 <span
                   className="absolute top-0 h-full w-0.5 bg-foreground/70"

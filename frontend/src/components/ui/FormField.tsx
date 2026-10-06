@@ -18,7 +18,15 @@ export interface FormFieldProps {
  * Wraps a form control with a visible label, helper text, and error slot.
  * Error renders below the field (never placeholder-only labels).
  */
-export function FormField({ label, htmlFor, required, helper, error, className, children }: FormFieldProps) {
+export function FormField({
+  label,
+  htmlFor,
+  required,
+  helper,
+  error,
+  className,
+  children,
+}: FormFieldProps) {
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       <label htmlFor={htmlFor} className="text-sm font-medium text-foreground">

@@ -60,10 +60,7 @@ const JENJANG_BAR: Record<string, string> = {
   SMA: "bg-success",
 };
 
-const JENJANG_METRICS: Record<
-  string,
-  { students: number; attendance: number; spp: number }
-> = {
+const JENJANG_METRICS: Record<string, { students: number; attendance: number; spp: number }> = {
   TK: { students: 186, attendance: 97, spp: 94 },
   SD: { students: 482, attendance: 94, spp: 82 },
   SMP: { students: 526, attendance: 95, spp: 88 },
@@ -72,10 +69,42 @@ const JENJANG_METRICS: Record<
 };
 
 const MOCK_ROWS: ComparisonRow[] = [
-  { id: "tk", name: "TK Menteng Ceria", jenjang: "TK", students: 186, attendance: 97, spp: 94, status: "sehat" },
-  { id: "sd", name: "SDN Menteng 01", jenjang: "SD", students: 482, attendance: 94, spp: 82, status: "perhatian" },
-  { id: "smp", name: "SMP Nusantara", jenjang: "SMP", students: 526, attendance: 95, spp: 88, status: "sehat" },
-  { id: "sma", name: "SMA Bhakti", jenjang: "SMA", students: 648, attendance: 92, spp: 79, status: "perhatian" },
+  {
+    id: "tk",
+    name: "TK Menteng Ceria",
+    jenjang: "TK",
+    students: 186,
+    attendance: 97,
+    spp: 94,
+    status: "sehat",
+  },
+  {
+    id: "sd",
+    name: "SDN Menteng 01",
+    jenjang: "SD",
+    students: 482,
+    attendance: 94,
+    spp: 82,
+    status: "perhatian",
+  },
+  {
+    id: "smp",
+    name: "SMP Nusantara",
+    jenjang: "SMP",
+    students: 526,
+    attendance: 95,
+    spp: 88,
+    status: "sehat",
+  },
+  {
+    id: "sma",
+    name: "SMA Bhakti",
+    jenjang: "SMA",
+    students: 648,
+    attendance: 92,
+    spp: 79,
+    status: "perhatian",
+  },
 ];
 
 const TENANT_USERS: { name: string; jenjang: string; value: number }[] = [
@@ -160,8 +189,7 @@ function YayasanContent({ me }: { me: UserMe }) {
         students: metric.students,
         attendance: metric.attendance,
         spp: metric.spp,
-        status:
-          metric.attendance >= 93 && metric.spp >= 85 ? "sehat" : "perhatian",
+        status: metric.attendance >= 93 && metric.spp >= 85 ? "sehat" : "perhatian",
       };
     });
   }, [tenants]);
@@ -189,44 +217,34 @@ function YayasanContent({ me }: { me: UserMe }) {
         key: "name",
         header: "Nama Sekolah",
         sortable: true,
-        cell: (row) => (
-          <span className="font-medium text-foreground">{row.name}</span>
-        ),
+        cell: (row) => <span className="font-medium text-foreground">{row.name}</span>,
       },
       {
         key: "jenjang",
         header: "Jenjang",
         sortable: true,
-        cell: (row) => (
-          <StatusChip tone={jenjangTone(row.jenjang)}>{row.jenjang}</StatusChip>
-        ),
+        cell: (row) => <StatusChip tone={jenjangTone(row.jenjang)}>{row.jenjang}</StatusChip>,
       },
       {
         key: "students",
         header: "Siswa",
         sortable: true,
         align: "right",
-        cell: (row) => (
-          <span className="font-mono tabular-nums">{row.students}</span>
-        ),
+        cell: (row) => <span className="font-mono tabular-nums">{row.students}</span>,
       },
       {
         key: "attendance",
         header: "Kehadiran %",
         sortable: true,
         align: "right",
-        cell: (row) => (
-          <span className="font-mono tabular-nums">{row.attendance}%</span>
-        ),
+        cell: (row) => <span className="font-mono tabular-nums">{row.attendance}%</span>,
       },
       {
         key: "spp",
         header: "SPP %",
         sortable: true,
         align: "right",
-        cell: (row) => (
-          <span className="font-mono tabular-nums">{row.spp}%</span>
-        ),
+        cell: (row) => <span className="font-mono tabular-nums">{row.spp}%</span>,
       },
       {
         key: "status",
@@ -259,8 +277,7 @@ function YayasanContent({ me }: { me: UserMe }) {
 
   const jenjangCount = new Set(rows.map((row) => row.jenjang)).size;
   const jenjangList = Array.from(new Set(rows.map((row) => row.jenjang))).join(" · ");
-  const kpiHint =
-    status === "error" ? "Perkiraan — gagal memuat data langsung" : undefined;
+  const kpiHint = status === "error" ? "Perkiraan — gagal memuat data langsung" : undefined;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
@@ -346,9 +363,8 @@ function YayasanContent({ me }: { me: UserMe }) {
         <CardHeader className="flex-wrap items-center border-b border-outline-variant pb-3">
           <CardTitle>Perbandingan Antar Sekolah</CardTitle>
           <p className="text-2xs text-muted-foreground">
-            Status sehat jika kehadiran ≥{" "}
-            <span className="font-mono tabular-nums">93%</span> dan SPP ≥{" "}
-            <span className="font-mono tabular-nums">85%</span>
+            Status sehat jika kehadiran ≥ <span className="font-mono tabular-nums">93%</span> dan
+            SPP ≥ <span className="font-mono tabular-nums">85%</span>
           </p>
         </CardHeader>
         <CardBody className="pt-4">
@@ -390,10 +406,7 @@ function YayasanContent({ me }: { me: UserMe }) {
             </span>
           </CardHeader>
           <CardBody>
-            <BarList
-              items={barItems}
-              ariaLabel="Jumlah pengguna per tenant"
-            />
+            <BarList items={barItems} ariaLabel="Jumlah pengguna per tenant" />
           </CardBody>
         </Card>
 
@@ -407,12 +420,8 @@ function YayasanContent({ me }: { me: UserMe }) {
               <div className="flex items-center gap-2">
                 <Activity className="h-4 w-4 text-success" aria-hidden />
                 <div>
-                  <p className="text-sm font-medium text-foreground">
-                    Ketersediaan layanan
-                  </p>
-                  <p className="text-2xs text-muted-foreground">
-                    30 hari terakhir
-                  </p>
+                  <p className="text-sm font-medium text-foreground">Ketersediaan layanan</p>
+                  <p className="text-2xs text-muted-foreground">30 hari terakhir</p>
                 </div>
               </div>
               <span className="font-mono text-sm font-semibold tabular-nums text-success">
@@ -423,9 +432,7 @@ function YayasanContent({ me }: { me: UserMe }) {
               <div className="flex items-center gap-2">
                 <RefreshCw className="h-4 w-4 text-success" aria-hidden />
                 <div>
-                  <p className="text-sm font-medium text-foreground">
-                    Sinkronisasi tenant
-                  </p>
+                  <p className="text-sm font-medium text-foreground">Sinkronisasi tenant</p>
                   <p className="text-2xs text-muted-foreground">
                     {jenjangCount} dari {jenjangCount} tenant
                   </p>
@@ -437,12 +444,8 @@ function YayasanContent({ me }: { me: UserMe }) {
               <div className="flex items-center gap-2">
                 <Save className="h-4 w-4 text-warning" aria-hidden />
                 <div>
-                  <p className="text-sm font-medium text-foreground">
-                    Backup terakhir
-                  </p>
-                  <p className="text-2xs text-muted-foreground">
-                    Jadwal: setiap 24 jam
-                  </p>
+                  <p className="text-sm font-medium text-foreground">Backup terakhir</p>
+                  <p className="text-2xs text-muted-foreground">Jadwal: setiap 24 jam</p>
                 </div>
               </div>
               <StatusChip tone="warning">26 jam lalu</StatusChip>
@@ -455,9 +458,5 @@ function YayasanContent({ me }: { me: UserMe }) {
 }
 
 export default function YayasanDashboardPage() {
-  return (
-    <DashboardShell role="super_admin">
-      {(me) => <YayasanContent me={me} />}
-    </DashboardShell>
-  );
+  return <DashboardShell role="super_admin">{(me) => <YayasanContent me={me} />}</DashboardShell>;
 }

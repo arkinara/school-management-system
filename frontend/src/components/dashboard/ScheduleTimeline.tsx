@@ -1,12 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  AlertCircle,
-  CalendarDays,
-  LogIn,
-  RotateCcw,
-} from "lucide-react";
+import { AlertCircle, CalendarDays, LogIn, RotateCcw } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -109,15 +104,9 @@ export function ScheduleTimeline({ me, audience }: ScheduleTimelineProps) {
       .then(([lookupResult, scheduleResult]) => {
         if (!active) return;
         const [subjectPage, classPage, userPage] = lookupResult;
-        setSubjectNames(
-          Object.fromEntries(subjectPage.items.map((s) => [s.id, s.name]))
-        );
-        setClassNames(
-          Object.fromEntries(classPage.items.map((c) => [c.id, c.name]))
-        );
-        setTeacherNames(
-          Object.fromEntries(userPage.items.map((u) => [u.id, u.full_name]))
-        );
+        setSubjectNames(Object.fromEntries(subjectPage.items.map((s) => [s.id, s.name])));
+        setClassNames(Object.fromEntries(classPage.items.map((c) => [c.id, c.name])));
+        setTeacherNames(Object.fromEntries(userPage.items.map((u) => [u.id, u.full_name])));
         setSessions(sortSessions(scheduleResult.records));
         setClassName(scheduleResult.label);
         setStatus("ready");
@@ -132,9 +121,7 @@ export function ScheduleTimeline({ me, audience }: ScheduleTimelineProps) {
   }, [audience, me.user.id, reloadKey]);
 
   const todayName = indonesianDayName(new Date());
-  const todaySessions = sessions.filter(
-    (record) => record.day_of_week.toLowerCase() === todayName
-  );
+  const todaySessions = sessions.filter((record) => record.day_of_week.toLowerCase() === todayName);
 
   const grouped = React.useMemo(() => {
     const groups = new Map<string, ScheduleRecord[]>();
@@ -152,10 +139,7 @@ export function ScheduleTimeline({ me, audience }: ScheduleTimelineProps) {
 
   function renderRow(record: ScheduleRecord, index: number) {
     return (
-      <li
-        key={record.id}
-        className="flex flex-wrap items-center gap-3 px-5 py-3"
-      >
+      <li key={record.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
         <span className="w-20 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
           {timeRange(record)}
         </span>
@@ -172,9 +156,8 @@ export function ScheduleTimeline({ me, audience }: ScheduleTimelineProps) {
           </p>
           <p className="truncate text-2xs text-muted-foreground">
             {audience === "teacher"
-              ? classNames[record.class_id] ?? `Kelas #${record.class_id}`
-              : teacherNames[record.teacher_id] ??
-                `Guru #${record.teacher_id}`}
+              ? (classNames[record.class_id] ?? `Kelas #${record.class_id}`)
+              : (teacherNames[record.teacher_id] ?? `Guru #${record.teacher_id}`)}
             {" · "}
             jam ke-{record.period_number}
           </p>
@@ -183,9 +166,7 @@ export function ScheduleTimeline({ me, audience }: ScheduleTimelineProps) {
           variant="outlined"
           icon={LogIn}
           type="button"
-          onClick={() =>
-            setToast("Fitur masuk kelas akan tersedia pada rilis berikutnya.")
-          }
+          onClick={() => setToast("Fitur masuk kelas akan tersedia pada rilis berikutnya.")}
         >
           Masuk Kelas
         </Button>
@@ -197,9 +178,7 @@ export function ScheduleTimeline({ me, audience }: ScheduleTimelineProps) {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-foreground">
-            Jadwal
-          </h1>
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">Jadwal</h1>
           <p className="text-xs text-muted-foreground">
             {audience === "teacher" ? "Guru" : "Siswa"}
             {className ? ` · ${className}` : ""}
@@ -261,9 +240,7 @@ export function ScheduleTimeline({ me, audience }: ScheduleTimelineProps) {
               />
             </CardBody>
           ) : (
-            <ol className="divide-y divide-outline-variant">
-              {todaySessions.map(renderRow)}
-            </ol>
+            <ol className="divide-y divide-outline-variant">{todaySessions.map(renderRow)}</ol>
           )}
         </Card>
       ) : sessions.length === 0 ? (
@@ -286,9 +263,7 @@ export function ScheduleTimeline({ me, audience }: ScheduleTimelineProps) {
                   </span>
                 )}
               </CardHeader>
-              <ol className="divide-y divide-outline-variant">
-                {group.records.map(renderRow)}
-              </ol>
+              <ol className="divide-y divide-outline-variant">{group.records.map(renderRow)}</ol>
             </Card>
           ))}
         </div>

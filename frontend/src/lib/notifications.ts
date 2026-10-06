@@ -31,9 +31,7 @@ export interface NotificationsResult {
 /** Polls the aggregated notification feed and exposes read mutations. */
 export function useNotifications(): NotificationsResult {
   const [notifications, setNotifications] = React.useState<AppNotification[]>([]);
-  const [status, setStatus] = React.useState<"loading" | "ready" | "error">(
-    "loading"
-  );
+  const [status, setStatus] = React.useState<"loading" | "ready" | "error">("loading");
   const [reloadKey, setReloadKey] = React.useState(0);
   const userIdRef = React.useRef<number | undefined>(undefined);
   const mountedRef = React.useRef(true);
@@ -81,9 +79,7 @@ export function useNotifications(): NotificationsResult {
 
   const markAllRead = React.useCallback(() => {
     const ids = notifications.map((item) => item.id);
-    setNotifications((current) =>
-      current.map((item) => ({ ...item, read: true }))
-    );
+    setNotifications((current) => current.map((item) => ({ ...item, read: true })));
     void markAllNotificationsRead(ids);
   }, [notifications]);
 

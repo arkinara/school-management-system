@@ -2,14 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import {
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle2,
-  Receipt,
-  RotateCcw,
-  Users,
-} from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, Receipt, RotateCcw, Users } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -87,8 +80,7 @@ function SppGenerateContent() {
         if (page.items[0]) setClassId(String(page.items[0].id));
       })
       .catch(() => {
-        if (active)
-          setToast({ message: "Gagal memuat daftar kelas.", tone: "error" });
+        if (active) setToast({ message: "Gagal memuat daftar kelas.", tone: "error" });
       });
     return () => {
       active = false;
@@ -136,8 +128,7 @@ function SppGenerateContent() {
     if (!Number.isFinite(numericAmount) || numericAmount <= 0)
       nextErrors.amount = "Nominal harus lebih dari 0.";
     if (!dueDate) nextErrors.dueDate = "Tanggal jatuh tempo wajib diisi.";
-    else if (dueDate < todayIso)
-      nextErrors.dueDate = "Jatuh tempo tidak boleh di masa lalu.";
+    else if (dueDate < todayIso) nextErrors.dueDate = "Jatuh tempo tidak boleh di masa lalu.";
     setErrors(nextErrors);
     const firstInvalid = (Object.keys(nextErrors) as (keyof typeof errors)[])[0];
     if (firstInvalid === "classId") classRef.current?.focus();
@@ -169,8 +160,7 @@ function SppGenerateContent() {
         tone: "success",
       });
     } catch (err) {
-      const detail =
-        err instanceof ApiError ? err.detail : "Gagal membuat tagihan.";
+      const detail = err instanceof ApiError ? err.detail : "Gagal membuat tagihan.";
       setToast({ message: detail, tone: "error" });
       setConfirmOpen(false);
     } finally {
@@ -211,9 +201,7 @@ function SppGenerateContent() {
             {result.skipped.length > 0 && (
               <p className="text-2xs text-muted-foreground">
                 ID siswa dilewati:{" "}
-                <span className="font-mono tabular-nums">
-                  {result.skipped.join(", ")}
-                </span>
+                <span className="font-mono tabular-nums">{result.skipped.join(", ")}</span>
               </p>
             )}
             <div className="flex gap-2">
@@ -297,12 +285,7 @@ function SppGenerateContent() {
                   className={inputClass}
                 />
               </FormField>
-              <FormField
-                label="Jatuh Tempo"
-                htmlFor="spp-due"
-                required
-                error={errors.dueDate}
-              >
+              <FormField label="Jatuh Tempo" htmlFor="spp-due" required error={errors.dueDate}>
                 <input
                   id="spp-due"
                   ref={dueRef}
@@ -324,9 +307,7 @@ function SppGenerateContent() {
               htmlFor="spp-amount"
               required
               error={errors.amount}
-              helper={
-                Number(amount) > 0 ? formatRupiah(Number(amount)) : "Contoh: 350000"
-              }
+              helper={Number(amount) > 0 ? formatRupiah(Number(amount)) : "Contoh: 350000"}
             >
               <input
                 id="spp-amount"
@@ -406,8 +387,8 @@ function SppGenerateContent() {
               >
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                 <p className="text-2xs">
-                  {existingCount} tagihan untuk periode ini sudah ada. Proses
-                  bersifat idempoten — siswa tersebut akan dilewati.
+                  {existingCount} tagihan untuk periode ini sudah ada. Proses bersifat idempoten —
+                  siswa tersebut akan dilewati.
                 </p>
               </div>
             )}
@@ -443,11 +424,7 @@ function SppGenerateContent() {
 
       <ToastViewport>
         {toast && (
-          <Toast
-            message={toast.message}
-            tone={toast.tone}
-            onDismiss={() => setToast(null)}
-          />
+          <Toast message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />
         )}
       </ToastViewport>
     </div>

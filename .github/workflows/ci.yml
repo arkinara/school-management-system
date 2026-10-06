@@ -27,6 +27,9 @@ jobs:
       - name: Lint
         run: pnpm --filter frontend lint
 
+      - name: Prettier format check
+        run: pnpm --filter frontend format:check
+
       - name: Build (check)
         run: pnpm --filter frontend build
 
@@ -47,6 +50,16 @@ jobs:
       - name: Install dependencies
         working-directory: backend
         run: uv sync --frozen
+
+      - name: Migration check (alembic upgrade head + drift)
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./ci_migration_check.db
+        run: |
+          uv run alembic upgrade head
+          # `alembic check` exits non-zero if autogenerate would emit any ops,
+          # i.e. the models and the migration history are out of sync.
+          uv run alembic check
 
       - name: Lint (ruff)
         working-directory: backend

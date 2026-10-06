@@ -6,14 +6,15 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, inspect, select
 from sqlalchemy.orm import Session
 
 from app.auth.cleanup import cleanup_expired_tokens
+from app.auth.deps import get_current_user
 from app.db import models  # noqa: F401  (registers all models on Base.metadata)
-from app.db.models import Class, Student, Tenant, User
+from app.db.models import Class, Student, Tenant, User, UserRole
 from app.db.seed import main as seed_main
 from app.db.session import SessionLocal, create_all, engine, get_db
 from app.middleware.scope import TenantScopeMiddleware
@@ -139,9 +140,19 @@ def health() -> dict[str, str]:
 
 
 @app.get("/api/db-info")
-def db_info(db: Session = Depends(get_db)) -> dict[str, int]:
-    """Return table and seed row counts so QA can verify the seed ran."""
-    # scope: public
+def db_info(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    """Return table and seed row counts so QA can verify the seed ran.
+
+    Debug-only: restricted to ``super_admin`` and non-production environments.
+    """
+    # scope: super_admin
+    if user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="super_admin only")
+    if os.environ.get("ENVIRONMENT", "dev") not in ("dev", "test"):
+        raise HTTPException(status_code=403, detail="dev only")
     tables = len(models.Base.metadata.tables)
     users = db.scalar(select(func.count()).select_from(User)) or 0
     students = db.scalar(select(func.count()).select_from(Student)) or 0

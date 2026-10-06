@@ -21,14 +21,8 @@ export interface BarListProps {
  * Horizontal bullet bar list — inline, no chart library. The value is printed
  * beside every bar so the comparison is readable as text, not colour alone.
  */
-export function BarList({
-  items,
-  max,
-  ariaLabel,
-  className,
-}: BarListProps) {
-  const domain =
-    max ?? Math.max(1, ...items.map((item) => Math.max(0, item.value)));
+export function BarList({ items, max, ariaLabel, className }: BarListProps) {
+  const domain = max ?? Math.max(1, ...items.map((item) => Math.max(0, item.value)));
   return (
     <ul className={cn("flex flex-col gap-3", className)} aria-label={ariaLabel}>
       {items.map((item) => {
@@ -47,10 +41,7 @@ export function BarList({
               aria-label={`${item.label}: ${item.value}`}
             >
               <div
-                className={cn(
-                  "h-full rounded-full",
-                  item.toneClass ?? "bg-primary"
-                )}
+                className={cn("h-full rounded-full", item.toneClass ?? "bg-primary")}
                 style={{ width: `${pct}%` }}
               />
             </div>

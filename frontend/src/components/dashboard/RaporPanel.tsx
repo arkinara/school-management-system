@@ -1,13 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  AlertCircle,
-  Download,
-  FileText,
-  Printer,
-  RotateCcw,
-} from "lucide-react";
+import { AlertCircle, Download, FileText, Printer, RotateCcw } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -29,20 +23,13 @@ import type { UserMe } from "@/lib/auth";
 
 type LoadStatus = "loading" | "ready" | "error";
 
-const SEMESTERS = [
-  "Semester Genap 2025/2026",
-  "Semester Ganjil 2025/2026",
-] as const;
+const SEMESTERS = ["Semester Genap 2025/2026", "Semester Ganjil 2025/2026"] as const;
 
 function formatScore(value: number): string {
   return value.toFixed(2).replace(".", ",");
 }
 
-function NarrativeList({
-  entries,
-}: {
-  entries: { aspek: string; deskripsi: string }[];
-}) {
+function NarrativeList({ entries }: { entries: { aspek: string; deskripsi: string }[] }) {
   return (
     <ul className="divide-y divide-outline-variant">
       {entries.map((entry) => (
@@ -88,18 +75,14 @@ function NumericTable({
         <tbody className="divide-y divide-outline-variant">
           {entries.map((entry) => (
             <tr key={entry.subject_id} className="hover:bg-surface-container-low">
-              <td className="px-4 py-2.5 font-medium text-foreground">
-                {entry.subject}
-              </td>
+              <td className="px-4 py-2.5 font-medium text-foreground">{entry.subject}</td>
               <td
                 data-value={entry.score}
                 className="px-4 py-2.5 text-right font-mono tabular-nums text-foreground"
               >
                 {formatScore(entry.score)}
               </td>
-              <td className="px-4 py-2.5 text-muted-foreground">
-                {entry.deskripsi || "—"}
-              </td>
+              <td className="px-4 py-2.5 text-muted-foreground">{entry.deskripsi || "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -165,14 +148,10 @@ export interface RaporPanelProps {
 export function RaporPanel({ me, audience }: RaporPanelProps) {
   const [children, setChildren] = React.useState<ChildSummary[]>([]);
   const [studentName, setStudentName] = React.useState(me.user.full_name);
-  const [selectedStudentId, setSelectedStudentId] = React.useState<number | null>(
-    null
-  );
+  const [selectedStudentId, setSelectedStudentId] = React.useState<number | null>(null);
   const [semester, setSemester] = React.useState<string>(SEMESTERS[0]);
   const [available, setAvailable] = React.useState<Record<string, boolean>>({});
-  const [records, setRecords] = React.useState<
-    Record<string, ReportCardRecord | null>
-  >({});
+  const [records, setRecords] = React.useState<Record<string, ReportCardRecord | null>>({});
   const [rapor, setRapor] = React.useState<ReportCardRecord | null>(null);
   const [status, setStatus] = React.useState<LoadStatus>("loading");
   const [reloadKey, setReloadKey] = React.useState(0);
@@ -181,18 +160,15 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
   React.useEffect(() => {
     let active = true;
     setStatus("loading");
-    const loadChildren: Promise<
-      { id: number; full_name: string }[]
-    > =
+    const loadChildren: Promise<{ id: number; full_name: string }[]> =
       audience === "parent"
         ? fetchParentChildren(me.user.id).then((kids) =>
             kids.map((kid) => ({ id: kid.id, full_name: kid.full_name }))
           )
         : fetchStudents({ size: 100 }).then((page) => {
             const own =
-              page.items.find(
-                (student: StudentRecord) => student.user_id === me.user.id
-              ) ?? page.items[0];
+              page.items.find((student: StudentRecord) => student.user_id === me.user.id) ??
+              page.items[0];
             return own
               ? [
                   {
@@ -281,20 +257,15 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
   const hasAnyRecord = SEMESTERS.some((value) => records[value] != null);
   const selectedRecord = records[semester] ?? null;
   const notPublished =
-    status === "ready" &&
-    selectedRecord !== null &&
-    selectedRecord.status !== "published";
+    status === "ready" && selectedRecord !== null && selectedRecord.status !== "published";
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
       <div className="no-print flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-foreground">
-            Rapor
-          </h1>
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">Rapor</h1>
           <p className="text-xs text-muted-foreground">
-            {audience === "parent" ? "Orang Tua" : "Siswa"} · hasil belajar per
-            semester
+            {audience === "parent" ? "Orang Tua" : "Siswa"} · hasil belajar per semester
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -350,11 +321,7 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
               className={inputClass}
             >
               {SEMESTERS.map((value) => (
-                <option
-                  key={value}
-                  value={value}
-                  disabled={available[value] === false}
-                >
+                <option key={value} value={value} disabled={available[value] === false}>
                   {value}
                   {available[value] === false ? " (belum tersedia)" : ""}
                 </option>

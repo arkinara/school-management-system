@@ -10,12 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 import { navByRole, roleLabel, type Role } from "@/components/ui/nav-items";
-import {
-  getMe,
-  needsOnboarding,
-  type UserMe,
-  type UserRole,
-} from "@/lib/auth";
+import { getMe, needsOnboarding, type UserMe, type UserRole } from "@/lib/auth";
 
 /** Backend auth roles → the navigation-rail role vocabulary. */
 const NAV_ROLE: Record<UserRole, Role> = {
@@ -53,9 +48,7 @@ export function DashboardShell({
 }: DashboardShellProps) {
   const router = useRouter();
   const [me, setMe] = React.useState<UserMe | null>(null);
-  const [status, setStatus] = React.useState<"loading" | "ready" | "denied" | "error">(
-    "loading"
-  );
+  const [status, setStatus] = React.useState<"loading" | "ready" | "denied" | "error">("loading");
   // Join to a primitive so a freshly-created `allow` array does not re-trigger
   // the profile fetch on every render.
   const allowKey = allow.join(",");
@@ -73,8 +66,7 @@ export function DashboardShell({
           router.replace("/onboarding");
           return;
         }
-        const permitted =
-          profile.role === role || allowKey.split(",").includes(profile.role);
+        const permitted = profile.role === role || allowKey.split(",").includes(profile.role);
         setMe(profile);
         setStatus(permitted ? "ready" : "denied");
       })
@@ -87,10 +79,7 @@ export function DashboardShell({
   }, [allowKey, role, router]);
 
   const navRole = NAV_ROLE[role];
-  const go = React.useCallback(
-    (item: { href: string }) => router.push(item.href),
-    [router]
-  );
+  const go = React.useCallback((item: { href: string }) => router.push(item.href), [router]);
 
   if (status === "loading") {
     return (
@@ -162,9 +151,7 @@ export function DashboardShell({
           onNavigate={go}
           className="hidden md:flex"
         />
-        <main className="min-w-0 flex-1 px-3 pb-24 pt-4 sm:px-5 md:pb-8">
-          {children(me)}
-        </main>
+        <main className="min-w-0 flex-1 px-3 pb-24 pt-4 sm:px-5 md:pb-8">{children(me)}</main>
       </div>
       <BottomNav items={navByRole[navRole]} active="home" onNavigate={go} />
     </div>

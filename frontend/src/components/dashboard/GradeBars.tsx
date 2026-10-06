@@ -24,12 +24,7 @@ export function gradeTone(score: number): string {
  * Per-subject bullet bars — inline, no chart library. The numeric score is
  * printed beside every bar so the value is readable without relying on colour.
  */
-export function GradeBars({
-  items,
-  ariaLabel,
-  max = 100,
-  className,
-}: GradeBarsProps) {
+export function GradeBars({ items, ariaLabel, max = 100, className }: GradeBarsProps) {
   return (
     <ul className={cn("flex flex-col gap-3", className)} aria-label={ariaLabel}>
       {items.map((item) => {
@@ -37,9 +32,7 @@ export function GradeBars({
         return (
           <li key={item.subject}>
             <div className="flex items-center justify-between gap-2 text-xs">
-              <span className="truncate text-muted-foreground">
-                {item.subject}
-              </span>
+              <span className="truncate text-muted-foreground">{item.subject}</span>
               <span className="shrink-0 font-mono font-medium tabular-nums text-foreground">
                 {item.score}
               </span>
