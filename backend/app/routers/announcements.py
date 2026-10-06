@@ -194,6 +194,7 @@ def list_announcements(
     db: Session = Depends(get_db),
 ) -> AnnouncementListResponse:
     """List announcements visible to the caller's tenant/school/role."""
+    # scope: school
     conditions = []
     if user.role == UserRole.SUPER_ADMIN:
         pass
@@ -248,6 +249,7 @@ def get_announcement(
     db: Session = Depends(get_db),
 ) -> AnnouncementOut:
     """Read one announcement; drafts are author/admin only."""
+    # scope: school
     announcement = db.get(Announcement, announcement_id)
     if announcement is None:
         raise HTTPException(

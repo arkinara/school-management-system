@@ -150,6 +150,7 @@ def list_grades(
     db: Session = Depends(get_db),
 ) -> GradeListResponse:
     """List grades inside the caller's scope with optional filters."""
+    # scope: school
     allowed_students = visible_student_ids(db, user)
     conditions = []
     if allowed_students is not None:
@@ -190,6 +191,7 @@ def aggregate_grades(
     db: Session = Depends(get_db),
 ) -> GradeAggregate:
     """Per-subject averages plus an overall average for a student/semester."""
+    # scope: school
     student = db.get(Student, student_id)
     if student is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="student not found")
@@ -241,6 +243,7 @@ def list_student_grades(
     db: Session = Depends(get_db),
 ) -> GradeListResponse:
     """Paginated grades for one student inside the caller's scope."""
+    # scope: school
     student = db.get(Student, student_id)
     if student is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="student not found")

@@ -260,6 +260,7 @@ def cleanup_tokens(
 @router.get("/me", response_model=UserMe)
 def me(user: User = Depends(get_current_user)) -> UserMe:
     """Return the authenticated user's profile plus resolved JWT claims."""
+    # scope: self
     return UserMe(
         user=UserOut.model_validate(user),
         tenant_id=user.tenant_id,

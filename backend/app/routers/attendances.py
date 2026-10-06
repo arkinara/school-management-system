@@ -148,6 +148,7 @@ def list_attendances(
     db: Session = Depends(get_db),
 ) -> AttendanceListResponse:
     """List attendance within the caller's scope, with optional filters."""
+    # scope: school
     allowed_classes = visible_class_ids(db, user)
     allowed_students = visible_student_ids(db, user)
 
@@ -192,6 +193,7 @@ def today_summary(
     db: Session = Depends(get_db),
 ) -> AttendanceTodaySummary:
     """Today's attendance plus per-status counts, scoped to the caller."""
+    # scope: school
     today = date_type.today()
     allowed_classes = visible_class_ids(db, user)
     allowed_students = visible_student_ids(db, user)
@@ -223,6 +225,7 @@ def list_student_attendances(
     db: Session = Depends(get_db),
 ) -> AttendanceListResponse:
     """Paginated attendance for one student inside the caller's scope."""
+    # scope: school
     student = db.get(Student, student_id)
     if student is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="student not found")

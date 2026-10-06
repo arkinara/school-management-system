@@ -11,6 +11,11 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user, require_role
 from app.db.models import Class, Schedule, School, Subject, User, UserRole
+from app.db.scoping import (
+    can_user_read_class,
+    log_scope_denial,
+    visible_school_ids,
+)
 from app.db.session import get_db
 from app.pagination import PageParams
 from app.schemas.schedule import (
@@ -135,17 +140,23 @@ def _find_conflict(
     period_number: int,
     start_time: time,
     end_time: time,
+    school_id: int,
     exclude_id: int | None = None,
 ) -> Schedule | None:
-    """Return the first entry clashing on the class or teacher dimension."""
+    """Return the first entry clashing on the class or teacher dimension.
+
+    Conflicts are only considered within ``school_id`` so a hidden schedule in
+    another school of the same tenant can never surface (or be inferred) here.
+    """
     overlap = (Schedule.start_time < end_time) & (Schedule.end_time > start_time)
-    conditions = [Schedule.day_of_week == day_of_week]
+    conditions = [Schedule.day_of_week == day_of_week, Class.school_id == school_id]
     if exclude_id is not None:
         conditions.append(Schedule.id != exclude_id)
 
     class_conflict = or_(Schedule.period_number == period_number, overlap)
     row = db.scalar(
         select(Schedule)
+        .join(Class, Class.id == Schedule.class_id)
         .where(*conditions, Schedule.class_id == class_id, class_conflict)
         .order_by(Schedule.id)
     )
@@ -153,6 +164,7 @@ def _find_conflict(
         return row
     return db.scalar(
         select(Schedule)
+        .join(Class, Class.id == Schedule.class_id)
         .where(*conditions, Schedule.teacher_id == teacher_id, overlap)
         .order_by(Schedule.id)
     )
@@ -198,6 +210,7 @@ def create_schedule(
         period_number=payload.period_number,
         start_time=payload.start_time,
         end_time=payload.end_time,
+        school_id=school.id,
     )
     if conflict is not None:
         raise _conflict_error(conflict)
@@ -248,6 +261,7 @@ def create_schedule_bulk(
             period_number=slot.period_number,
             start_time=slot.start_time,
             end_time=slot.end_time,
+            school_id=school.id,
         )
         if conflict is not None:
             raise _conflict_error(conflict)
@@ -304,10 +318,12 @@ def list_schedules(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ScheduleListResponse:
-    """List schedule entries within the caller's tenant, paginated."""
+    """List schedule entries within the caller's visible schools, paginated."""
+    # scope: school
     conditions = []
     if user.role != UserRole.SUPER_ADMIN:
         conditions.append(School.tenant_id == user.tenant_id)
+        conditions.append(School.id.in_(visible_school_ids(db, user)))
     if class_id is not None:
         klass = _load_class(db, class_id)
         if user.role != UserRole.SUPER_ADMIN:
@@ -362,11 +378,23 @@ def teacher_schedule(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[ScheduleOut]:
-    """A teacher's full weekly timetable (ordered day then period)."""
+    """A teacher's full weekly timetable (self, or admin/principal, or super_admin)."""
+    # scope: school
     teacher = db.get(User, teacher_id)
     if teacher is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="teacher not found")
     if user.role != UserRole.SUPER_ADMIN and teacher.tenant_id != user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    if user.role not in (UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PRINCIPAL) and (
+        user.id != teacher_id or user.school_id != teacher.school_id
+    ):
+        log_scope_denial(
+            db,
+            user,
+            resource="teacher_schedule",
+            resource_id=teacher_id,
+            reason="teacher may only read own schedule",
+        )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     rows = db.scalars(
         select(Schedule)
@@ -382,12 +410,22 @@ def class_schedule(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[ScheduleOut]:
-    """A class's full weekly timetable (ordered day then period)."""
+    """A class's full weekly timetable (visible school only; ordered day then period)."""
+    # scope: school
     klass = _load_class(db, class_id)
     if user.role != UserRole.SUPER_ADMIN:
         school = _school_or_404(db, klass.school_id)
         if school.tenant_id != user.tenant_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    if user.role != UserRole.SUPER_ADMIN and not can_user_read_class(db, user, class_id):
+        log_scope_denial(
+            db,
+            user,
+            resource="class_schedule",
+            resource_id=class_id,
+            reason="cross-school read blocked",
+        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="class not found")
     rows = db.scalars(
         select(Schedule)
         .where(Schedule.class_id == class_id)
@@ -436,6 +474,7 @@ def update_schedule(
         period_number=period_number,
         start_time=start_time,
         end_time=end_time,
+        school_id=school.id,
         exclude_id=entry.id,
     )
     if conflict is not None:

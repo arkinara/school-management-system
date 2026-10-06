@@ -62,6 +62,7 @@ def list_subjects(
     db: Session = Depends(get_db),
 ) -> SubjectListResponse:
     """List subjects in the caller's tenant, optionally filtered by grade/category."""
+    # scope: tenant
     conditions = []
     if user.role != UserRole.SUPER_ADMIN:
         conditions.append(Subject.tenant_id == user.tenant_id)
@@ -96,6 +97,7 @@ def get_subject(
     db: Session = Depends(get_db),
 ) -> SubjectOut:
     """Read one subject; cross-tenant access by non-super_admin is 403."""
+    # scope: tenant
     subject = db.get(Subject, subject_id)
     if subject is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="subject not found")

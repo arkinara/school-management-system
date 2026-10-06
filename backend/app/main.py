@@ -127,18 +127,21 @@ app.include_router(audit.router, prefix="/api/audit-log", tags=["audit-log"])
 @app.get("/")
 def root() -> dict[str, str]:
     """Service identity probe."""
+    # scope: public
     return {"name": "School Management System API", "version": "0.1.0"}
 
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
     """Liveness probe used by CI and load balancers."""
+    # scope: public
     return {"status": "ok"}
 
 
 @app.get("/api/db-info")
 def db_info(db: Session = Depends(get_db)) -> dict[str, int]:
     """Return table and seed row counts so QA can verify the seed ran."""
+    # scope: public
     tables = len(models.Base.metadata.tables)
     users = db.scalar(select(func.count()).select_from(User)) or 0
     students = db.scalar(select(func.count()).select_from(Student)) or 0

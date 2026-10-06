@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.db.models import School, Student, User, UserRole
+from app.db.scoping import log_scope_denial, visible_school_ids
 from app.db.session import get_db
 from app.linking import (
     add_link,
@@ -65,16 +66,41 @@ def _require_same_tenant(user: User, parent: User) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
 
+def _can_read_parent(user: User, parent: User) -> bool:
+    """Read gate for a specific parent: self, super_admin, or same-school admin."""
+    if user.role == UserRole.SUPER_ADMIN:
+        return parent.tenant_id == user.tenant_id
+    if user.id == parent.id:
+        return True
+    if user.role in _ADMIN_ROLES:
+        return parent.tenant_id == user.tenant_id and parent.school_id == user.school_id
+    return False
+
+
+def _require_readable_parent(db: Session, user: User, parent: User) -> None:
+    if not _can_read_parent(user, parent):
+        log_scope_denial(
+            db,
+            user,
+            resource="parent",
+            resource_id=parent.id,
+            reason="cross-school/relationship read blocked",
+        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
+
 @router.get("", response_model=ParentListResponse)
 def list_parents(
     page: PageParams = Depends(PageParams),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ParentListResponse:
-    """List parent users in the caller's tenant (super_admin sees all)."""
+    """List parent users in the caller's school (super_admin sees all)."""
+    # scope: school
     conditions = [User.role == UserRole.PARENT]
     if user.role != UserRole.SUPER_ADMIN:
         conditions.append(User.tenant_id == user.tenant_id)
+        conditions.append(User.school_id.in_(visible_school_ids(db, user)))
 
     total = db.scalar(select(func.count()).select_from(User).where(*conditions)) or 0
     rows = db.scalars(
@@ -98,9 +124,10 @@ def get_parent(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ParentOut:
-    """Read a parent and their linked children (same tenant only)."""
+    """Read a parent and their linked children (self, same-school admin, super_admin)."""
+    # scope: school
     parent = _get_parent_or_404(db, parent_id)
-    _require_same_tenant(user, parent)
+    _require_readable_parent(db, user, parent)
     return _parent_out(db, parent)
 
 
@@ -110,9 +137,10 @@ def list_parent_children(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[ChildSummary]:
-    """Sibling lookup: all students linked to a parent."""
+    """Sibling lookup: all students linked to a parent the caller may read."""
+    # scope: school
     parent = _get_parent_or_404(db, parent_id)
-    _require_same_tenant(user, parent)
+    _require_readable_parent(db, user, parent)
     return build_children_summaries(db, parent.id)
 
 

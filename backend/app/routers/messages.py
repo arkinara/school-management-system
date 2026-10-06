@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.db.models import Message, MessageThread, School, User, UserRole, utcnow
+from app.db.scoping import can_user_read_school
 from app.db.session import get_db
 from app.pagination import PageParams
 from app.schemas.message import (
@@ -99,6 +100,16 @@ def create_thread(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="cannot add a participant from another tenant",
             )
+        if (
+            user.role != UserRole.SUPER_ADMIN
+            and member.school_id is not None
+            and user.school_id is not None
+            and member.school_id != user.school_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="cannot add a participant from another school",
+            )
 
     school_id = payload.school_id if payload.school_id is not None else user.school_id
     if school_id is not None:
@@ -108,7 +119,10 @@ def create_thread(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="school_id does not exist",
             )
-        if user.role != UserRole.SUPER_ADMIN and school.tenant_id != user.tenant_id:
+        if user.role != UserRole.SUPER_ADMIN and (
+            school.tenant_id != user.tenant_id
+            or not can_user_read_school(db, user, school_id)
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="cannot target another tenant's school",
@@ -133,6 +147,7 @@ def list_threads(
     db: Session = Depends(get_db),
 ) -> MessageThreadListResponse:
     """List threads the caller participates in (moderators: own school)."""
+    # scope: participant
     stmt = select(MessageThread)
     if user.role != UserRole.SUPER_ADMIN:
         stmt = stmt.where(MessageThread.tenant_id == user.tenant_id)
@@ -155,6 +170,7 @@ def get_thread(
     db: Session = Depends(get_db),
 ) -> MessageThreadOut:
     """Read one thread (participant or same-school moderator)."""
+    # scope: participant
     thread = _load_thread(db, thread_id)
     if not _can_read_thread(thread, user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
@@ -168,9 +184,10 @@ def list_messages(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MessageListResponse:
-    """List messages chronologically; marks the caller's unread as read."""
+    """List messages chronologically; caller must be a participant in the thread's school."""
+    # scope: participant
     thread = _load_thread(db, thread_id)
-    if not _is_participant(thread, user):
+    if not _is_participant(thread, user) or not _same_school(user, thread):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
     unread = db.scalars(

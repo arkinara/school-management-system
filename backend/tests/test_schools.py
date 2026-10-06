@@ -123,7 +123,7 @@ def test_list_schools_pagination_respected(client: TestClient, db_session: Sessi
         headers=_auth(PRINCIPAL),
         json={"tenant_id": 1, "name": "SDN Paging 2", "address": "Jl. P2"},
     )
-    response = client.get("/api/schools?page=1&size=1", headers=_auth(PRINCIPAL))
+    response = client.get("/api/schools?page=1&size=1", headers=_auth(SUPER))
     assert response.status_code == 200, response.text
     body = response.json()
     assert len(body["items"]) == 1

@@ -244,6 +244,7 @@ def list_bills(
     db: Session = Depends(get_db),
 ) -> SppBillListResponse:
     """List bills within the caller's scope (parents: own children only)."""
+    # scope: school
     conditions = []
     scope = _scope_student_condition(user, db)
     if scope is not None:
@@ -288,6 +289,7 @@ def list_overdue_bills(
     db: Session = Depends(get_db),
 ) -> SppBillListResponse:
     """Bills that are overdue or unpaid past their due date (TU follow-up)."""
+    # scope: school
     today = date_type.today()
     conditions = [
         or_(
@@ -328,6 +330,7 @@ def get_bill(
     db: Session = Depends(get_db),
 ) -> SppBillOut:
     """Read one bill inside the caller's scope."""
+    # scope: school
     bill = _bill_or_404(db, bill_id)
     student = db.get(Student, bill.student_id)
     allowed = visible_student_ids(db, user)
@@ -473,6 +476,7 @@ def list_payments(
     db: Session = Depends(get_db),
 ) -> SppPaymentListResponse:
     """List payments within the caller's scope."""
+    # scope: school
     conditions = []
     scope = _scope_student_condition(user, db)
     if scope is not None:
@@ -527,6 +531,7 @@ def spp_summary(
     db: Session = Depends(get_db),
 ) -> SppSummary:
     """Collection rate, totals and overdue count for the caller's scope."""
+    # scope: school
     today = date_type.today()
     conditions = []
     scope = _scope_student_condition(user, db)

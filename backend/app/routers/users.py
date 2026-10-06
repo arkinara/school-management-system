@@ -67,6 +67,7 @@ def list_users(
     db: Session = Depends(get_db),
 ) -> UserListResponse:
     """List users in the caller's tenant (super_admin sees every tenant)."""
+    # scope: school
     conditions = []
     if user.role != UserRole.SUPER_ADMIN:
         conditions.append(User.tenant_id == user.tenant_id)
@@ -105,6 +106,7 @@ def get_user(
     db: Session = Depends(get_db),
 ) -> UserOut:
     """Read a user: self, same-school admin/principal, or super_admin."""
+    # scope: school
     target = db.get(User, user_id)
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")

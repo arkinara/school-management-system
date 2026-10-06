@@ -8,6 +8,11 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.db.models import Class, School, Tenant, User, UserRole
+from app.db.scoping import (
+    can_user_read_school,
+    log_scope_denial,
+    visible_school_ids,
+)
 from app.db.session import get_db
 from app.pagination import PageParams
 from app.schemas.school import (
@@ -59,11 +64,13 @@ def list_schools(
     db: Session = Depends(get_db),
 ) -> SchoolListResponse:
     """List schools in the caller's tenant (super_admin may filter any tenant)."""
+    # scope: school
     conditions = []
     if user.role != UserRole.SUPER_ADMIN:
         if tenant_id is not None and tenant_id != user.tenant_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
         conditions.append(School.tenant_id == user.tenant_id)
+        conditions.append(School.id.in_(visible_school_ids(db, user)))
     elif tenant_id is not None:
         conditions.append(School.tenant_id == tenant_id)
 
@@ -89,11 +96,19 @@ def get_school(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> SchoolOut:
-    """Read one school; 404 for cross-tenant access by non-super_admin."""
+    """Read one school; 404 for cross-tenant/cross-school access by non-super_admin."""
+    # scope: school
     school = db.get(School, school_id)
     if school is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="school not found")
-    if user.role != UserRole.SUPER_ADMIN and school.tenant_id != user.tenant_id:
+    if not can_user_read_school(db, user, school_id):
+        log_scope_denial(
+            db,
+            user,
+            resource="school",
+            resource_id=school_id,
+            reason="cross-school read blocked",
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="school not found")
     return SchoolOut.model_validate(school)
 
@@ -105,12 +120,12 @@ def update_school(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> SchoolOut:
-    """Update a school (principal of that school or super_admin)."""
+    """Update a school (principal/admin of that school or super_admin)."""
     school = db.get(School, school_id)
     if school is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="school not found")
     permitted = user.role == UserRole.SUPER_ADMIN or (
-        user.role == UserRole.PRINCIPAL and user.school_id == school.id
+        user.role in _ADMIN_ROLES and user.school_id == school.id
     )
     if not permitted:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")

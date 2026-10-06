@@ -9,6 +9,11 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.db.models import Class, School, Student, User, UserRole, parent_links
+from app.db.scoping import (
+    can_user_read_student,
+    log_scope_denial,
+    visible_school_ids,
+)
 from app.db.session import get_db
 from app.linking import (
     add_link,
@@ -65,7 +70,7 @@ def _validate_class(db: Session, school: School, class_id: int | None) -> None:
         )
 
 
-def _validate_parent(db: Session, parent_id: int, tenant_id: int) -> User:
+def _validate_parent(db: Session, parent_id: int, tenant_id: int, school_id: int) -> User:
     parent = db.get(User, parent_id)
     if parent is None or parent.role != UserRole.PARENT:
         raise HTTPException(
@@ -77,18 +82,16 @@ def _validate_parent(db: Session, parent_id: int, tenant_id: int) -> User:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="cannot link a parent from another tenant",
         )
+    if parent.school_id is not None and parent.school_id != school_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="cannot link a parent from another school",
+        )
     return parent
 
 
 def _can_view_student(db: Session, user: User, student: Student) -> bool:
-    if user.role == UserRole.SUPER_ADMIN:
-        return True
-    if user.id == student.user_id:
-        return True
-    school = db.get(School, student.school_id)
-    if _can_manage_school(user, school):
-        return True
-    return user.role == UserRole.PARENT and link_exists(db, user.id, student.id)
+    return can_user_read_student(db, user, student.id)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=StudentOut)
@@ -165,7 +168,7 @@ def create_student(
     db.flush()
 
     for parent_id in dict.fromkeys(payload.parent_ids or []):
-        _validate_parent(db, parent_id, school.tenant_id)
+        _validate_parent(db, parent_id, school.tenant_id, school.id)
         add_link(db, parent_id, student.id, "orang_tua", False)
 
     db.commit()
@@ -182,21 +185,23 @@ def list_students(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> StudentListResponse:
-    """List students scoped to tenant/school; parents see only their children."""
+    """List students scoped by role: self, linked children, own school, or tenant."""
+    # scope: school
     conditions = []
-    if user.role == UserRole.PARENT:
+    if user.role == UserRole.SUPER_ADMIN:
+        pass
+    elif user.role == UserRole.STUDENT:
+        conditions.append(Student.user_id == user.id)
+    elif user.role == UserRole.PARENT:
         conditions.append(
             Student.id.in_(
                 select(parent_links.c.student_id).where(parent_links.c.parent_id == user.id)
             )
         )
         conditions.append(School.tenant_id == user.tenant_id)
-    elif user.role == UserRole.SUPER_ADMIN:
-        pass
     else:
         conditions.append(School.tenant_id == user.tenant_id)
-        if user.role in _ADMIN_ROLES and user.school_id is not None:
-            conditions.append(Student.school_id == user.school_id)
+        conditions.append(Student.school_id.in_(visible_school_ids(db, user)))
 
     if school_id is not None:
         conditions.append(Student.school_id == school_id)
@@ -237,10 +242,18 @@ def get_student(
     db: Session = Depends(get_db),
 ) -> StudentOut:
     """Read one student: same-school staff, linked parent, self, or super_admin."""
+    # scope: school
     student = db.get(Student, student_id)
     if student is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="student not found")
     if not _can_view_student(db, user, student):
+        log_scope_denial(
+            db,
+            user,
+            resource="student",
+            resource_id=student_id,
+            reason="relationship/school scope blocked",
+        )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     return _student_out(db, student)
 
@@ -307,6 +320,7 @@ def list_student_parents(
     db: Session = Depends(get_db),
 ) -> list[ParentSummary]:
     """List a student's linked guardians."""
+    # scope: school
     student = db.get(Student, student_id)
     if student is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="student not found")
@@ -333,7 +347,7 @@ def link_student_parent(
     school = db.get(School, student.school_id)
     if not _can_manage_school(user, school):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
-    _validate_parent(db, payload.parent_user_id, school.tenant_id)
+    _validate_parent(db, payload.parent_user_id, school.tenant_id, school.id)
     if link_exists(db, payload.parent_user_id, student.id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="parent already linked"

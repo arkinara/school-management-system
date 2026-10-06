@@ -10,13 +10,42 @@ reason is supplied — the bypass is recorded in ``audit_logs``.
 from __future__ import annotations
 
 import logging
+from typing import TypeVar
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import AuditLog, User, UserRole
+from app.audit import log_audit_event
+from app.db.models import (
+    AuditLog,
+    Class,
+    Schedule,
+    School,
+    Student,
+    User,
+    UserRole,
+    parent_links,
+)
 
 logger = logging.getLogger("app.db.scoping")
+
+T = TypeVar("T")
+
+# Scope matrix (role -> visible set)
+#   super_admin : all schools in the caller's tenant
+#   principal   : own school only
+#   admin       : own school only
+#   teacher     : own school; student PII limited to own classes
+#   student     : self only
+#   parent      : own linked children only
+ROLE_SCOPE = {
+    UserRole.SUPER_ADMIN: "tenant",
+    UserRole.PRINCIPAL: "school",
+    UserRole.ADMIN: "school",
+    UserRole.TEACHER: "school_pii_limited",
+    UserRole.STUDENT: "self",
+    UserRole.PARENT: "children",
+}
 
 
 class MissingTenantContextError(ValueError):
@@ -90,3 +119,119 @@ def scoped_query(
         stmt = stmt.where(model.school_id == user.school_id)
 
     return stmt
+
+
+def log_scope_denial(
+    db: Session, user: User, *, resource: str, resource_id: int, reason: str
+) -> None:
+    """Best-effort audit record for a blocked cross-school/cross-tenant read."""
+    logger.info(
+        "scope denied: user=%s role=%s resource=%s:%s reason=%s",
+        user.id,
+        str(user.role),
+        resource,
+        resource_id,
+        reason,
+    )
+    try:
+        log_audit_event(
+            db,
+            user=user,
+            action="scope_access_denied",
+            entity_type=resource,
+            entity_id=resource_id,
+            detail=reason,
+        )
+    except Exception:  # noqa: BLE001 - audit must never block the denial path
+        logger.exception("failed to audit scope denial user=%s", user.id)
+
+
+def apply_school_scope(query: T, user: User, school_column) -> T:
+    """Filter ``query`` by the caller's school for school-level roles."""
+    if user.role == UserRole.SUPER_ADMIN:
+        return query
+    if user.school_id is None:
+        return query.where(False)
+    return query.where(school_column == user.school_id)
+
+
+def apply_tenant_scope(query: T, user: User, tenant_column) -> T:
+    """Filter ``query`` by the caller's tenant (the default scope)."""
+    if user.role == UserRole.SUPER_ADMIN:
+        return query
+    return query.where(tenant_column == user.tenant_id)
+
+
+def visible_school_ids(db: Session, user: User) -> list[int]:
+    """Return the school IDs the caller is allowed to read."""
+    if user.role == UserRole.SUPER_ADMIN:
+        return [
+            s.id
+            for s in db.scalars(
+                select(School).where(School.tenant_id == user.tenant_id)
+            ).all()
+        ]
+    if user.school_id is None:
+        return []
+    return [user.school_id]
+
+
+def can_user_read_school(db: Session, user: User, school_id: int) -> bool:
+    """Permission check for a specific school."""
+    if user.role == UserRole.SUPER_ADMIN:
+        school = db.get(School, school_id)
+        return school is not None and school.tenant_id == user.tenant_id
+    return user.school_id == school_id
+
+
+def can_user_read_class(db: Session, user: User, class_id: int) -> bool:
+    """Permission check for a specific class."""
+    cls = db.get(Class, class_id)
+    if cls is None:
+        return False
+    if user.role == UserRole.SUPER_ADMIN:
+        school = db.get(School, cls.school_id)
+        return school is not None and school.tenant_id == user.tenant_id
+    return cls.school_id == user.school_id
+
+
+def can_user_read_student(db: Session, user: User, student_id: int) -> bool:
+    """Relationship-aware permission check for a specific student."""
+    student = db.get(Student, student_id)
+    if student is None:
+        return False
+    if user.role == UserRole.SUPER_ADMIN:
+        school = db.get(School, student.school_id)
+        return school is not None and school.tenant_id == user.tenant_id
+    if user.role == UserRole.PARENT:
+        row = db.execute(
+            select(parent_links.c.parent_id).where(
+                parent_links.c.parent_id == user.id,
+                parent_links.c.student_id == student_id,
+            )
+        ).first()
+        return row is not None
+    if user.role == UserRole.STUDENT:
+        return student.user_id == user.id
+    if user.role in (UserRole.PRINCIPAL, UserRole.ADMIN):
+        return student.school_id == user.school_id
+    if user.role == UserRole.TEACHER:
+        if student.school_id != user.school_id:
+            return False
+        if student.class_id is None:
+            return False
+        cls = db.get(Class, student.class_id)
+        if cls is not None and cls.wali_kelas_id == user.id:
+            return True
+        return (
+            db.scalar(
+                select(Schedule.id)
+                .where(
+                    Schedule.class_id == student.class_id,
+                    Schedule.teacher_id == user.id,
+                )
+                .limit(1)
+            )
+            is not None
+        )
+    return False

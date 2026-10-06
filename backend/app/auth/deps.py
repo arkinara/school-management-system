@@ -18,6 +18,7 @@ from app.auth.jwt import (
     decode_access_token_strict,
 )
 from app.db.models import TokenDenylist, User, UserRole
+from app.db.scoping import can_user_read_school
 from app.db.session import get_db
 from app.middleware.scope import enforce_tenant_scope
 
@@ -178,6 +179,32 @@ def require_tenant_access(
                 school_id = request.query_params.get(school_id_param)
 
         enforce_tenant_scope(user, tenant_id, school_id)
+        return user
+
+    return _dependency
+
+
+def require_same_school(school_id_param: str = "school_id") -> Callable[..., User]:
+    """Dependency factory: the path/query ``school_id`` must be visible to the user."""
+
+    def _dependency(
+        request: Request,
+        user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> User:
+        raw = request.path_params.get(school_id_param)
+        if raw is None:
+            raw = request.query_params.get(school_id_param)
+        if raw is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="school not found",
+            )
+        if not can_user_read_school(db, user, int(raw)):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="school not found",
+            )
         return user
 
     return _dependency

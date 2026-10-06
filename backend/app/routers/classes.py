@@ -8,6 +8,11 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.db.models import Class, JenjangType, School, Student, Tenant, User, UserRole
+from app.db.scoping import (
+    can_user_read_class,
+    log_scope_denial,
+    visible_school_ids,
+)
 from app.db.session import get_db
 from app.pagination import PageParams
 from app.schemas.classes import ClassCreate, ClassListResponse, ClassOut, ClassUpdate
@@ -86,10 +91,12 @@ def list_classes(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ClassListResponse:
-    """List classes in the caller's tenant, optionally filtered by school/grade."""
+    """List classes in the caller's school, optionally filtered by school/grade."""
+    # scope: school
     conditions = []
     if user.role != UserRole.SUPER_ADMIN:
         conditions.append(School.tenant_id == user.tenant_id)
+        conditions.append(Class.school_id.in_(visible_school_ids(db, user)))
     if school_id is not None:
         conditions.append(Class.school_id == school_id)
     if grade_level is not None:
@@ -126,13 +133,23 @@ def get_class(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ClassOut:
-    """Read one class; cross-tenant access by non-super_admin is 403."""
+    """Read one class; cross-tenant/cross-school access by non-super_admin is blocked."""
+    # scope: school
     klass = db.get(Class, class_id)
     if klass is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="class not found")
     school = db.get(School, klass.school_id)
     if user.role != UserRole.SUPER_ADMIN and (school is None or school.tenant_id != user.tenant_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    if user.role != UserRole.SUPER_ADMIN and not can_user_read_class(db, user, class_id):
+        log_scope_denial(
+            db,
+            user,
+            resource="class",
+            resource_id=class_id,
+            reason="cross-school read blocked",
+        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="class not found")
     return ClassOut.model_validate(klass)
 
 

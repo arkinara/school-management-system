@@ -207,6 +207,7 @@ def list_report_cards(
     db: Session = Depends(get_db),
 ) -> ReportCardListResponse:
     """List rapors in scope; parents/students only ever see published ones."""
+    # scope: school
     allowed_students = visible_student_ids(db, user)
     conditions = []
     if allowed_students is not None:
@@ -248,6 +249,7 @@ def get_report_card(
     db: Session = Depends(get_db),
 ) -> ReportCardOut:
     """Read one rapor; drafts are invisible to parents/students."""
+    # scope: school
     report_card = db.get(ReportCard, report_card_id)
     if report_card is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="report card not found")

@@ -72,6 +72,7 @@ def list_audit_log(
     db: Session = Depends(get_db),
 ) -> AuditLogListResponse:
     """Paginated audit trail (super_admin: all; admin: own school)."""
+    # scope: audit
     conditions = _audit_conditions(
         user,
         user_id=user_id,
@@ -106,6 +107,7 @@ def list_entity_audit_log(
     db: Session = Depends(get_db),
 ) -> AuditLogListResponse:
     """Every event recorded for one entity (super_admin only)."""
+    # scope: audit
     if user.role != UserRole.SUPER_ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     conditions = [AuditLog.reason.like(f"%entity={entity_type}:{entity_id}%")]
@@ -131,6 +133,7 @@ def audit_summary(
     db: Session = Depends(get_db),
 ) -> AuditLogSummary:
     """Aggregate event counts by action over the trailing window (super_admin)."""
+    # scope: audit
     if user.role != UserRole.SUPER_ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 

@@ -75,6 +75,7 @@ def list_tenants(
     db: Session = Depends(get_db),
 ) -> list[TenantOut]:
     """List every tenant across the system (super_admin only)."""
+    # scope: tenant
     _require_super_admin(user)
     tenants = db.scalars(select(Tenant).order_by(Tenant.id)).all()
     return [_to_out(db, tenant) for tenant in tenants]
@@ -87,6 +88,7 @@ def get_tenant(
     db: Session = Depends(get_db),
 ) -> TenantOut:
     """Read one tenant: super_admin, or an admin/principal of that tenant."""
+    # scope: tenant
     tenant = db.get(Tenant, tenant_id)
     if tenant is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant not found")
