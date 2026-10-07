@@ -6,12 +6,20 @@ import { Building2, GraduationCap, School } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { cn } from "@/components/ui/cn";
-import { getMe, setOnboardedSchoolId, SEED_SCHOOLS, SEED_TENANTS, type UserMe } from "@/lib/auth";
+import {
+  completeOnboarding,
+  fetchSchoolsForTenant,
+  fetchTenants,
+  getMe,
+  persistAuth,
+  sanitizeNextPath,
+  type SchoolOption,
+} from "@/lib/auth";
 
 export default function OnboardingPage() {
   const router = useRouter();
 
-  const [me, setMe] = React.useState<UserMe | null>(null);
+  const [schools, setSchools] = React.useState<SchoolOption[]>([]);
   const [selected, setSelected] = React.useState<number | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [submitting, setSubmitting] = React.useState(false);
@@ -20,20 +28,25 @@ export default function OnboardingPage() {
   React.useEffect(() => {
     let active = true;
     getMe()
-      .then((profile) => {
+      .then(async (profile) => {
         if (!active) return;
         if (profile === null) {
           router.replace("/sign-in");
           return;
         }
-        if (profile.school_id !== null) {
-          router.replace("/dashboard");
+        const next = sanitizeNextPath(new URLSearchParams(window.location.search).get("next"));
+        if (profile.role === "super_admin" || profile.school_id !== null) {
+          router.replace(next ?? "/dashboard");
           return;
         }
-        setMe(profile);
+        const tenants = await fetchTenants();
+        const tenantId = profile.tenant_id ?? tenants[0]?.id;
+        if (tenantId === undefined) return;
+        const rows = await fetchSchoolsForTenant(tenantId);
+        if (active) setSchools(rows);
       })
       .catch(() => {
-        if (active) setError("Tidak dapat memuat profil. Coba lagi.");
+        if (active) setError("Tidak dapat memuat data. Coba lagi.");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -43,19 +56,26 @@ export default function OnboardingPage() {
     };
   }, [router]);
 
-  const isSuperAdmin = me?.role === "super_admin";
-  const options = isSuperAdmin ? SEED_TENANTS : SEED_SCHOOLS;
+  const options = schools;
 
-  function onConfirm() {
+  async function onConfirm() {
     if (selected === null) {
       setError("Pilih salah satu opsi terlebih dahulu.");
       return;
     }
     setSubmitting(true);
-    // v1: persist locally so the picker is skipped on the next visit. A future
-    // ticket adds PATCH /api/auth/me/school to persist server-side.
-    setOnboardedSchoolId(selected);
-    router.replace("/dashboard");
+    setError(null);
+    try {
+      const res = await completeOnboarding(selected);
+      persistAuth(res);
+      // Re-fetch so the profile reflects the new server-side school_id.
+      await getMe();
+      const next = sanitizeNextPath(new URLSearchParams(window.location.search).get("next"));
+      router.replace(next ?? "/dashboard");
+    } catch {
+      setError("Tidak dapat menyimpan pilihan. Coba lagi.");
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -68,9 +88,7 @@ export default function OnboardingPage() {
           Lengkapi Profil Anda
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {isSuperAdmin
-            ? "Pilih tenant yayasan yang ingin Anda kelola."
-            : "Pilih sekolah tempat Anda bertugas atau terdaftar."}
+          Pilih sekolah tempat Anda bertugas atau terdaftar.
         </p>
       </div>
 
@@ -91,14 +109,10 @@ export default function OnboardingPage() {
           />
         ) : (
           <>
-            <div
-              role="radiogroup"
-              aria-label={isSuperAdmin ? "Pilih tenant" : "Pilih sekolah"}
-              className="flex flex-col gap-2"
-            >
+            <div role="radiogroup" aria-label="Pilih sekolah" className="flex flex-col gap-2">
               {options.map((option) => {
                 const active = selected === option.id;
-                const Icon = isSuperAdmin ? Building2 : School;
+                const Icon = School;
                 return (
                   <button
                     key={option.id}
@@ -120,7 +134,7 @@ export default function OnboardingPage() {
                     <span className="flex-1">
                       <span className="block text-sm font-medium">{option.name}</span>
                       <span className="block text-xs text-muted-foreground">
-                        Jenjang {option.jenjang}
+                        Sekolah #{option.id}
                       </span>
                     </span>
                   </button>

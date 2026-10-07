@@ -8,7 +8,14 @@ import { Button } from "@/components/ui/Button";
 import { FormField, inputClass } from "@/components/ui/FormField";
 import { cn } from "@/components/ui/cn";
 import { ApiError, UnauthorizedError } from "@/lib/api";
-import { login, persistAuth, routeAfterAuth, SEED_TENANTS } from "@/lib/auth";
+import {
+  fetchTenants,
+  login,
+  persistAuth,
+  routeAfterAuth,
+  sanitizeNextPath,
+  type TenantOption,
+} from "@/lib/auth";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -21,6 +28,7 @@ export default function SignInPage() {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [tenantId, setTenantId] = React.useState("");
+  const [tenants, setTenants] = React.useState<TenantOption[]>([]);
   const [showTenant, setShowTenant] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
 
@@ -35,6 +43,18 @@ export default function SignInPage() {
     emailRef.current?.focus();
     const params = new URLSearchParams(window.location.search);
     setShowTenant(params.get("tenant") === null);
+
+    let active = true;
+    fetchTenants()
+      .then((rows) => {
+        if (active) setTenants(rows);
+      })
+      .catch(() => {
+        // A failed tenant list must not block email/password sign-in.
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   function validate(): boolean {
@@ -70,7 +90,9 @@ export default function SignInPage() {
         tenantId: tenantId ? Number(tenantId) : undefined,
       });
       persistAuth(res);
-      router.replace(routeAfterAuth(res.user));
+      const fallback = routeAfterAuth(res.user);
+      const next = sanitizeNextPath(new URLSearchParams(window.location.search).get("next"));
+      router.replace(fallback === "/onboarding" ? fallback : (next ?? fallback));
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         setFormError("Email atau kata sandi salah.");
@@ -127,9 +149,9 @@ export default function SignInPage() {
               className={cn(inputClass, "appearance-none")}
             >
               <option value="">Pilih sekolah (opsional)</option>
-              {SEED_TENANTS.map((t) => (
+              {tenants.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name} ({t.jenjang})
+                  {t.name} ({t.jenjang_type})
                 </option>
               ))}
             </select>

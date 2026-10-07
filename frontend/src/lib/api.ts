@@ -8,9 +8,13 @@
  *
  * Ticket #40: the short-lived access token (15m) is paired with a long-lived
  * refresh token (7d). `apiFetch` transparently refreshes once on a 401 and
- * retries the request; it never loops. Better Auth with httpOnly cookies is
- * deferred to #45 — until then both tokens live in localStorage (a known
- * limitation).
+ * retries the request; it never loops.
+ *
+ * Ticket #45: if the retry still 401s, the session is expired — tokens are
+ * cleared and the browser is sent to `/sign-in?next=<current path>` so the user
+ * lands back where they were after signing in. Better Auth was removed (see
+ * `docs/adr/001-better-auth-decision.md`); both tokens live in localStorage (a
+ * known limitation).
  */
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -21,6 +25,36 @@ export const TOKEN_COOKIE_NAME = "sms_auth_token";
 export const REFRESH_TOKEN_COOKIE_NAME = "sms_refresh_token";
 const TOKEN_MAX_AGE_SECONDS = 60 * 15;
 const REFRESH_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+
+/**
+ * Endpoints where a 401 means "wrong credentials", not "session expired".
+ * A failed sign-in/register must surface to the form instead of bouncing the
+ * user to `/sign-in` mid-submit.
+ */
+const AUTH_SUBMIT_PATHS = ["/api/auth/login", "/api/auth/register", "/api/auth/refresh"];
+
+function isAuthSubmitPath(path: string): boolean {
+  return AUTH_SUBMIT_PATHS.some((prefix) => path.startsWith(prefix));
+}
+
+/**
+ * Build a same-origin `/sign-in?next=` URL. `next` is only honored when it is
+ * an absolute path on this origin (rejects protocol-relative `//evil.com`).
+ */
+export function buildSignInUrl(next: string | null | undefined): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) {
+    return "/sign-in";
+  }
+  return `/sign-in?next=${encodeURIComponent(next)}`;
+}
+
+/** Clear local auth and hard-navigate to sign-in (once). */
+function redirectToSignIn(): void {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname.startsWith("/sign-in")) return;
+  const next = window.location.pathname + window.location.search;
+  window.location.href = buildSignInUrl(next);
+}
 
 /** Thrown when the backend answers 401; callers usually reset to sign-in. */
 export class UnauthorizedError extends Error {
@@ -193,7 +227,9 @@ export async function refreshTokens(): Promise<RefreshedTokens> {
  *
  * Prepends the API base URL, attaches the Bearer token when present, and on a
  * 401 with a stored refresh token refreshes once and retries exactly once.
- * A still-failing request clears the tokens and throws `UnauthorizedError`.
+ * A still-failing request clears the tokens, redirects to `/sign-in?next=...`
+ * and throws `UnauthorizedError`. Login/register 401s are surfaced as errors
+ * instead (they mean bad credentials, not an expired session).
  * `204 No Content` resolves to `undefined`.
  */
 export async function apiFetch<T>(path: string, opts: RequestInit = {}): Promise<T> {
@@ -215,18 +251,25 @@ export async function apiFetch<T>(path: string, opts: RequestInit = {}): Promise
 
   let res = await doFetch();
 
-  if (res.status === 401 && !path.includes("/api/auth/refresh") && hasRefreshToken()) {
+  const isAuthSubmit = isAuthSubmitPath(path);
+
+  if (res.status === 401 && hasRefreshToken() && !isAuthSubmit) {
     try {
+      // Refresh exactly once; a still-401 response falls through to the
+      // shared session-expired handling below (never loops).
       await refreshTokens();
       res = await doFetch();
     } catch {
-      // Refresh failed: fall through to the shared 401 handling below.
+      // Refresh failed: clear + redirect via the shared 401 branch.
     }
   }
 
   if (res.status === 401) {
     clearToken();
-    throw new UnauthorizedError();
+    // Credential endpoints surface the 401 to their form; everything else
+    // treats it as an expired session and bounces to sign-in exactly once.
+    if (!isAuthSubmit) redirectToSignIn();
+    throw new UnauthorizedError("session expired");
   }
 
   if (!res.ok) {

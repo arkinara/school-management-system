@@ -47,6 +47,17 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=8)
 
 
+class CompleteOnboarding(BaseModel):
+    """Finish onboarding by pinning the user to a school within their tenant.
+
+    ``tenant_id`` is accepted only so a mismatching value can be rejected; it is
+    never applied post-onboarding. Changing tenants requires an admin action.
+    """
+
+    school_id: int | None = None
+    tenant_id: int | None = None
+
+
 class UserMe(BaseModel):
     user: UserOut
     tenant_id: int

@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.schemas.tenant import TenantCreate, TenantOut, TenantUpdate
 
 router = APIRouter()
+public_router = APIRouter()
 
 _READ_ROLES = {UserRole.ADMIN, UserRole.PRINCIPAL}
 
@@ -36,6 +37,22 @@ def _to_out(db: Session, tenant: Tenant) -> TenantOut:
     out = TenantOut.model_validate(tenant)
     out.school_count = _school_count(db, tenant.id)
     return out
+
+
+@public_router.get("/api/public/tenants")
+def list_public_tenants(db: Session = Depends(get_db)) -> list[dict]:
+    """Public, unauthenticated — used by the sign-in/sign-up tenant picker.
+
+    Returns only ``id`` + ``name`` + ``jenjang_type`` (no config, no counts) so
+    unauthenticated clients learn nothing beyond the picker labels.
+    """
+    # scope: public
+    return [
+        {"id": t.id, "name": t.name, "jenjang_type": t.jenjang_type}
+        for t in db.scalars(
+            select(Tenant).order_by(Tenant.jenjang_type, Tenant.name)
+        ).all()
+    ]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=TenantOut)

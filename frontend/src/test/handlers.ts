@@ -318,4 +318,29 @@ export const handlers = [
   http.get(`${API}/api/announcements`, () =>
     HttpResponse.json(page(announcements, announcements.length))
   ),
+
+  http.get(`${API}/api/public/tenants`, () =>
+    HttpResponse.json([
+      { id: 1, name: "TK Menteng Ceria", jenjang_type: "SD" },
+      { id: 2, name: "SMP Menteng", jenjang_type: "SMP" },
+    ])
+  ),
+
+  http.get(`${API}/api/public/schools`, ({ request }) => {
+    const tenantId = Number(new URL(request.url).searchParams.get("tenant_id") ?? 1);
+    return HttpResponse.json([
+      { id: 1, name: "SDN Menteng 01", tenant_id: tenantId },
+      { id: 2, name: "SDN Menteng 02", tenant_id: tenantId },
+    ]);
+  }),
+
+  http.post(`${API}/api/auth/complete-onboarding`, async ({ request }) => {
+    const body = (await request.json()) as { school_id?: number };
+    const response: AuthResponse = {
+      user: { ...principalUser.user, school_id: body.school_id ?? principalUser.user.school_id },
+      access_token: "mock-access-token-onboarded",
+      token_type: "bearer",
+    };
+    return HttpResponse.json(response);
+  }),
 ];

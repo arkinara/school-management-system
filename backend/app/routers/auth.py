@@ -24,6 +24,7 @@ from app.db.session import get_db
 from app.schemas.auth import (
     AuthResponse,
     ChangePasswordRequest,
+    CompleteOnboarding,
     UserLogin,
     UserMe,
     UserRegister,
@@ -266,6 +267,40 @@ def me(user: User = Depends(get_current_user)) -> UserMe:
         tenant_id=user.tenant_id,
         school_id=user.school_id,
         role=str(user.role),
+    )
+
+
+@router.post("/complete-onboarding", response_model=AuthResponse)
+def complete_onboarding(
+    payload: CompleteOnboarding,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AuthResponse:
+    """Set the caller's ``school_id`` and return a refreshed access token.
+
+    Idempotent: re-calling with the same values is a no-op. The tenant can never
+    be changed through this endpoint; a mismatching ``tenant_id`` is rejected.
+    """
+    # scope: self
+    if payload.tenant_id is not None and payload.tenant_id != user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="cannot change tenant via onboarding",
+        )
+    if payload.school_id is not None:
+        school = db.get(School, payload.school_id)
+        if school is None or school.tenant_id != user.tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid school",
+            )
+        user.school_id = school.id
+    db.commit()
+    db.refresh(user)
+    return AuthResponse(
+        user=UserOut.model_validate(user),
+        access_token=_token_for(user),
+        token_type="bearer",
     )
 
 

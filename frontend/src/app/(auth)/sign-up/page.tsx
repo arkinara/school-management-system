@@ -9,7 +9,14 @@ import { FormField, inputClass } from "@/components/ui/FormField";
 import { SegmentedButton, type Segment } from "@/components/ui/SegmentedButton";
 import { cn } from "@/components/ui/cn";
 import { ApiError } from "@/lib/api";
-import { persistAuth, register, SEED_SCHOOLS, type UserRole } from "@/lib/auth";
+import {
+  fetchSchoolsForTenant,
+  fetchTenants,
+  persistAuth,
+  register,
+  type SchoolOption,
+  type UserRole,
+} from "@/lib/auth";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -59,6 +66,7 @@ export default function SignUpPage() {
   const [password, setPassword] = React.useState("");
   const [role, setRole] = React.useState<UserRole>("teacher");
   const [schoolId, setSchoolId] = React.useState("");
+  const [schools, setSchools] = React.useState<SchoolOption[]>([]);
   const [showPassword, setShowPassword] = React.useState(false);
 
   const [errors, setErrors] = React.useState<FieldErrors>({});
@@ -69,6 +77,20 @@ export default function SignUpPage() {
 
   React.useEffect(() => {
     nameRef.current?.focus();
+
+    let active = true;
+    fetchTenants()
+      .then((tenants) =>
+        Promise.all(tenants.map((tenant) => fetchSchoolsForTenant(tenant.id))).then((lists) => {
+          if (active) setSchools(lists.flat());
+        })
+      )
+      .catch(() => {
+        // Keep the form usable; an empty list shows the validation message.
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   function validate(): boolean {
@@ -286,9 +308,9 @@ export default function SignUpPage() {
             className={cn(inputClass, "appearance-none", errors.school && "border-destructive")}
           >
             <option value="">Pilih sekolah</option>
-            {SEED_SCHOOLS.map((s) => (
+            {schools.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name} ({s.jenjang})
+                {s.name}
               </option>
             ))}
           </select>

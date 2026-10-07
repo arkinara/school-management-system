@@ -23,12 +23,31 @@ from app.schemas.school import (
 )
 
 router = APIRouter()
+public_router = APIRouter()
 
 _ADMIN_ROLES = {UserRole.ADMIN, UserRole.PRINCIPAL}
 
 
 def _is_tenant_admin(user: User, tenant_id: int) -> bool:
     return user.role in _ADMIN_ROLES and user.tenant_id == tenant_id
+
+
+@public_router.get("/api/public/schools")
+def list_public_schools(
+    tenant_id: int = Query(...),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """Public, unauthenticated — schools within a tenant, for the school picker.
+
+    Returns only ``id`` + ``name`` + ``tenant_id``; callers must supply a tenant.
+    """
+    # scope: public
+    return [
+        {"id": s.id, "name": s.name, "tenant_id": s.tenant_id}
+        for s in db.scalars(
+            select(School).where(School.tenant_id == tenant_id).order_by(School.name)
+        ).all()
+    ]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=SchoolOut)
