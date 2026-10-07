@@ -23,6 +23,10 @@ from app.db.models import (
     utcnow,
 )
 from app.db.session import get_db
+from app.notifications.triggers import (
+    safe_trigger,
+    trigger_spp_overdue_notification,
+)
 from app.pagination import PageParams
 from app.schemas.spp import (
     SppBillBulkCreate,
@@ -402,10 +406,12 @@ def mark_overdue_bills(
                 .where(School.tenant_id == user.tenant_id)
             )
         )
-    rows = db.scalars(select(SppBill).where(*conditions)).all()
+    rows = list(db.scalars(select(SppBill).where(*conditions)).all())
     for bill in rows:
         bill.status = _OVERDUE
     db.commit()
+    for bill in rows:
+        safe_trigger(trigger_spp_overdue_notification, db, bill)
     return {"updated": len(rows)}
 
 

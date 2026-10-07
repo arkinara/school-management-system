@@ -27,6 +27,7 @@ from app.routers import (
     classes,
     grades,
     messages,
+    notifications,
     parents,
     report_cards,
     schedules,
@@ -130,6 +131,9 @@ app.include_router(
     messages.router, prefix="/api/message-threads", tags=["message-threads"]
 )
 app.include_router(audit.router, prefix="/api/audit-log", tags=["audit-log"])
+app.include_router(
+    notifications.router, prefix="/api/notifications", tags=["notifications"]
+)
 
 
 @app.get("/")

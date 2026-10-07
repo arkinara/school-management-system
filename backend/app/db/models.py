@@ -24,6 +24,7 @@ from sqlalchemy import (
     Integer,
     String,
     Table,
+    Text,
     Time,
     UniqueConstraint,
     func,
@@ -442,6 +443,31 @@ class Announcement(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     body: Mapped[str] = mapped_column(String, nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class Notification(Base):
+    """A per-user, tenant-scoped in-app notification (ticket #51)."""
+
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    link: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_read: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utcnow, server_default=func.now(), nullable=False, index=True
+    )
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class MessageThread(Base):

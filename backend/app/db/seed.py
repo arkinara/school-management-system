@@ -26,6 +26,7 @@ from app.db.models import (
     JenjangType,
     Message,
     MessageThread,
+    Notification,
     ReportCard,
     ReportCardStatus,
     Schedule,
@@ -55,6 +56,7 @@ def _hash(password: str) -> str:
 def clear_all(session: Session) -> None:
     """Remove every row in FK-safe order so seeding is idempotent."""
     delete_order = [
+        Notification,
         TeacherAssignment,
         Message,
         SppPayment,

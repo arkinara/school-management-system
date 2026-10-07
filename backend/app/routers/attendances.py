@@ -25,6 +25,10 @@ from app.db.models import (
 )
 from app.db.scoping import scoped_query
 from app.db.session import get_db
+from app.notifications.triggers import (
+    safe_trigger,
+    trigger_absence_guardian_notification,
+)
 from app.pagination import PageParams
 from app.schemas.attendance import (
     AttendanceBulkCreate,
@@ -120,6 +124,7 @@ def create_attendance(
             before=before,
             after={"status": str(payload.status), "note": payload.note},
         )
+        safe_trigger(trigger_absence_guardian_notification, db, existing)
         return AttendanceOut.model_validate(existing)
 
     record = Attendance(
@@ -134,6 +139,7 @@ def create_attendance(
     db.add(record)
     db.commit()
     db.refresh(record)
+    safe_trigger(trigger_absence_guardian_notification, db, record)
     return AttendanceOut.model_validate(record)
 
 
@@ -206,6 +212,8 @@ def create_attendance_bulk(
             before=before,
             after=after,
         )
+    for record in records:
+        safe_trigger(trigger_absence_guardian_notification, db, record)
     return AttendanceBulkResult(class_id=klass.id, date=payload.date, created=len(records))
 
 
@@ -441,6 +449,7 @@ def update_attendance(
         before=before,
         after={"status": str(record.status), "note": record.note},
     )
+    safe_trigger(trigger_absence_guardian_notification, db, record)
     return AttendanceOut.model_validate(record)
 
 
