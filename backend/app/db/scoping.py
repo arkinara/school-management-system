@@ -21,6 +21,7 @@ from app.db.models import (
     Class,
     Schedule,
     School,
+    SppBill,
     Student,
     User,
     UserRole,
@@ -94,7 +95,17 @@ def scoped_query(
       one; also filtered by ``school_id`` when both the user and model expose it.
     - ``super_admin``: bypasses the tenant filter only when ``bypass_reason`` is
       provided; the bypass is written to ``audit_logs``.
+    - Models without direct ``tenant_id`` or ``school_id`` columns (Student,
+      SppBill) are scoped via joins to their parent tables.
+    - Other models without a scoping path raise ``MissingTenantContextError``
+      (caller must provide an explicit scope).
     """
+    # Join-based scoping for models that don't have direct columns
+    if model is Student:
+        return _scope_student(user)
+    if model is SppBill:
+        return _scope_spp_bill(user)
+
     stmt = select(model)
     has_tenant = hasattr(model, "tenant_id")
     has_school = hasattr(model, "school_id")
@@ -119,6 +130,35 @@ def scoped_query(
         stmt = stmt.where(model.school_id == user.school_id)
 
     return stmt
+
+
+def _scope_student(user: User):
+    """Scope Student via direct school_id (Student has school_id)."""
+    stmt = select(Student)
+    if user.role == UserRole.SUPER_ADMIN:
+        return stmt
+    if user.role == UserRole.STUDENT:
+        return stmt.where(Student.user_id == user.id)
+    if user.role == UserRole.PARENT:
+        stmt = stmt.join(parent_links, parent_links.c.student_id == Student.id)
+        return stmt.where(parent_links.c.parent_id == user.id)
+    # school-level roles
+    if user.school_id is None:
+        return stmt.where(False)
+    return stmt.where(Student.school_id == user.school_id)
+
+
+def _scope_spp_bill(user: User):
+    """Scope SppBill via join through Student (no direct tenant/school columns)."""
+    stmt = select(SppBill).join(Student, SppBill.student_id == Student.id)
+    if user.role == UserRole.SUPER_ADMIN:
+        return stmt
+    if user.role == UserRole.PARENT:
+        stmt = stmt.join(parent_links, parent_links.c.student_id == Student.id)
+        return stmt.where(parent_links.c.parent_id == user.id)
+    if user.school_id is None:
+        return stmt.where(False)
+    return stmt.where(Student.school_id == user.school_id)
 
 
 def log_scope_denial(

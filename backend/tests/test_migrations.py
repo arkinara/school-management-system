@@ -20,8 +20,10 @@ NEW_HEAD = "c3d4e5f6a7b8"
 
 
 def _config(db_path: str) -> Config:
-    cfg = Config("alembic.ini")
-    cfg.set_main_option("script_location", str(Path("alembic").resolve()))
+    # alembic.ini + alembic/ live in backend/; resolve from this test file
+    backend_dir = Path(__file__).resolve().parent.parent
+    cfg = Config(str(backend_dir / "alembic.ini"))
+    cfg.set_main_option("script_location", str(backend_dir / "alembic"))
     cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
     return cfg
 

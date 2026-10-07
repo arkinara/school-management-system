@@ -40,11 +40,19 @@ class Base(DeclarativeBase):
 
 
 def _str_enum(enum_cls: type[StrEnum], length: int) -> Enum:
-    """Enum column storing human-readable ``.value`` strings (not member names)."""
+    """Enum column storing human-readable ``.value`` strings (not member names).
+
+    ``create_constraint=True`` emits a DB-level ``CHECK (col IN (...))`` so
+    invalid values are rejected even when the ORM's Python-side validation is
+    bypassed (raw SQL). The explicit named constraints for migrated databases
+    are added by ``d4e5f6a7b8c9_add_enum_constraints``.
+    """
     return Enum(
         enum_cls,
+        name=enum_cls.__name__.lower(),
         values_callable=lambda e: [m.value for m in e],
         native_enum=False,
+        create_constraint=True,
         length=length,
     )
 
@@ -59,7 +67,7 @@ class JenjangType(StrEnum):
     SD = "SD"
     SMP = "SMP"
     SMA = "SMA"
-    UNIVERSITY = "University"
+    # UNIVERSITY removed: PRD covers TK–SMA only (future ticket owns extension).
 
 
 class UserRole(StrEnum):
@@ -120,7 +128,7 @@ class DayOfWeek(IntEnum):
 
 
 class Tenant(Base):
-    """A jenjang-scoped organisation (TK/SD/SMP/SMA/University)."""
+    """A jenjang-scoped organisation (TK/SD/SMP/SMA)."""
 
     __tablename__ = "tenants"
 
