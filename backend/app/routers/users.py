@@ -5,15 +5,16 @@ from __future__ import annotations
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from passlib.hash import bcrypt
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.audit import log_audit_event
 from app.auth.deps import get_current_user
-from app.db.models import School, User, UserRole
+from app.db.models import School, Tenant, User, UserRole
 from app.db.session import get_db
 from app.pagination import PageParams
-from app.schemas.user import UserListResponse, UserOut, UserUpdate
+from app.schemas.user import UserCreate, UserListResponse, UserOut, UserUpdate
 
 router = APIRouter()
 
@@ -58,19 +59,111 @@ def _same_school_admin(user: User, target: User) -> bool:
     )
 
 
+@router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+def admin_create_user(
+    payload: UserCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserOut:
+    """Create a privileged user (admin/principal/super_admin only).
+
+    Public registration via ``/api/auth/register`` stays limited to
+    student/parent (#39); this endpoint is the admin path for privileged roles
+    and enforces the role hierarchy before creation.
+    """
+    if user.role not in (UserRole.SUPER_ADMIN, UserRole.PRINCIPAL, UserRole.ADMIN):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin only")
+
+    try:
+        target_role = UserRole(payload.role)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="invalid role",
+        ) from exc
+
+    if ROLE_HIERARCHY[target_role] > ROLE_HIERARCHY[user.role]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"cannot create user with role {payload.role}",
+        )
+
+    tenant = db.get(Tenant, payload.tenant_id)
+    if tenant is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="tenant not found"
+        )
+
+    if user.role != UserRole.SUPER_ADMIN:
+        if payload.tenant_id != user.tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="cannot create user in another tenant",
+            )
+        if payload.school_id is not None and payload.school_id != user.school_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="cannot create user in another school",
+            )
+
+    if payload.school_id is not None:
+        school = db.get(School, payload.school_id)
+        if school is None or school.tenant_id != payload.tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="invalid school assignment",
+            )
+
+    existing = db.scalar(select(User).where(User.email == str(payload.email)))
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="email already registered"
+        )
+
+    new_user = User(
+        tenant_id=payload.tenant_id,
+        school_id=payload.school_id,
+        email=str(payload.email),
+        hashed_auth_ref=bcrypt.hash(payload.password),
+        role=target_role,
+        full_name=payload.full_name,
+    )
+    db.add(new_user)
+    db.flush()
+    log_audit_event(
+        db,
+        actor=user,
+        action="create_user",
+        entity_type="user",
+        entity_id=new_user.id,
+        after={"role": str(target_role), "school_id": new_user.school_id},
+    )
+    db.commit()
+    db.refresh(new_user)
+    return UserOut.model_validate(new_user)
+
+
 @router.get("", response_model=UserListResponse)
 def list_users(
     role: str | None = Query(None),
     school_id: int | None = Query(None),
+    include_inactive: bool = Query(False),
     page: PageParams = Depends(PageParams),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> UserListResponse:
-    """List users in the caller's tenant (super_admin sees every tenant)."""
+    """List users in the caller's tenant (super_admin sees every tenant).
+
+    Inactive (soft-deleted) users are hidden unless an admin/principal requests
+    ``?include_inactive=true``.
+    """
     # scope: school
     conditions = []
     if user.role != UserRole.SUPER_ADMIN:
         conditions.append(User.tenant_id == user.tenant_id)
+    can_see_inactive = user.role == UserRole.SUPER_ADMIN or user.role in _ADMIN_ROLES
+    if not (include_inactive and can_see_inactive):
+        conditions.append(User.is_active.is_(True))
     if school_id is not None:
         conditions.append(User.school_id == school_id)
     if role is not None:
@@ -265,13 +358,29 @@ def delete_user(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Response:
-    """Delete a user (same-school admin/principal or super_admin)."""
+    """Soft-delete a user (same-school admin/principal or super_admin).
+
+    The row is never removed: ``is_active`` is flipped to ``False`` so history
+    (grades, attendance, audit) stays referentially intact and the account can
+    no longer authenticate.
+    """
     target = db.get(User, user_id)
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
     permitted = user.role == UserRole.SUPER_ADMIN or _same_school_admin(user, target)
     if not permitted:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
-    db.delete(target)
+    if not target.is_active:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    target.is_active = False
+    log_audit_event(
+        db,
+        actor=user,
+        action="deactivate_user",
+        entity_type="user",
+        entity_id=target.id,
+        before={"is_active": True},
+        after={"is_active": False},
+    )
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

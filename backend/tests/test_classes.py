@@ -126,6 +126,28 @@ def test_jurusan_on_non_sma_tenant_returns_422(
     assert response.status_code == 422
 
 
+def test_wali_kelas_must_be_teacher(client: TestClient, db_session: Session) -> None:
+    response = client.post(
+        "/api/classes",
+        headers=_auth(PRINCIPAL),
+        json={
+            "school_id": 1,
+            "name": "6D",
+            "grade_level": 6,
+            "wali_kelas_id": 2,
+            "academic_year": "2024/2025",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_patch_wali_kelas_must_be_teacher(client: TestClient, db_session: Session) -> None:
+    response = client.patch(
+        "/api/classes/3", headers=_auth(PRINCIPAL), json={"wali_kelas_id": 2}
+    )
+    assert response.status_code == 422
+
+
 def test_wali_kelas_must_be_same_school(client: TestClient, db_session: Session) -> None:
     _add_other_tenant_with_class(db_session)
     response = client.post(

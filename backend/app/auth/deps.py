@@ -65,7 +65,7 @@ def get_current_user(
             detail="invalid token: missing subject",
         )
     user = db.get(User, int(raw_id))
-    if user is None:
+    if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="user not found",

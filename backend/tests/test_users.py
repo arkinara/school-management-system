@@ -148,7 +148,7 @@ def test_admin_cannot_update_cross_school_user(client: TestClient, db_session: S
     assert response.status_code == 403
 
 
-def test_delete_user_removes_record(client: TestClient, db_session: Session) -> None:
+def test_delete_user_soft_deletes_record(client: TestClient, db_session: Session) -> None:
     _add_user(
         db_session,
         user_id=400,
@@ -158,12 +158,95 @@ def test_delete_user_removes_record(client: TestClient, db_session: Session) -> 
         role=UserRole.TEACHER,
     )
     assert client.delete("/api/users/400", headers=_auth(SUPER)).status_code == 204
-    assert client.get("/api/users/400", headers=_auth(SUPER)).status_code == 404
+    follow = client.get("/api/users/400", headers=_auth(SUPER))
+    assert follow.status_code == 200, follow.text
+    assert follow.json()["is_active"] is False
 
 
 def test_delete_user_cross_tenant_forbidden(client: TestClient, db_session: Session) -> None:
     _add_other_tenant(db_session)
     assert client.delete("/api/users/200", headers=_auth(PRINCIPAL)).status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# user administration + soft-delete (ticket #48)
+# ---------------------------------------------------------------------------
+
+
+def _payload(**overrides) -> dict:
+    body = {
+        "tenant_id": 1,
+        "school_id": 1,
+        "email": "newstaff@menteng.sch.id",
+        "password": "newstaff123",
+        "role": "teacher",
+        "full_name": "New Staff",
+    }
+    body.update(overrides)
+    return body
+
+
+def test_admin_create_user_teacher(client: TestClient, db_session: Session) -> None:
+    response = client.post("/api/users", headers=_auth(ADMIN), json=_payload())
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["role"] == "teacher"
+    assert body["email"] == "newstaff@menteng.sch.id"
+    assert body["is_active"] is True
+
+
+def test_admin_create_user_super_admin_rejected(
+    client: TestClient, db_session: Session
+) -> None:
+    response = client.post(
+        "/api/users", headers=_auth(ADMIN), json=_payload(role="super_admin")
+    )
+    assert response.status_code == 403, response.text
+
+
+def test_admin_cannot_create_user_other_school(
+    client: TestClient, db_session: Session
+) -> None:
+    _add_other_tenant(db_session)
+    response = client.post(
+        "/api/users", headers=_auth(ADMIN), json=_payload(tenant_id=2)
+    )
+    assert response.status_code == 403, response.text
+
+
+def test_teacher_cannot_create_user(client: TestClient, db_session: Session) -> None:
+    response = client.post("/api/users", headers=_auth(TEACHER), json=_payload())
+    assert response.status_code == 403, response.text
+
+
+def test_deactivate_user_soft_delete(client: TestClient, db_session: Session) -> None:
+    assert client.delete("/api/users/4", headers=_auth(SUPER)).status_code == 204
+    follow = client.get("/api/users/4", headers=_auth(SUPER))
+    assert follow.status_code == 200, follow.text
+    assert follow.json()["is_active"] is False
+    assert db_session.get(User, 4).is_active is False
+
+
+def test_deactivated_user_cannot_login(client: TestClient, db_session: Session) -> None:
+    assert client.delete("/api/users/4", headers=_auth(SUPER)).status_code == 204
+    login = client.post(
+        "/api/auth/login",
+        json={"email": "siti@menteng.sch.id", "password": SEED_PASSWORD, "tenant_id": 1},
+    )
+    assert login.status_code == 401, login.text
+
+
+def test_list_users_excludes_inactive_by_default(
+    client: TestClient, db_session: Session
+) -> None:
+    assert client.delete("/api/users/4", headers=_auth(PRINCIPAL)).status_code == 204
+    default = client.get("/api/users", headers=_auth(PRINCIPAL))
+    assert default.status_code == 200, default.text
+    assert default.json()["total"] == 10
+
+    included = client.get("/api/users?include_inactive=true", headers=_auth(PRINCIPAL))
+    assert included.status_code == 200, included.text
+    assert included.json()["total"] == 11
 
 
 # ---------------------------------------------------------------------------

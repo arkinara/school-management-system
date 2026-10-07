@@ -55,7 +55,7 @@ def _authenticate(db: Session, email: str, password: str, tenant_id: int | None)
     if tenant_id is not None:
         stmt = stmt.where(User.tenant_id == tenant_id)
     user = db.scalar(stmt)
-    if user is None or not bcrypt.verify(password, user.hashed_auth_ref):
+    if user is None or not user.is_active or not bcrypt.verify(password, user.hashed_auth_ref):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",

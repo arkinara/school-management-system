@@ -181,6 +181,9 @@ class User(Base):
         _str_enum(UserRole, 32), nullable=False
     )
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="1", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
     tenant: Mapped[Tenant] = relationship(back_populates="users")
@@ -266,6 +269,25 @@ class Subject(Base):
     tenant: Mapped[Tenant] = relationship(back_populates="subjects")
     schedules: Mapped[list[Schedule]] = relationship(back_populates="subject")
     grades: Mapped[list[Grade]] = relationship(back_populates="subject")
+
+
+class TeacherAssignment(Base):
+    """A teacher assigned to teach a subject for a class in an academic year."""
+
+    __tablename__ = "teacher_assignments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    teacher_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    subject_id: Mapped[int] = mapped_column(
+        ForeignKey("subjects.id"), nullable=False, index=True
+    )
+    class_id: Mapped[int] = mapped_column(ForeignKey("classes.id"), nullable=False, index=True)
+    academic_year: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    teacher: Mapped[User] = relationship()
+    subject: Mapped[Subject] = relationship()
+    klass: Mapped[Class] = relationship()
 
 
 class Schedule(Base):

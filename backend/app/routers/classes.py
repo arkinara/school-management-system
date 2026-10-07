@@ -47,10 +47,10 @@ def _validate_wali_kelas(db: Session, school: School, wali_kelas_id: int | None)
     if wali_kelas_id is None:
         return
     wali = db.get(User, wali_kelas_id)
-    if wali is None or wali.school_id != school.id:
+    if wali is None or wali.role != UserRole.TEACHER or wali.school_id != school.id:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="wali_kelas_id must reference a user in the same school",
+            detail="wali_kelas_id must reference a teacher in the same school",
         )
 
 

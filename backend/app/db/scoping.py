@@ -23,6 +23,7 @@ from app.db.models import (
     School,
     SppBill,
     Student,
+    TeacherAssignment,
     User,
     UserRole,
     parent_links,
@@ -105,6 +106,8 @@ def scoped_query(
         return _scope_student(user)
     if model is SppBill:
         return _scope_spp_bill(user)
+    if model is TeacherAssignment:
+        return _scope_teacher_assignment(user)
 
     stmt = select(model)
     has_tenant = hasattr(model, "tenant_id")
@@ -159,6 +162,20 @@ def _scope_spp_bill(user: User):
     if user.school_id is None:
         return stmt.where(False)
     return stmt.where(Student.school_id == user.school_id)
+
+
+def _scope_teacher_assignment(user: User):
+    """Scope TeacherAssignment via its Class -> School chain."""
+    stmt = (
+        select(TeacherAssignment)
+        .join(Class, TeacherAssignment.class_id == Class.id)
+        .join(School, Class.school_id == School.id)
+    )
+    if user.role == UserRole.SUPER_ADMIN:
+        return stmt.where(School.tenant_id == user.tenant_id)
+    if user.school_id is None:
+        return stmt.where(False)
+    return stmt.where(Class.school_id == user.school_id)
 
 
 def log_scope_denial(

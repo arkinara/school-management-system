@@ -34,6 +34,7 @@ from app.routers import (
     spp,
     students,
     subjects,
+    teacher_assignments,
     tenants,
     users,
 )
@@ -110,6 +111,7 @@ app.include_router(schools.router, prefix="/api/schools", tags=["schools"])
 app.include_router(tenants.public_router, tags=["public"])
 app.include_router(schools.public_router, tags=["public"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
+app.include_router(teacher_assignments.router, prefix="/api", tags=["teachers"])
 app.include_router(classes.router, prefix="/api/classes", tags=["classes"])
 app.include_router(subjects.router, prefix="/api/subjects", tags=["subjects"])
 app.include_router(students.router, prefix="/api/students", tags=["students"])

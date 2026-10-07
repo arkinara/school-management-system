@@ -35,6 +35,7 @@ from app.db.models import (
     SppPayment,
     Student,
     Subject,
+    TeacherAssignment,
     Tenant,
     User,
     UserRole,
@@ -54,6 +55,7 @@ def _hash(password: str) -> str:
 def clear_all(session: Session) -> None:
     """Remove every row in FK-safe order so seeding is idempotent."""
     delete_order = [
+        TeacherAssignment,
         Message,
         SppPayment,
         Attendance,
