@@ -62,6 +62,7 @@ def test_semester_accepts_canonical(client: TestClient, db_session: Session) -> 
             "semester": "2026/2027-ganjil",
             "category": "formatif",
             "score": 80,
+            "description": "catatan capaian",
         },
     )
     assert response.status_code == 201, response.text

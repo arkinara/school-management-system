@@ -362,14 +362,29 @@ class Grade(Base):
     category: Mapped[GradeCategory] = mapped_column(
         _str_enum(GradeCategory, 16), nullable=False
     )
+    assessment_no: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     score: Mapped[float] = mapped_column(Float, nullable=False)
     description: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    kurikulum_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     recorded_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime, default=utcnow, onupdate=utcnow, nullable=True
+    )
 
     student: Mapped[Student] = relationship(back_populates="grades")
     subject: Mapped[Subject] = relationship(back_populates="grades")
 
-    __table_args__ = (CheckConstraint("score >= 0 AND score <= 100", name="ck_grade_score_range"),)
+    __table_args__ = (
+        CheckConstraint("score >= 0 AND score <= 100", name="ck_grade_score_range"),
+        UniqueConstraint(
+            "student_id",
+            "subject_id",
+            "category",
+            "semester",
+            "assessment_no",
+            name="uq_grade_student_subject_category_semester_assessment",
+        ),
+    )
 
 
 class ReportCard(Base):

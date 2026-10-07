@@ -15,6 +15,7 @@ class GradeCreate(BaseModel):
     subject_id: int
     semester: SemesterStr
     category: GradeCategory
+    assessment_no: int = Field(default=1, ge=1)
     score: float = Field(ge=0, le=100)
     description: str | None = None
 
@@ -34,6 +35,7 @@ class GradeBulkCreate(BaseModel):
     subject_id: int
     semester: SemesterStr
     category: GradeCategory
+    assessment_no: int = Field(default=1, ge=1)
     entries: list[GradeEntry]
 
 
@@ -53,8 +55,10 @@ class GradeOut(BaseModel):
     subject_id: int
     semester: str
     category: GradeCategory
+    assessment_no: int = 1
     score: float
     description: str | None = None
+    kurikulum_version: str | None = None
     recorded_by: int
 
 
@@ -73,6 +77,7 @@ class GradeBulkResult(BaseModel):
     semester: str
     category: GradeCategory
     created: int
+    updated: int = 0
 
 
 class SubjectAggregate(BaseModel):

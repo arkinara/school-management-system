@@ -8,11 +8,13 @@ from sqlalchemy.orm import Session
 
 from app.auth.jwt import create_access_token
 from app.db.models import (
+    AuditLog,
     Class,
     Grade,
     JenjangType,
     School,
     Student,
+    Subject,
     Tenant,
     User,
     UserRole,
@@ -117,7 +119,7 @@ def test_bulk_grade_entry(client: TestClient, db_session: Session) -> None:
             "semester": "2026/2027-ganjil",
             "category": "tugas",
             "entries": [
-                {"student_id": 1, "score": 80},
+                {"student_id": 1, "score": 80, "description": "baik"},
                 {"student_id": 2, "score": 90, "description": "rajin"},
             ],
         },
@@ -254,3 +256,159 @@ def test_super_admin_sees_all_tenants(client: TestClient, db_session: Session) -
     response = client.get("/api/grades?student_id=20", headers=_auth(SUPER))
     assert response.status_code == 200
     assert response.json()["total"] == 0
+
+
+def _bulk_payload() -> dict:
+    return {
+        "class_id": 1,
+        "subject_id": 2,
+        "semester": "2026/2027-ganjil",
+        "category": "tugas",
+        "entries": [
+            {"student_id": 1, "score": 80, "description": "baik"},
+            {"student_id": 2, "score": 90, "description": "rajin"},
+        ],
+    }
+
+
+def test_bulk_upsert_creates(client: TestClient, db_session: Session) -> None:
+    response = client.post("/api/grades/bulk", headers=_auth(TEACHER4), json=_bulk_payload())
+    assert response.status_code == 201, response.text
+    assert response.json()["created"] == 2
+    db_session.expire_all()
+    rows = db_session.query(Grade).filter(
+        Grade.subject_id == 2, Grade.category == "tugas", Grade.semester == "2026/2027-ganjil"
+    ).all()
+    assert len(rows) == 2
+
+
+def test_bulk_upsert_updates_existing(client: TestClient, db_session: Session) -> None:
+    first = client.post("/api/grades/bulk", headers=_auth(TEACHER4), json=_bulk_payload())
+    assert first.status_code == 201, first.text
+
+    second = client.post("/api/grades/bulk", headers=_auth(TEACHER4), json=_bulk_payload())
+    assert second.status_code == 201, second.text
+    assert second.json()["created"] == 0
+    assert second.json()["updated"] == 2
+
+    db_session.expire_all()
+    rows = db_session.query(Grade).filter(
+        Grade.subject_id == 2, Grade.category == "tugas", Grade.semester == "2026/2027-ganjil"
+    ).all()
+    assert len(rows) == 2
+    audits = db_session.query(AuditLog).filter(AuditLog.action == "update_grade").all()
+    assert len(audits) >= 2
+
+
+def test_tk_sd_description_required(client: TestClient, db_session: Session) -> None:
+    response = client.post(
+        "/api/grades",
+        headers=_auth(TEACHER4),
+        json={
+            "student_id": 1,
+            "subject_id": 1,
+            "semester": "2026/2027-ganjil",
+            "category": "sumatif",
+            "score": 85,
+        },
+    )
+    assert response.status_code == 422, response.text
+    assert "description" in response.text
+
+
+def test_smp_sma_description_optional(client: TestClient, db_session: Session) -> None:
+    _add_other_tenant(db_session)
+    db_session.add(Subject(id=30, tenant_id=2, name="Matematika", category="formal"))
+    db_session.commit()
+    token = _token(200, 2, 2, "principal")
+    response = client.post(
+        "/api/grades",
+        headers=_auth(token),
+        json={
+            "student_id": 20,
+            "subject_id": 30,
+            "semester": "2026/2027-ganjil",
+            "category": "sumatif",
+            "score": 85,
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["description"] is None
+
+
+def test_invalid_semester_rejected(client: TestClient, db_session: Session) -> None:
+    response = client.post(
+        "/api/grades",
+        headers=_auth(TEACHER4),
+        json={
+            "student_id": 1,
+            "subject_id": 1,
+            "semester": "2026-ganjil",
+            "category": "sumatif",
+            "score": 80,
+            "description": "catatan",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_subject_cross_tenant_rejected(client: TestClient, db_session: Session) -> None:
+    _add_other_tenant(db_session)
+    db_session.add(Subject(id=30, tenant_id=2, name="Matematika", category="formal"))
+    db_session.add(
+        User(
+            id=60,
+            tenant_id=1,
+            school_id=1,
+            email="nc@menteng.sch.id",
+            hashed_auth_ref=bcrypt.hash(SEED_PASSWORD),
+            role=UserRole.STUDENT,
+            full_name="No Class",
+        )
+    )
+    db_session.flush()
+    db_session.add(Student(id=50, user_id=60, school_id=1, class_id=None, nis="NOCLASS1"))
+    db_session.commit()
+
+    response = client.post(
+        "/api/grades",
+        headers=_auth(ADMIN),
+        json={
+            "student_id": 50,
+            "subject_id": 30,
+            "semester": "2026/2027-ganjil",
+            "category": "formatif",
+            "score": 80,
+            "description": "catatan",
+        },
+    )
+    assert response.status_code == 422, response.text
+    assert "tenant" in response.text
+
+
+def test_post_same_grade_twice_leaves_one_row(
+    client: TestClient, db_session: Session
+) -> None:
+    payload = {
+        "student_id": 2,
+        "subject_id": 4,
+        "semester": "2026/2027-ganjil",
+        "category": "sumatif",
+        "assessment_no": 1,
+        "score": 77,
+        "description": "catatan",
+    }
+    first = client.post("/api/grades", headers=_auth(TEACHER4), json=payload)
+    assert first.status_code == 201, first.text
+    payload["score"] = 88
+    second = client.post("/api/grades", headers=_auth(TEACHER4), json=payload)
+    assert second.status_code == 201, second.text
+    assert second.json()["id"] == first.json()["id"]
+    assert second.json()["score"] == 88
+    db_session.expire_all()
+    rows = db_session.query(Grade).filter(
+        Grade.student_id == 2, Grade.subject_id == 4, Grade.category == "sumatif"
+    ).all()
+    assert len(rows) == 1
+    audits = db_session.query(AuditLog).filter(AuditLog.action == "update_grade").all()
+    assert len(audits) >= 1
