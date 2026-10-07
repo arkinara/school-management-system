@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.auth.audit import log_audit_event
 from app.auth.deps import get_current_user
 from app.db.models import Class, School, Tenant, User, UserRole
 from app.db.scoping import (
@@ -24,12 +25,6 @@ from app.schemas.school import (
 
 router = APIRouter()
 public_router = APIRouter()
-
-_ADMIN_ROLES = {UserRole.ADMIN, UserRole.PRINCIPAL}
-
-
-def _is_tenant_admin(user: User, tenant_id: int) -> bool:
-    return user.role in _ADMIN_ROLES and user.tenant_id == tenant_id
 
 
 @public_router.get("/api/public/schools")
@@ -56,20 +51,31 @@ def create_school(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> SchoolOut:
-    """Create a school under an existing tenant."""
+    """Create a school under an existing tenant (super_admin only)."""
+    if user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="super_admin only")
     tenant = db.get(Tenant, payload.tenant_id)
     if tenant is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant not found")
-    if user.role != UserRole.SUPER_ADMIN and not _is_tenant_admin(user, tenant.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
+    kurikulum = payload.kurikulum_version or tenant.kurikulum_version
     school = School(
         tenant_id=tenant.id,
         name=payload.name,
         address=payload.address,
         principal_id=payload.principal_id,
+        kurikulum_version=kurikulum,
     )
     db.add(school)
+    db.flush()
+    log_audit_event(
+        db,
+        actor=user,
+        action="create_school",
+        entity_type="school",
+        entity_id=school.id,
+        after={"name": school.name, "tenant_id": school.tenant_id},
+    )
     db.commit()
     db.refresh(school)
     return SchoolOut.model_validate(school)
@@ -139,15 +145,12 @@ def update_school(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> SchoolOut:
-    """Update a school (principal/admin of that school or super_admin)."""
+    """Update a school (super_admin only)."""
+    if user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="super_admin only")
     school = db.get(School, school_id)
     if school is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="school not found")
-    permitted = user.role == UserRole.SUPER_ADMIN or (
-        user.role in _ADMIN_ROLES and user.school_id == school.id
-    )
-    if not permitted:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(school, field, value)
     db.commit()

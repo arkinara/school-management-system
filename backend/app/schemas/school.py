@@ -12,12 +12,14 @@ class SchoolCreate(BaseModel):
     name: str
     address: str
     principal_id: int | None = None
+    kurikulum_version: str | None = None
 
 
 class SchoolUpdate(BaseModel):
     name: str | None = None
     address: str | None = None
     principal_id: int | None = None
+    kurikulum_version: str | None = None
 
 
 class SchoolOut(BaseModel):
@@ -28,6 +30,7 @@ class SchoolOut(BaseModel):
     name: str
     address: str | None = None
     principal_id: int | None = None
+    kurikulum_version: str
     created_at: datetime
 
 

@@ -56,7 +56,15 @@ def _add_smp_tenant(db_session: Session) -> None:
             config={"fase": "D"},
         )
     )
-    db_session.add(School(id=2, tenant_id=2, name="SMP Lain 02", address="Jl. Lain"))
+    db_session.add(
+        School(
+            id=2,
+            tenant_id=2,
+            name="SMP Lain 02",
+            address="Jl. Lain",
+            kurikulum_version="K13",
+        )
+    )
     db_session.flush()
     db_session.add_all(
         [

@@ -11,9 +11,10 @@ import os
 from pathlib import Path
 
 import pytest
+from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
-from alembic.config import Config
+
 from alembic import command
 
 
@@ -88,14 +89,34 @@ def test_attendance_valid_status_accepted(db_with_constraints):
     try:
         with engine.begin() as conn:
             # Insert a minimal user/school/class to satisfy FKs
-            conn.execute(text("INSERT INTO tenants (id, name, jenjang_type, kurikulum_version, created_at) VALUES (1, 'T', 'TK', 'K', '2026-10-01 00:00:00')"))
-            conn.execute(text("INSERT INTO schools (id, tenant_id, name, address, created_at) VALUES (1, 1, 'S', 'A', '2026-10-01 00:00:00')"))
-            conn.execute(text("INSERT INTO users (id, tenant_id, school_id, email, hashed_auth_ref, role, full_name, created_at) VALUES (1, 1, 1, 'u@x', 'h', 'admin', 'U', '2026-10-01 00:00:00')"))
+            conn.execute(
+                text(
+                    "INSERT INTO tenants "
+                    "(id, name, jenjang_type, kurikulum_version, created_at) "
+                    "VALUES (1, 'T', 'TK', 'K', '2026-10-01 00:00:00')"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO schools "
+                    "(id, tenant_id, name, address, kurikulum_version, created_at) "
+                    "VALUES (1, 1, 'S', 'A', 'K', '2026-10-01 00:00:00')"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO users "
+                    "(id, tenant_id, school_id, email, hashed_auth_ref, role, "
+                    "full_name, created_at) "
+                    "VALUES (1, 1, 1, 'u@x', 'h', 'admin', 'U', '2026-10-01 00:00:00')"
+                )
+            )
             for i, s in enumerate(("hadir", "izin", "sakit", "alpa")):
                 try:
                     conn.execute(
                         text(
-                            "INSERT INTO attendances (student_id, class_id, date, status, recorded_by) "
+                            "INSERT INTO attendances "
+                            "(student_id, class_id, date, status, recorded_by) "
                             "VALUES (1, 1, :d, :s, 1)"
                         ),
                         {"d": f"2026-10-0{i+1}", "s": s},

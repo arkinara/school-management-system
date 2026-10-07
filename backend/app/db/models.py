@@ -158,6 +158,7 @@ class School(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     address: Mapped[str | None] = mapped_column(String(512), nullable=True)
     principal_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    kurikulum_version: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
     tenant: Mapped[Tenant] = relationship(back_populates="schools")

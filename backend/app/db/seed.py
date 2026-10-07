@@ -202,6 +202,7 @@ def seed(session: Session) -> None:
         name="SDN Menteng 01",
         address="Jl. Menteng Raya No. 1, Jakarta Pusat",
         principal_id=3,
+        kurikulum_version="Merdeka 2024",
     )
     session.add(school)
     session.flush()

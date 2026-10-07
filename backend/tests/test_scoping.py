@@ -46,7 +46,15 @@ PARENT_A = _token(10, 1, 1, "parent")
 @pytest.fixture
 def school_b(db_session: Session) -> dict[str, int]:
     """Add a second school inside tenant 1 with a class, student and parent."""
-    db_session.add(School(id=SCHOOL_B, tenant_id=1, name="SDN Menteng 02", address="Jl. Dua"))
+    db_session.add(
+        School(
+            id=SCHOOL_B,
+            tenant_id=1,
+            name="SDN Menteng 02",
+            address="Jl. Dua",
+            kurikulum_version="Merdeka 2024",
+        )
+    )
     db_session.flush()
     db_session.add_all(
         [

@@ -42,7 +42,13 @@ def _add_other_school(db_session: Session) -> None:
             Tenant(
                 id=2, name="SMP Lain", jenjang_type=JenjangType.SMP, kurikulum_version="K13"
             ),
-            School(id=2, tenant_id=2, name="SMP Lain 02", address="Jl. Lain"),
+            School(
+                id=2,
+                tenant_id=2,
+                name="SMP Lain 02",
+                address="Jl. Lain",
+                kurikulum_version="K13",
+            ),
         ]
     )
     db_session.flush()

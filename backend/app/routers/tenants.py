@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.db.models import School, Tenant, User, UserRole
+from app.db.scoping import scoped_query
 from app.db.session import get_db
+from app.schemas.school import SchoolOut
 from app.schemas.tenant import TenantCreate, TenantOut, TenantUpdate
 
 router = APIRouter()
@@ -113,6 +115,29 @@ def get_tenant(
         if user.role not in _READ_ROLES or user.tenant_id != tenant.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     return _to_out(db, tenant)
+
+
+@router.get("/{tenant_id}/schools", response_model=list[SchoolOut])
+def get_tenant_schools(
+    tenant_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[School]:
+    """Schools within a tenant; tenant-scoped via scoped_query.
+
+    super_admin may read any tenant; tenant users are limited to their own
+    tenant (cross-tenant access returns 404, never leaking existence).
+    """
+    # scope: tenant
+    if user.role != UserRole.SUPER_ADMIN and user.tenant_id != tenant_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant not found")
+    if user.role == UserRole.SUPER_ADMIN:
+        stmt = scoped_query(
+            School, user, db, bypass_reason="nested tenant schools listing"
+        )
+    else:
+        stmt = scoped_query(School, user, db)
+    return list(db.scalars(stmt.where(School.tenant_id == tenant_id)).all())
 
 
 @router.patch("/{tenant_id}", response_model=TenantOut)

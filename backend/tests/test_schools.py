@@ -27,7 +27,9 @@ TEACHER = _token(4, 1, 1, "teacher")
 
 def _add_other_tenant_with_school(db_session: Session) -> None:
     other = Tenant(id=2, name="SMP Lain", jenjang_type=JenjangType.SMP, kurikulum_version="K13")
-    school = School(id=2, tenant_id=2, name="SMP Lain 02", address="Jl. Lain")
+    school = School(
+        id=2, tenant_id=2, name="SMP Lain 02", address="Jl. Lain", kurikulum_version="K13"
+    )
     principal = User(
         id=200,
         tenant_id=2,
@@ -41,27 +43,22 @@ def _add_other_tenant_with_school(db_session: Session) -> None:
     db_session.commit()
 
 
-def test_principal_creates_school_in_own_tenant(
-    client: TestClient, db_session: Session
-) -> None:
+def test_principal_cannot_create_school(client: TestClient, db_session: Session) -> None:
     response = client.post(
         "/api/schools",
         headers=_auth(PRINCIPAL),
         json={"tenant_id": 1, "name": "SDN Menteng 02", "address": "Jl. Baru No. 2"},
     )
-    assert response.status_code == 201, response.text
-    body = response.json()
-    assert body["tenant_id"] == 1
-    assert body["name"] == "SDN Menteng 02"
+    assert response.status_code == 403, response.text
 
 
-def test_admin_creates_school_in_own_tenant(client: TestClient, db_session: Session) -> None:
+def test_admin_cannot_create_school(client: TestClient, db_session: Session) -> None:
     response = client.post(
         "/api/schools",
         headers=_auth(ADMIN),
         json={"tenant_id": 1, "name": "SDN Menteng 03", "address": "Jl. Tiga"},
     )
-    assert response.status_code == 201, response.text
+    assert response.status_code == 403, response.text
 
 
 def test_create_school_cross_tenant_blocked(client: TestClient, db_session: Session) -> None:
@@ -115,12 +112,12 @@ def test_super_admin_sees_all_schools(client: TestClient, db_session: Session) -
 def test_list_schools_pagination_respected(client: TestClient, db_session: Session) -> None:
     client.post(
         "/api/schools",
-        headers=_auth(PRINCIPAL),
+        headers=_auth(SUPER),
         json={"tenant_id": 1, "name": "SDN Paging 1", "address": "Jl. P1"},
     )
     client.post(
         "/api/schools",
-        headers=_auth(PRINCIPAL),
+        headers=_auth(SUPER),
         json={"tenant_id": 1, "name": "SDN Paging 2", "address": "Jl. P2"},
     )
     response = client.get("/api/schools?page=1&size=1", headers=_auth(SUPER))
@@ -143,14 +140,25 @@ def test_get_school_cross_tenant_returns_404(client: TestClient, db_session: Ses
     assert response.status_code == 404
 
 
-def test_patch_school_by_principal(client: TestClient, db_session: Session) -> None:
+def test_patch_school_super_admin(client: TestClient, db_session: Session) -> None:
     response = client.patch(
         "/api/schools/1",
-        headers=_auth(PRINCIPAL),
+        headers=_auth(SUPER),
         json={"name": "SDN Menteng 01 Updated"},
     )
     assert response.status_code == 200, response.text
     assert response.json()["name"] == "SDN Menteng 01 Updated"
+
+
+def test_patch_school_non_super_admin_forbidden(
+    client: TestClient, db_session: Session
+) -> None:
+    assert (
+        client.patch(
+            "/api/schools/1", headers=_auth(PRINCIPAL), json={"name": "Nope"}
+        ).status_code
+        == 403
+    )
 
 
 def test_delete_school_blocked_when_classes_exist(

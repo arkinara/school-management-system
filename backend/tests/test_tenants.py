@@ -20,6 +20,7 @@ def _token(user_id: int, tenant_id: int | None, school_id: int | None, role: str
 
 
 SUPER = _token(1, 1, None, "super_admin")
+ADMIN = _token(2, 1, 1, "admin")
 PRINCIPAL = _token(3, 1, 1, "principal")
 TEACHER = _token(4, 1, 1, "teacher")
 
@@ -172,3 +173,70 @@ def test_delete_tenant_forbidden_for_non_super_admin(
     client: TestClient, db_session: Session
 ) -> None:
     assert client.delete("/api/tenants/1", headers=_auth(TEACHER)).status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# nested schools listing + kurikulum inheritance (ticket #47)
+# ---------------------------------------------------------------------------
+
+
+def test_get_tenant_schools(client: TestClient, db_session: Session) -> None:
+    response = client.get("/api/tenants/1/schools", headers=_auth(PRINCIPAL))
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["id"] == 1
+    assert body[0]["tenant_id"] == 1
+
+
+def test_get_tenant_schools_cross_tenant_blocked(
+    client: TestClient, db_session: Session
+) -> None:
+    _add_other_tenant(db_session)
+    response = client.get("/api/tenants/2/schools", headers=_auth(PRINCIPAL))
+    assert response.status_code == 404
+
+
+def test_create_school_inherits_kurikulum(client: TestClient, db_session: Session) -> None:
+    response = client.post(
+        "/api/schools",
+        headers=_auth(SUPER),
+        json={"tenant_id": 1, "name": "SDN Warisan", "address": "Jl. Warisan"},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["kurikulum_version"] == "Merdeka 2024"
+
+
+def test_create_school_with_explicit_kurikulum(
+    client: TestClient, db_session: Session
+) -> None:
+    response = client.post(
+        "/api/schools",
+        headers=_auth(SUPER),
+        json={
+            "tenant_id": 1,
+            "name": "SDN Override",
+            "address": "Jl. Override",
+            "kurikulum_version": "K13",
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["kurikulum_version"] == "K13"
+
+
+def test_admin_cannot_create_school(client: TestClient, db_session: Session) -> None:
+    response = client.post(
+        "/api/schools",
+        headers=_auth(ADMIN),
+        json={"tenant_id": 1, "name": "SDN Admin", "address": "Jl. Admin"},
+    )
+    assert response.status_code == 403
+
+
+def test_principal_cannot_create_school(client: TestClient, db_session: Session) -> None:
+    response = client.post(
+        "/api/schools",
+        headers=_auth(PRINCIPAL),
+        json={"tenant_id": 1, "name": "SDN Principal", "address": "Jl. Principal"},
+    )
+    assert response.status_code == 403
