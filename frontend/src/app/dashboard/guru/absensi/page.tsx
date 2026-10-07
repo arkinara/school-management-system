@@ -1,9 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, CalendarCheck, Check, RotateCcw, Save, Users } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  CalendarCheck,
+  Check,
+  RotateCcw,
+  Save,
+  Users,
+  X,
+} from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormField, inputClass } from "@/components/ui/FormField";
@@ -17,20 +26,23 @@ import {
   ATTENDANCE_STATUSES,
   bulkSaveAttendances,
   fetchAll,
-  fetchAttendances,
+  fetchAttendanceRoster,
   fetchClasses,
   fetchStudents,
   getTeacherSchedule,
-  updateAttendance,
-  type AttendanceRecord,
+  type AttendanceRow,
   type AttendanceStatus,
   type ClassRecord,
-  type StudentRecord,
 } from "@/lib/endpoints";
 import type { UserMe } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 
 type LoadStatus = "idle" | "loading" | "ready" | "error";
+
+interface Edit {
+  status: AttendanceStatus;
+  note: string;
+}
 
 const STATUS_LABEL: Record<AttendanceStatus, string> = {
   hadir: "Hadir",
@@ -57,30 +69,39 @@ function todayIso(): string {
   return new Date(now.getTime() - tz * 60_000).toISOString().slice(0, 10);
 }
 
+function studentName(row: AttendanceRow): string {
+  return row.student?.full_name ?? `Siswa #${row.student_id}`;
+}
+
 function AbsensiContent({ me }: { me: UserMe }) {
   const today = React.useMemo(todayIso, []);
   const [classes, setClasses] = React.useState<ClassRecord[]>([]);
   const [classId, setClassId] = React.useState("");
   const [date, setDate] = React.useState(today);
-  const [roster, setRoster] = React.useState<StudentRecord[]>([]);
-  const [statusMap, setStatusMap] = React.useState<Record<number, AttendanceStatus>>({});
-  const [noteMap, setNoteMap] = React.useState<Record<number, string>>({});
-  const [existing, setExisting] = React.useState<Record<number, AttendanceRecord>>({});
+  const [rows, setRows] = React.useState<AttendanceRow[]>([]);
+  const [edits, setEdits] = React.useState<Record<number, Edit>>({});
   const [status, setStatus] = React.useState<LoadStatus>("idle");
   const [reloadKey, setReloadKey] = React.useState(0);
   const [saving, setSaving] = React.useState(false);
   const [errors, setErrors] = React.useState<{ classId?: string; date?: string }>({});
+  const [editWindow, setEditWindow] = React.useState<{ editable: boolean; reason?: string }>({
+    editable: true,
+  });
+  const [noticeDismissed, setNoticeDismissed] = React.useState(false);
   const [toast, setToast] = React.useState<{
     message: string;
     tone: "success" | "error";
-    undo?: () => void;
   } | null>(null);
   const rowRefs = React.useRef<(HTMLDivElement | null)[]>([]);
   const classSelectRef = React.useRef<HTMLSelectElement>(null);
-  const savedSnapshot = React.useRef<{
-    statusMap: Record<number, AttendanceStatus>;
-    noteMap: Record<number, string>;
-  } | null>(null);
+
+  function statusOf(row: AttendanceRow): AttendanceStatus {
+    return edits[row.student_id]?.status ?? row.status;
+  }
+
+  function noteOf(row: AttendanceRow): string {
+    return edits[row.student_id]?.note ?? row.note ?? "";
+  }
 
   React.useEffect(() => {
     let active = true;
@@ -115,26 +136,42 @@ function AbsensiContent({ me }: { me: UserMe }) {
     const numericClass = Number(classId);
     Promise.all([
       fetchAll((p) => fetchStudents({ class_id: numericClass, ...p })),
-      fetchAll((p) => fetchAttendances({ class_id: numericClass, date, ...p })),
+      fetchAttendanceRoster({ class_id: numericClass, date }),
     ])
       .then(([students, records]) => {
         if (!active) return;
-        setRoster(students);
-        const nextStatus: Record<number, AttendanceStatus> = {};
-        const nextNote: Record<number, string> = {};
-        const byStudent: Record<number, AttendanceRecord> = {};
+        const byId = new Map(students.map((student) => [student.id, student]));
+        const next: AttendanceRow[] = records.map((record) => {
+          const student = record.student ?? byId.get(record.student_id);
+          return student
+            ? {
+                ...record,
+                student: {
+                  id: student.id,
+                  full_name: student.full_name,
+                  nis: student.nis,
+                },
+              }
+            : record;
+        });
         for (const student of students) {
-          nextStatus[student.id] = "hadir";
-          nextNote[student.id] = "";
+          if (!next.some((row) => row.student_id === student.id)) {
+            next.push({
+              id: 0,
+              student_id: student.id,
+              class_id: numericClass,
+              date,
+              status: "hadir",
+              note: null,
+              recorded_by: me.user.id,
+              student: { id: student.id, full_name: student.full_name, nis: student.nis },
+            });
+          }
         }
-        for (const record of records) {
-          byStudent[record.student_id] = record;
-          nextStatus[record.student_id] = record.status;
-          nextNote[record.student_id] = record.note ?? "";
-        }
-        setStatusMap(nextStatus);
-        setNoteMap(nextNote);
-        setExisting(byStudent);
+        setRows(next);
+        setEdits({});
+        setEditWindow({ editable: true });
+        setNoticeDismissed(false);
         setStatus("ready");
       })
       .catch(() => {
@@ -143,36 +180,64 @@ function AbsensiContent({ me }: { me: UserMe }) {
     return () => {
       active = false;
     };
-  }, [classId, date, reloadKey]);
+  }, [classId, date, reloadKey, me.user.id]);
+
+  function applyEdit(studentId: number, next: Partial<Edit>) {
+    setEdits((current) => {
+      const row = rows.find((item) => item.student_id === studentId);
+      if (!row) return current;
+      const baseNote = row.note ?? "";
+      const draftStatus = next.status ?? current[studentId]?.status ?? row.status;
+      const draftNote = next.note ?? current[studentId]?.note ?? baseNote;
+      if (draftStatus === row.status && draftNote === baseNote) {
+        const { [studentId]: _removed, ...rest } = current;
+        return rest;
+      }
+      return { ...current, [studentId]: { status: draftStatus, note: draftNote } };
+    });
+  }
 
   function setStudentStatus(studentId: number, next: AttendanceStatus) {
-    setStatusMap((current) => ({ ...current, [studentId]: next }));
+    applyEdit(studentId, { status: next });
+  }
+
+  function setStudentNote(studentId: number, note: string) {
+    applyEdit(studentId, { note });
   }
 
   function handleRowKeyDown(index: number, event: React.KeyboardEvent) {
     const mapped = KEY_TO_STATUS[event.key.toLowerCase()];
     if (!mapped) return;
     event.preventDefault();
-    const student = roster[index];
-    if (!student) return;
-    setStudentStatus(student.id, mapped);
+    const row = rows[index];
+    if (!row) return;
+    setStudentStatus(row.student_id, mapped);
     const nextRow = rowRefs.current[index + 1];
     nextRow?.focus();
   }
 
   function markAllPresent() {
-    const next: Record<number, AttendanceStatus> = {};
-    for (const student of roster) next[student.id] = "hadir";
-    setStatusMap(next);
+    setEdits((current) => {
+      const next = { ...current };
+      for (const row of rows) {
+        const baseNote = row.note ?? "";
+        const draftNote = current[row.student_id]?.note ?? baseNote;
+        if (row.status === "hadir" && draftNote === baseNote) {
+          delete next[row.student_id];
+        } else {
+          next[row.student_id] = { status: "hadir", note: draftNote };
+        }
+      }
+      return next;
+    });
   }
 
   function resetForm() {
-    setStatusMap((current) => {
-      const next = { ...current };
-      for (const student of roster) next[student.id] = "hadir";
-      return next;
-    });
-    setNoteMap({});
+    setEdits({});
+  }
+
+  function classRefFocus() {
+    classSelectRef.current?.focus();
   }
 
   async function save() {
@@ -184,96 +249,41 @@ function AbsensiContent({ me }: { me: UserMe }) {
       classRefFocus();
       return;
     }
-    if (nextErrors.date || saving) return;
+    if (nextErrors.date || saving || !editWindow.editable) return;
+
+    const entries = Object.entries(edits).map(([studentId, change]) => ({
+      student_id: Number(studentId),
+      status: change.status,
+      note: change.note.trim() ? change.note : null,
+    }));
+    if (entries.length === 0) return;
 
     setSaving(true);
-    savedSnapshot.current = { statusMap, noteMap };
-    const entries = roster.map((student) => ({
-      student_id: student.id,
-      status: statusMap[student.id] ?? "hadir",
-      note: noteMap[student.id]?.trim() ? noteMap[student.id] : null,
-    }));
     try {
-      if (Object.keys(existing).length > 0) {
-        const changed = roster.filter((student) => {
-          const record = existing[student.id];
-          if (!record) return true;
-          return (
-            record.status !== (statusMap[student.id] ?? "hadir") ||
-            (record.note ?? "") !== (noteMap[student.id] ?? "")
-          );
-        });
-        const known = changed.filter((student) => existing[student.id]);
-        const missing = changed.filter((student) => !existing[student.id]);
-        await Promise.all([
-          ...known.map((student) =>
-            updateAttendance(existing[student.id].id, {
-              status: statusMap[student.id] ?? "hadir",
-              note: noteMap[student.id]?.trim() ? noteMap[student.id] : null,
-            })
-          ),
-          ...(missing.length > 0
-            ? [
-                bulkSaveAttendances({
-                  class_id: Number(classId),
-                  date,
-                  entries: missing.map((student) => ({
-                    student_id: student.id,
-                    status: statusMap[student.id] ?? "hadir",
-                    note: noteMap[student.id]?.trim() ? noteMap[student.id] : null,
-                  })),
-                }),
-              ]
-            : []),
-        ]);
-      } else {
-        await bulkSaveAttendances({ class_id: Number(classId), date, entries });
-      }
-      const count = roster.length;
-      setToast({
-        message: `Absensi ${count} siswa disimpan`,
-        tone: "success",
-        undo: undoLastSave,
-      });
+      await bulkSaveAttendances({ class_id: Number(classId), date, entries });
+      const fresh = await fetchAttendanceRoster({ class_id: Number(classId), date });
+      setRows(fresh);
+      setEdits({});
+      setToast({ message: `Absensi ${entries.length} siswa disimpan`, tone: "success" });
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        setToast({
-          message: "Sebagian absensi sudah tercatat. Muat ulang kelas lalu ulangi koreksi.",
-          tone: "error",
-        });
-      } else {
-        const detail = err instanceof ApiError ? err.detail : "Gagal menyimpan absensi.";
-        setToast({ message: detail, tone: "error" });
+      if (err instanceof ApiError && err.status === 403) {
+        setEditWindow({ editable: false, reason: err.detail });
+        setNoticeDismissed(false);
+        return;
       }
+      const detail = err instanceof ApiError ? err.detail : "Gagal menyimpan absensi.";
+      setToast({ message: detail, tone: "error" });
     } finally {
       setSaving(false);
     }
   }
 
-  function undoLastSave() {
-    const snapshot = savedSnapshot.current;
-    if (snapshot) {
-      setStatusMap(snapshot.statusMap);
-      setNoteMap(snapshot.noteMap);
-    }
-    setToast({ message: "Perubahan dibatalkan", tone: "success" });
-  }
-
-  function classRefFocus() {
-    classSelectRef.current?.focus();
-  }
-
-  const editedAfterSubmissionDay = React.useMemo(() => {
-    const records = Object.values(existing);
-    return records.length > 0 && records.some((record) => record.date !== today);
-  }, [existing, today]);
-
-  const columns: Column<StudentRecord>[] = [
+  const columns: Column<AttendanceRow>[] = [
     {
       key: "full_name",
       header: "Nama Siswa",
-      cell: (student) => {
-        const index = roster.indexOf(student);
+      cell: (row) => {
+        const index = rows.indexOf(row);
         return (
           <div
             ref={(node) => {
@@ -282,13 +292,13 @@ function AbsensiContent({ me }: { me: UserMe }) {
             tabIndex={0}
             onKeyDown={(event) => handleRowKeyDown(index, event)}
             role="button"
-            aria-label={`${student.full_name ?? "Siswa"}, fokus dan tekan H/I/S/A`}
+            aria-label={`${studentName(row)}, fokus dan tekan H/I/S/A`}
             className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <p className="text-sm font-medium text-foreground">
-              {student.full_name ?? `Siswa #${student.id}`}
+            <p className="text-sm font-medium text-foreground">{studentName(row)}</p>
+            <p className="font-mono text-2xs tabular-nums text-muted-foreground">
+              {row.student?.nis}
             </p>
-            <p className="font-mono text-2xs tabular-nums text-muted-foreground">{student.nis}</p>
           </div>
         );
       },
@@ -296,12 +306,12 @@ function AbsensiContent({ me }: { me: UserMe }) {
     {
       key: "status",
       header: "Status",
-      cell: (student) => (
+      cell: (row) => (
         <SegmentedButton
-          aria-label={`Status ${student.full_name ?? student.nis}`}
+          aria-label={`Status ${studentName(row)}`}
           options={STATUS_OPTIONS}
-          value={statusMap[student.id] ?? "hadir"}
-          onChange={(value) => setStudentStatus(student.id, value)}
+          value={statusOf(row)}
+          onChange={(value) => setStudentStatus(row.student_id, value)}
           showCheck={false}
           className="[&>button]:min-h-[32px] [&>button]:px-3 [&>button]:text-xs"
         />
@@ -310,36 +320,22 @@ function AbsensiContent({ me }: { me: UserMe }) {
     {
       key: "note",
       header: "Catatan",
-      cell: (student) => (
+      cell: (row) => (
         <input
           type="text"
-          value={noteMap[student.id] ?? ""}
-          onChange={(event) =>
-            setNoteMap((current) => ({
-              ...current,
-              [student.id]: event.target.value,
-            }))
-          }
-          placeholder={(statusMap[student.id] ?? "hadir") === "hadir" ? "—" : "Keterangan opsional"}
-          aria-label={`Catatan ${student.full_name ?? student.nis}`}
+          value={noteOf(row)}
+          onChange={(event) => setStudentNote(row.student_id, event.target.value)}
+          placeholder={statusOf(row) === "hadir" ? "—" : "Keterangan opsional"}
+          aria-label={`Catatan ${studentName(row)}`}
           className={cn(inputClass, "min-h-[32px] w-full min-w-[12rem] px-2 text-xs")}
         />
       ),
-    },
-    {
-      key: "flag",
-      header: "",
-      align: "right",
-      cell: (student) =>
-        editedAfterSubmissionDay && existing[student.id] ? (
-          <StatusChip tone="warning">diedit setelah hari H</StatusChip>
-        ) : null,
     },
   ];
 
   const presentCount = ATTENDANCE_STATUSES.map((value) => ({
     value,
-    count: Object.values(statusMap).filter((s) => s === value).length,
+    count: rows.filter((row) => statusOf(row) === value).length,
   }));
 
   return (
@@ -357,7 +353,7 @@ function AbsensiContent({ me }: { me: UserMe }) {
             icon={RotateCcw}
             type="button"
             onClick={resetForm}
-            disabled={status !== "ready" || roster.length === 0}
+            disabled={status !== "ready" || rows.length === 0}
           >
             Reset
           </Button>
@@ -366,7 +362,7 @@ function AbsensiContent({ me }: { me: UserMe }) {
             type="button"
             onClick={save}
             loading={saving}
-            disabled={status !== "ready" || roster.length === 0}
+            disabled={status !== "ready" || rows.length === 0 || !editWindow.editable}
           >
             Simpan Absensi
           </Button>
@@ -417,7 +413,7 @@ function AbsensiContent({ me }: { me: UserMe }) {
               icon={Check}
               type="button"
               onClick={markAllPresent}
-              disabled={roster.length === 0}
+              disabled={rows.length === 0}
             >
               Hadir Semua
             </Button>
@@ -427,7 +423,7 @@ function AbsensiContent({ me }: { me: UserMe }) {
         <div className="flex flex-wrap items-center gap-2 border-b border-outline-variant px-5 py-2.5">
           <Users className="h-4 w-4 text-muted-foreground" aria-hidden />
           <span className="font-mono text-2xs tabular-nums text-muted-foreground">
-            {roster.length} siswa
+            {rows.length} siswa
           </span>
           {presentCount.map((item) => (
             <StatusChip
@@ -445,9 +441,6 @@ function AbsensiContent({ me }: { me: UserMe }) {
               {STATUS_LABEL[item.value]} {item.count}
             </StatusChip>
           ))}
-          {editedAfterSubmissionDay && (
-            <StatusChip tone="warning">mode koreksi · edit setelah hari H</StatusChip>
-          )}
           <span className="ml-auto hidden text-2xs text-muted-foreground sm:block">
             Fokus baris lalu tekan{" "}
             <kbd className="rounded-xs border border-outline px-1 font-mono">H</kbd>{" "}
@@ -456,6 +449,26 @@ function AbsensiContent({ me }: { me: UserMe }) {
             <kbd className="rounded-xs border border-outline px-1 font-mono">A</kbd>
           </span>
         </div>
+
+        {!editWindow.editable && !noticeDismissed && (
+          <div
+            role="alert"
+            className="flex items-start gap-2 border-b border-warning bg-warning-container px-5 py-3 text-sm text-warning"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <p className="flex-1">
+              {editWindow.reason ?? "Periode koreksi sudah berakhir. Absensi tidak dapat diubah."}
+            </p>
+            <button
+              type="button"
+              aria-label="Tutup pemberitahuan"
+              onClick={() => setNoticeDismissed(true)}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-surface-container-high"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
+        )}
 
         {status === "loading" ? (
           <div className="p-4">
@@ -486,7 +499,7 @@ function AbsensiContent({ me }: { me: UserMe }) {
               description="Pilih kelas dan tanggal untuk memuat daftar siswa."
             />
           </div>
-        ) : roster.length === 0 ? (
+        ) : rows.length === 0 ? (
           <div className="p-4">
             <EmptyState
               icon={Users}
@@ -495,18 +508,13 @@ function AbsensiContent({ me }: { me: UserMe }) {
             />
           </div>
         ) : (
-          <Table columns={columns} rows={roster} rowKey={(student) => String(student.id)} />
+          <Table columns={columns} rows={rows} rowKey={(row) => String(row.student_id)} />
         )}
       </Card>
 
       <ToastViewport>
         {toast && (
-          <Toast
-            message={toast.message}
-            tone={toast.tone}
-            action={toast.undo ? { label: "Undo", onClick: toast.undo } : undefined}
-            onDismiss={() => setToast(null)}
-          />
+          <Toast message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />
         )}
       </ToastViewport>
     </div>

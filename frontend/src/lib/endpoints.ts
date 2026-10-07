@@ -192,6 +192,25 @@ export interface AttendanceRecord {
   note: string | null;
 }
 
+export interface AttendanceStudentSummary {
+  id: number;
+  full_name: string | null;
+  nis: string;
+}
+
+/**
+ * A roster row from `GET /api/attendances?class_id=&date=`.
+ *
+ * The backend returns every active student in the class, synthesising a
+ * default `hadir` row (id 0) for anyone not yet recorded. Some backends also
+ * embed the student summary; `student` is optional because it may need to be
+ * joined locally from the students endpoint.
+ */
+export interface AttendanceRow extends AttendanceRecord {
+  recorded_at?: string;
+  student?: AttendanceStudentSummary;
+}
+
 export interface AttendanceEntryInput {
   student_id: number;
   status: AttendanceStatus;
@@ -215,6 +234,22 @@ export function fetchAttendances(
   } = {}
 ): Promise<Paginated<AttendanceRecord>> {
   return apiFetch<Paginated<AttendanceRecord>>(`/api/attendances${toQuery(params)}`);
+}
+
+/**
+ * GET /api/attendances?class_id=&date= — the full class roster for one date.
+ *
+ * Returns all students in the class with a default `hadir` status for rows
+ * that have not been recorded yet (id 0), so the page never needs an
+ * oversized paginated fetch.
+ */
+export function fetchAttendanceRoster(params: {
+  class_id: number;
+  date: string;
+}): Promise<AttendanceRow[]> {
+  return apiFetch<Paginated<AttendanceRow>>(`/api/attendances${toQuery(params)}`).then(
+    (page) => page.items
+  );
 }
 
 /** POST /api/attendances/bulk — one row per student for a class/date. */

@@ -3,6 +3,7 @@ import type {
   AnnouncementRecord,
   AttendanceBulkResult,
   AttendanceRecord,
+  AttendanceRow,
   AttendanceTodaySummary,
   ClassRecord,
   GradeBulkResult,
@@ -232,8 +233,20 @@ export const handlers = [
   http.get(`${API}/api/attendances`, ({ request }) => {
     const url = new URL(request.url);
     if (url.searchParams.has("class_id")) {
+      // Roster endpoint: every class student, default hadir when unrecorded.
+      const date = url.searchParams.get("date") ?? "2026-01-15";
+      const roster: AttendanceRow[] = students.map((student) => ({
+        id: 0,
+        student_id: student.id,
+        class_id: 1,
+        date,
+        status: "hadir",
+        recorded_by: TEACHER_ID,
+        note: null,
+        student: { id: student.id, full_name: student.full_name, nis: student.nis },
+      }));
       return HttpResponse.json(
-        page<AttendanceRecord>([], 0, Number(url.searchParams.get("size") ?? 100))
+        page(roster, roster.length, Number(url.searchParams.get("size") ?? 100))
       );
     }
     const rows: AttendanceRecord[] = Array.from({ length: 10 }, (_, index) => ({
