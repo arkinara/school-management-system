@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.db.models import EnrollmentStatus
 from app.schemas.parent import ParentSummary
 
 
@@ -24,7 +25,7 @@ class StudentCreate(BaseModel):
     email: EmailStr | None = None
     password: str | None = None
     birth_date: date | None = None
-    enrollment_status: str = "active"
+    enrollment_status: EnrollmentStatus = EnrollmentStatus.ACTIVE
     parent_ids: list[int] = []
 
 
@@ -32,8 +33,21 @@ class StudentUpdate(BaseModel):
     class_id: int | None = None
     nis: str | None = None
     birth_date: date | None = None
-    enrollment_status: str | None = None
+    enrollment_status: EnrollmentStatus | None = None
     full_name: str | None = None
+
+
+class CreateGuardian(BaseModel):
+    """Admin/principal-supplied guardian details for create-and-link (#49).
+
+    Used when a parent has no email and cannot self-register; the caller
+    (admin/principal) creates a role=parent user and links it atomically.
+    """
+
+    email: EmailStr
+    password: str = Field(min_length=8)
+    full_name: str
+    relationship: str = "orang_tua"
 
 
 class ParentLink(BaseModel):

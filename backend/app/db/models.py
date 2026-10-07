@@ -86,6 +86,13 @@ class AttendanceStatus(StrEnum):
     ALPA = "alpa"
 
 
+class EnrollmentStatus(StrEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    GRADUATED = "graduated"
+    TRANSFERRED = "transferred"
+
+
 class GradeCategory(StrEnum):
     FORMATIF = "formatif"
     SUMATIF = "sumatif"
@@ -223,7 +230,9 @@ class Student(Base):
     )
     nis: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    enrollment_status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
+    enrollment_status: Mapped[str] = mapped_column(
+        String(20), default=EnrollmentStatus.ACTIVE.value, nullable=False
+    )
 
     user: Mapped[User] = relationship(back_populates="student")
     klass: Mapped[Class | None] = relationship(back_populates="students")

@@ -272,3 +272,90 @@ def test_delete_student_forbidden_for_principal(
     client: TestClient, db_session: Session
 ) -> None:
     assert client.delete("/api/students/4", headers=_auth(PRINCIPAL)).status_code == 403
+
+
+def test_create_student_with_invalid_enrollment_status_rejected(
+    client: TestClient, db_session: Session
+) -> None:
+    response = client.post(
+        "/api/students",
+        headers=_auth(PRINCIPAL),
+        json={
+            "school_id": 1,
+            "nis": "2025910",
+            "full_name": "Status Bogus",
+            "email": "status.bogus@menteng.sch.id",
+            "password": SEED_PASSWORD,
+            "enrollment_status": "bogus",
+        },
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_create_student_with_valid_enrollment_status_accepted(
+    client: TestClient, db_session: Session
+) -> None:
+    response = client.post(
+        "/api/students",
+        headers=_auth(PRINCIPAL),
+        json={
+            "school_id": 1,
+            "nis": "2025911",
+            "full_name": "Lulus Sekolah",
+            "email": "lulus@menteng.sch.id",
+            "password": SEED_PASSWORD,
+            "enrollment_status": "graduated",
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["enrollment_status"] == "graduated"
+
+
+def test_patch_student_with_invalid_enrollment_status_rejected(
+    client: TestClient, db_session: Session
+) -> None:
+    response = client.patch(
+        "/api/students/1", headers=_auth(PRINCIPAL), json={"enrollment_status": "foo"}
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_create_guardian_for_student(client: TestClient, db_session: Session) -> None:
+    response = client.post(
+        "/api/students/1/create-guardian",
+        headers=_auth(PRINCIPAL),
+        json={
+            "email": "wali.baru@menteng.sch.id",
+            "password": SEED_PASSWORD,
+            "full_name": "Wali Baru",
+            "relationship": "wali",
+        },
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["role"] == "parent"
+    assert body["full_name"] == "Wali Baru"
+
+    db_session.expire_all()
+    created = db_session.get(User, body["id"])
+    assert created is not None
+    assert created.role == UserRole.PARENT
+
+    linked = client.get("/api/students/1/parents", headers=_auth(PRINCIPAL))
+    assert linked.status_code == 200, linked.text
+    assert any(item["id"] == body["id"] for item in linked.json())
+
+
+def test_create_guardian_duplicate_email_rejected(
+    client: TestClient, db_session: Session
+) -> None:
+    response = client.post(
+        "/api/students/1/create-guardian",
+        headers=_auth(PRINCIPAL),
+        json={
+            "email": "tatausaha@menteng.sch.id",
+            "password": SEED_PASSWORD,
+            "full_name": "Duplikat Email",
+        },
+    )
+    assert response.status_code == 409, response.text

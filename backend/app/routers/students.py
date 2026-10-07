@@ -7,6 +7,7 @@ from passlib.hash import bcrypt
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.auth.audit import log_audit_event
 from app.auth.deps import get_current_user
 from app.db.models import Class, School, Student, User, UserRole, parent_links
 from app.db.scoping import (
@@ -24,11 +25,13 @@ from app.linking import (
 from app.pagination import PageParams
 from app.schemas.parent import ParentLinkCreate, ParentSummary
 from app.schemas.student import (
+    CreateGuardian,
     StudentCreate,
     StudentListResponse,
     StudentOut,
     StudentUpdate,
 )
+from app.schemas.user import UserOut
 
 router = APIRouter()
 
@@ -174,6 +177,56 @@ def create_student(
     db.commit()
     db.refresh(student)
     return _student_out(db, student)
+
+
+@router.post(
+    "/{student_id}/create-guardian",
+    status_code=status.HTTP_201_CREATED,
+    response_model=UserOut,
+)
+def create_guardian_for_student(
+    student_id: int,
+    payload: CreateGuardian,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    """Create a new guardian user (role=parent) and link it to the student.
+
+    Used by admin/principal when a parent has no email and cannot self-register.
+    """
+    if user.role not in (UserRole.SUPER_ADMIN, UserRole.PRINCIPAL, UserRole.ADMIN):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin only")
+    student = db.get(Student, student_id)
+    if student is None or not can_user_read_student(db, user, student_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="student not found"
+        )
+    if db.scalar(select(User).where(User.email == str(payload.email))) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="email already registered"
+        )
+    new_parent = User(
+        tenant_id=user.tenant_id,
+        school_id=student.school_id,
+        email=str(payload.email),
+        hashed_auth_ref=bcrypt.hash(payload.password),
+        role=UserRole.PARENT,
+        full_name=payload.full_name,
+    )
+    db.add(new_parent)
+    db.flush()
+    add_link(db, new_parent.id, student_id, payload.relationship, True)
+    db.commit()
+    db.refresh(new_parent)
+    log_audit_event(
+        db,
+        actor=user,
+        action="create_guardian",
+        entity_type="user",
+        entity_id=new_parent.id,
+        after={"email": str(payload.email), "student_id": student_id},
+    )
+    return new_parent
 
 
 @router.get("", response_model=StudentListResponse)
