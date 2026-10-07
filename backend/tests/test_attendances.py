@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 from passlib.hash import bcrypt
@@ -182,14 +182,108 @@ def test_cross_class_write_blocked(client: TestClient, db_session: Session) -> N
     assert response.status_code == 403
 
 
-def test_duplicate_attendance_rejected(client: TestClient, db_session: Session) -> None:
-    today = date.today().isoformat()
-    response = client.post(
+def test_create_attendance_upsert_on_conflict(
+    client: TestClient, db_session: Session
+) -> None:
+    first = client.post(
         "/api/attendances",
         headers=_auth(TEACHER4),
-        json={"student_id": 1, "class_id": 1, "date": today, "status": "hadir"},
+        json={
+            "student_id": 1,
+            "class_id": 1,
+            "date": "2024-09-08",
+            "status": "hadir",
+        },
     )
-    assert response.status_code == 409
+    assert first.status_code == 201, first.text
+    first_id = first.json()["id"]
+
+    second = client.post(
+        "/api/attendances",
+        headers=_auth(TEACHER4),
+        json={
+            "student_id": 1,
+            "class_id": 1,
+            "date": "2024-09-08",
+            "status": "izin",
+            "note": "acara",
+        },
+    )
+    assert second.status_code == 201, second.text
+    assert second.json()["id"] == first_id
+    assert second.json()["status"] == "izin"
+    assert second.json()["note"] == "acara"
+
+
+def test_attendance_edit_window_blocks_old_edits(
+    client: TestClient, db_session: Session
+) -> None:
+    db_session.expire_all()
+    record = db_session.get(Attendance, 1)
+    assert record is not None
+    record.recorded_at = datetime.now(timezone.utc) - timedelta(hours=48)
+    db_session.commit()
+
+    response = client.patch(
+        "/api/attendances/1", headers=_auth(TEACHER4), json={"status": "izin"}
+    )
+    assert response.status_code == 403, response.text
+
+
+def test_attendance_edit_within_window_succeeds(
+    client: TestClient, db_session: Session
+) -> None:
+    db_session.expire_all()
+    record = db_session.get(Attendance, 1)
+    assert record is not None
+    record.recorded_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    db_session.commit()
+
+    response = client.patch(
+        "/api/attendances/1", headers=_auth(TEACHER4), json={"status": "alpa"}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "alpa"
+
+
+def test_list_attendances_includes_roster_defaults(
+    client: TestClient, db_session: Session
+) -> None:
+    response = client.get(
+        "/api/attendances?class_id=1&date=2024-09-10", headers=_auth(TEACHER4)
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["total"] == 2
+    assert {item["student_id"] for item in body["items"]} == {1, 2}
+    assert all(item["status"] == "hadir" for item in body["items"])
+
+
+def test_attendance_recap(client: TestClient, db_session: Session) -> None:
+    for day, status in ((11, "hadir"), (12, "izin"), (13, "hadir")):
+        created = client.post(
+            "/api/attendances",
+            headers=_auth(TEACHER4),
+            json={
+                "student_id": 1,
+                "class_id": 1,
+                "date": f"2024-09-{day:02d}",
+                "status": status,
+            },
+        )
+        assert created.status_code == 201, created.text
+
+    response = client.get(
+        "/api/attendances/recap?class_id=1&month=9&year=2024", headers=_auth(TEACHER4)
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["class_id"] == 1
+    recaps = {row["student_id"]: row for row in body["students"]}
+    assert recaps[1]["hadir"] == 2
+    assert recaps[1]["izin"] == 1
+    assert recaps[1]["total"] == 3
+    assert recaps[1]["rate"] > 0
 
 
 def test_parent_sees_only_own_children(client: TestClient, db_session: Session) -> None:

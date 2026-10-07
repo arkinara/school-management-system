@@ -2,14 +2,28 @@
 
 from __future__ import annotations
 
+from calendar import monthrange
 from datetime import date as date_type
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.auth.audit import log_audit_event
 from app.auth.deps import get_current_user
-from app.db.models import Attendance, AttendanceStatus, Class, School, Student, User, UserRole
+from app.config import EDIT_WINDOW_HOURS
+from app.db.models import (
+    Attendance,
+    AttendanceStatus,
+    Class,
+    School,
+    Student,
+    User,
+    UserRole,
+    utcnow,
+)
+from app.db.scoping import scoped_query
 from app.db.session import get_db
 from app.pagination import PageParams
 from app.schemas.attendance import (
@@ -40,6 +54,27 @@ def _get_class_or_404(db: Session, class_id: int) -> Class:
     return klass
 
 
+def _within_edit_window(recorded_at: datetime | None) -> bool:
+    """True when a record may still be corrected under the edit-window rule.
+
+    SQLite stores naive datetimes, so a naive value is assumed to be UTC before
+    comparing against an aware "now"; ``recorded_at`` is never None in practice
+    but an unstamped row (legacy insert) is treated as editable.
+    """
+    if recorded_at is None:
+        return True
+    if recorded_at.tzinfo is None:
+        recorded_at = recorded_at.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - recorded_at <= timedelta(hours=EDIT_WINDOW_HOURS)
+
+
+def _edit_window_error() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"edits only allowed within {EDIT_WINDOW_HOURS} hours",
+    )
+
+
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=AttendanceOut)
 def create_attendance(
     payload: AttendanceCreate,
@@ -60,16 +95,32 @@ def create_attendance(
             detail="student does not belong to this class",
         )
 
-    duplicate = db.scalar(
+    existing = db.scalar(
         select(Attendance).where(
             Attendance.student_id == student.id, Attendance.date == payload.date
         )
     )
-    if duplicate is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="attendance already recorded for this student and date",
+    if existing is not None:
+        # Same-day edit: enforce the edit window and audit old -> new.
+        if not _within_edit_window(existing.recorded_at):
+            raise _edit_window_error()
+        before = {"status": str(existing.status), "note": existing.note}
+        existing.status = payload.status
+        existing.note = payload.note
+        existing.recorded_by = user.id
+        existing.recorded_at = utcnow()
+        db.commit()
+        db.refresh(existing)
+        log_audit_event(
+            db,
+            actor=user,
+            action="update_attendance",
+            entity_type="attendance",
+            entity_id=existing.id,
+            before=before,
+            after={"status": str(payload.status), "note": payload.note},
         )
+        return AttendanceOut.model_validate(existing)
 
     record = Attendance(
         student_id=student.id,
@@ -78,6 +129,7 @@ def create_attendance(
         status=payload.status,
         recorded_by=user.id,
         note=payload.note,
+        recorded_at=utcnow(),
     )
     db.add(record)
     db.commit()
@@ -100,6 +152,7 @@ def create_attendance_bulk(
 
     entries = list({entry.student_id: entry for entry in payload.entries}.values())
     records: list[Attendance] = []
+    audits: list[tuple[int, dict, dict]] = []
     for entry in entries:
         student = db.get(Student, entry.student_id)
         if student is None:
@@ -112,16 +165,23 @@ def create_attendance_bulk(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"student {entry.student_id} does not belong to this class",
             )
-        duplicate = db.scalar(
+        existing = db.scalar(
             select(Attendance).where(
                 Attendance.student_id == student.id, Attendance.date == payload.date
             )
         )
-        if duplicate is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"attendance already recorded for student {student.id}",
-            )
+        if existing is not None:
+            if not _within_edit_window(existing.recorded_at):
+                raise _edit_window_error()
+            before = {"status": str(existing.status), "note": existing.note}
+            existing.status = entry.status
+            existing.note = entry.note
+            existing.recorded_by = user.id
+            existing.recorded_at = utcnow()
+            db.flush()
+            audits.append((existing.id, before, {"status": str(entry.status), "note": entry.note}))
+            records.append(existing)
+            continue
         records.append(
             Attendance(
                 student_id=student.id,
@@ -130,11 +190,22 @@ def create_attendance_bulk(
                 status=entry.status,
                 recorded_by=user.id,
                 note=entry.note,
+                recorded_at=utcnow(),
             )
         )
 
-    db.add_all(records)
+    db.add_all([r for r in records if r.id is None])
     db.commit()
+    for entity_id, before, after in audits:
+        log_audit_event(
+            db,
+            actor=user,
+            action="update_attendance",
+            entity_type="attendance",
+            entity_id=entity_id,
+            before=before,
+            after=after,
+        )
     return AttendanceBulkResult(class_id=klass.id, date=payload.date, created=len(records))
 
 
@@ -172,19 +243,101 @@ def list_attendances(
     total = (
         db.scalar(select(func.count()).select_from(Attendance).where(*conditions)) or 0
     )
-    rows = db.scalars(
-        select(Attendance)
-        .where(*conditions)
-        .order_by(Attendance.date.desc(), Attendance.id)
-        .offset(page.offset)
-        .limit(page.size)
-    ).all()
+    rows = list(
+        db.scalars(
+            select(Attendance)
+            .where(*conditions)
+            .order_by(Attendance.date.desc(), Attendance.id)
+            .offset(page.offset)
+            .limit(page.size)
+        ).all()
+    )
+
+    # Roster defaults: with a class + date, return every active student,
+    # synthesising a default hadir row for anyone not yet recorded.
+    if class_id is not None and date is not None:
+        existing_keys = {(row.student_id, row.date) for row in rows}
+        roster = list(
+            db.scalars(
+                scoped_query(Student, user, db).where(Student.class_id == class_id)
+            ).all()
+        )
+        for student in roster:
+            if (student.id, date) not in existing_keys:
+                rows.append(
+                    Attendance(
+                        id=0,
+                        student_id=student.id,
+                        class_id=class_id,
+                        date=date,
+                        status=AttendanceStatus.HADIR,
+                        note=None,
+                        recorded_by=user.id,
+                        recorded_at=datetime.now(timezone.utc),
+                    )
+                )
+        total = len(rows)
+
     return AttendanceListResponse(
         items=[AttendanceOut.model_validate(row) for row in rows],
         total=total,
         page=page.page,
         size=page.size,
     )
+
+
+@router.get("/recap")
+def attendance_recap(
+    class_id: int = Query(...),
+    month: int = Query(..., ge=1, le=12),
+    year: int = Query(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Monthly attendance recap for rapor: per-student counts and rate."""
+    # scope: school
+    allowed_classes = visible_class_ids(db, user)
+    if allowed_classes is not None and class_id not in allowed_classes:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
+    _, last_day = monthrange(year, month)
+    start = date_type(year, month, 1)
+    end = date_type(year, month, last_day)
+    students = list(
+        db.scalars(
+            scoped_query(Student, user, db).where(Student.class_id == class_id)
+        ).all()
+    )
+    recaps = []
+    for student in students:
+        rows = list(
+            db.scalars(
+                select(Attendance).where(
+                    Attendance.student_id == student.id,
+                    Attendance.date >= start,
+                    Attendance.date <= end,
+                )
+            ).all()
+        )
+        hadir = sum(1 for row in rows if str(row.status) == "hadir")
+        recaps.append(
+            {
+                "student_id": student.id,
+                "hadir": hadir,
+                "izin": sum(1 for row in rows if str(row.status) == "izin"),
+                "sakit": sum(1 for row in rows if str(row.status) == "sakit"),
+                "alpa": sum(1 for row in rows if str(row.status) == "alpa"),
+                "total": len(rows),
+                "rate": (hadir / max(len(rows), 1)) * 100,
+            }
+        )
+    return {
+        "class_id": class_id,
+        "month": month,
+        "year": year,
+        "partial": end > date_type.today(),
+        "students": recaps,
+    }
 
 
 @router.get("/today", response_model=AttendanceTodaySummary)
@@ -266,13 +419,28 @@ def update_attendance(
     if klass is None or not can_manage_class(db, user, klass):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
+    if not _within_edit_window(record.recorded_at):
+        raise _edit_window_error()
+
     data = payload.model_dump(exclude_unset=True)
+    before = {"status": str(record.status), "note": record.note}
     if data.get("status") is not None:
         record.status = data["status"]
     if "note" in data:
         record.note = data["note"]
+    record.recorded_by = user.id
+    record.recorded_at = utcnow()
     db.commit()
     db.refresh(record)
+    log_audit_event(
+        db,
+        actor=user,
+        action="update_attendance",
+        entity_type="attendance",
+        entity_id=record.id,
+        before=before,
+        after={"status": str(record.status), "note": record.note},
+    )
     return AttendanceOut.model_validate(record)
 
 

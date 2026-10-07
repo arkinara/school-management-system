@@ -26,6 +26,7 @@ from sqlalchemy import (
     Table,
     Time,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -337,6 +338,9 @@ class Attendance(Base):
     )
     recorded_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     note: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utcnow, server_default=func.now(), nullable=False
+    )
 
     student: Mapped[Student] = relationship(back_populates="attendances")
 
