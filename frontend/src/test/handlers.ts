@@ -226,7 +226,15 @@ export const handlers = [
 
   http.get(`${API}/api/schedules/teacher/:teacherId`, () => HttpResponse.json(schedules)),
 
+  http.get(`${API}/api/schedules/class/:classId`, () => HttpResponse.json(schedules)),
+
+  http.get(`${API}/api/schedules/by-class/:classId`, () => HttpResponse.json(schedules)),
+
+  http.post(`${API}/api/schedules/bulk-replace/:classId`, () => HttpResponse.json([])),
+
   http.get(`${API}/api/schedules`, () => HttpResponse.json(page(schedules, 0))),
+
+  http.get(`${API}/api/parents/:id/children`, () => HttpResponse.json([])),
 
   http.get(`${API}/api/attendances/today`, () => HttpResponse.json(attendanceSummary)),
 

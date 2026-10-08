@@ -69,13 +69,21 @@ export class ApiError extends Error {
   status: number;
   detail: string;
   fieldErrors?: Record<string, string>;
+  /** Raw parsed response body (typed FastAPI `detail` objects, e.g. 409). */
+  body?: unknown;
 
-  constructor(status: number, detail: string, fieldErrors?: Record<string, string>) {
+  constructor(
+    status: number,
+    detail: string,
+    fieldErrors?: Record<string, string>,
+    body?: unknown
+  ) {
     super(detail);
     this.name = "ApiError";
     this.status = status;
     this.detail = detail;
     this.fieldErrors = fieldErrors;
+    this.body = body;
   }
 }
 
@@ -283,7 +291,7 @@ export async function apiFetch<T>(path: string, opts: RequestInit = {}): Promise
       typeof payload === "object" && payload !== null && "detail" in payload
         ? (payload as { detail: unknown }).detail
         : undefined;
-    throw new ApiError(res.status, parseDetail(detail), parseFieldErrors(detail));
+    throw new ApiError(res.status, parseDetail(detail), parseFieldErrors(detail), payload);
   }
 
   if (res.status === 204) return undefined as T;

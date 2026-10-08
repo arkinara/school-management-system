@@ -9,6 +9,9 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
     globals: true,
     css: false,
+    // MSW + jsdom startup is slow in CI; the default 5s per-test budget is too
+    // tight for the multi-step schedule/dialog interaction tests.
+    testTimeout: 30_000,
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],

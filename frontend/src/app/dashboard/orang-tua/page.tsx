@@ -6,6 +6,7 @@ import {
   AlertCircle,
   ArrowRight,
   CalendarCheck,
+  CalendarDays,
   ClipboardList,
   Megaphone,
   RotateCcw,
@@ -343,13 +344,22 @@ function OrangTuaContent({ me }: { me: UserMe }) {
             Orang Tua · {children.length} anak{today ? ` · ${today}` : ""}
           </p>
         </div>
-        <Link
-          href="/dashboard/orang-tua/rapor"
-          className="flex min-h-10 items-center gap-1.5 rounded-full border border-outline px-4 text-xs font-medium text-primary hover:bg-surface-container-high"
-        >
-          Rapor lengkap
-          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/dashboard/orang-tua/jadwal"
+            className="flex min-h-10 items-center gap-1.5 rounded-full border border-outline px-4 text-xs font-medium text-primary hover:bg-surface-container-high"
+          >
+            <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+            Jadwal anak
+          </Link>
+          <Link
+            href="/dashboard/orang-tua/rapor"
+            className="flex min-h-10 items-center gap-1.5 rounded-full border border-outline px-4 text-xs font-medium text-primary hover:bg-surface-container-high"
+          >
+            Rapor lengkap
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+          </Link>
+        </div>
       </div>
 
       <section aria-label="Pilih anak" className="flex flex-wrap items-center gap-2">

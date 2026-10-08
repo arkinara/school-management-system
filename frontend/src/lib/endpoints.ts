@@ -374,9 +374,63 @@ export interface ScheduleInput {
   end_time: string;
 }
 
+/** One slot inside a bulk-replace payload (class_id comes from the path). */
+export interface ScheduleBulkEntry {
+  subject_id: number;
+  teacher_id: number;
+  day_of_week: number;
+  period_number: number;
+  start_time: string;
+  end_time: string;
+}
+
+/**
+ * A conflict entry returned in a 409 `detail.conflicts` list (#57/#58).
+ *
+ * Carries both the canonical `day_of_week`/`start_time`/`end_time` fields and
+ * `type` (`teacher` | `class` | `batch`) so the FE can highlight the offending
+ * grid cell.
+ */
+export interface ScheduleConflict {
+  type: string;
+  schedule_id: number;
+  id: number;
+  class_id: number;
+  subject_id: number;
+  teacher_id: number;
+  day_of_week: number;
+  period_number: number;
+  start_time: string;
+  end_time: string;
+}
+
 /** GET /api/schedules/class/{classId} — full weekly timetable for a class. */
 export function getSchedule(classId: number): Promise<ScheduleRecord[]> {
   return apiFetch<ScheduleRecord[]>(`/api/schedules/class/${classId}`);
+}
+
+/**
+ * GET /api/schedules/by-class/{classId} — relationship-aware class timetable.
+ *
+ * Unlike `getSchedule`, this variant also authorises parents/students via their
+ * linked child's class, so the orang tua view can use it (#58).
+ */
+export function getClassScheduleByRelationship(classId: number): Promise<ScheduleRecord[]> {
+  return apiFetch<ScheduleRecord[]>(`/api/schedules/by-class/${classId}`);
+}
+
+/**
+ * POST /api/schedules/bulk-replace/{classId} — atomically replace a class's
+ * whole timetable (#57). Returns the persisted, canonical slot list.
+ */
+export function bulkReplaceSchedules(
+  classId: number,
+  entries: ScheduleBulkEntry[]
+): Promise<ScheduleRecord[]> {
+  return apiFetch<ScheduleRecord[]>(`/api/schedules/bulk-replace/${classId}`, {
+    method: "POST",
+    body: JSON.stringify(entries),
+  });
 }
 
 /** GET /api/schedules/teacher/{teacherId} — a teacher's weekly timetable. */

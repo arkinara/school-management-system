@@ -13,13 +13,15 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { Toast, ToastViewport } from "@/components/ui/Toast";
 import { cn } from "@/components/ui/cn";
 import {
-  bulkSaveSchedules,
+  bulkReplaceSchedules,
   fetchAll,
   fetchClasses,
   fetchSubjects,
   fetchUsers,
   getSchedule,
   type ClassRecord,
+  type ScheduleBulkEntry,
+  type ScheduleConflict,
   type SubjectRecord,
   type UserRecord,
 } from "@/lib/endpoints";
@@ -55,8 +57,63 @@ interface TeacherOption {
   full_name: string;
 }
 
-function overlap(a: Slot, b: Slot): boolean {
+function overlap(a: { start: string; end: string }, b: { start: string; end: string }): boolean {
   return a.start < b.end && a.end > b.start;
+}
+
+/**
+ * Stable serialisation of the grid, used to detect whether the user actually
+ * changed anything since the server state was loaded. Prevents re-posting an
+ * unchanged timetable (negative AC #58: no request, no self-409).
+ */
+function serializeGrid(grid: Record<string, Slot>): string {
+  return Object.keys(grid)
+    .sort()
+    .map((key) => {
+      const slot = grid[key];
+      return `${key}|${slot.subjectId}|${slot.teacherId}|${slot.start}|${slot.end}`;
+    })
+    .join(",");
+}
+
+/**
+ * Map backend 409 `detail.conflicts[]` to grid cell keys.
+ *
+ * Conflicts reference pre-existing rows (usually on another class's timetable
+ * for the same teacher) plus in-batch duplicates. A submitted cell is flagged
+ * when it overlaps the conflict on the same day and shares the teacher or class.
+ */
+function conflictCellKeys(
+  conflicts: ScheduleConflict[],
+  grid: Record<string, Slot>,
+  classId: number
+): Set<string> {
+  const flagged = new Set<string>();
+  for (const conflict of conflicts) {
+    const day = Number(conflict.day_of_week);
+    const start = conflict.start_time.slice(0, 5);
+    const end = conflict.end_time.slice(0, 5);
+    for (const [key, slot] of Object.entries(grid)) {
+      const [keyDay] = key.split(":");
+      if (Number(keyDay) !== day) continue;
+      if (!overlap(slot, { start, end })) continue;
+      if (slot.teacherId === conflict.teacher_id || conflict.class_id === classId) {
+        flagged.add(key);
+      }
+    }
+  }
+  return flagged;
+}
+
+function extractConflicts(error: ApiError): ScheduleConflict[] {
+  const detail = (error.body as { detail?: { conflicts?: unknown; conflict?: unknown } })?.detail;
+  if (detail && Array.isArray(detail.conflicts)) {
+    return detail.conflicts as ScheduleConflict[];
+  }
+  if (detail && detail.conflict) {
+    return [detail.conflict as ScheduleConflict];
+  }
+  return [];
 }
 
 function JadwalConfigContent() {
@@ -67,6 +124,11 @@ function JadwalConfigContent() {
   const [classId, setClassId] = React.useState("");
   const [pool, setPool] = React.useState<{ subjectId: number; teacherId: number }[]>([]);
   const [grid, setGrid] = React.useState<Record<string, Slot>>({});
+  const [serverSnapshot, setServerSnapshot] = React.useState("");
+  const [gridError, setGridError] = React.useState(false);
+  const [gridKey, setGridKey] = React.useState(0);
+  const [apiConflicts, setApiConflicts] = React.useState<ScheduleConflict[]>([]);
+  const [teacherFilter, setTeacherFilter] = React.useState<number | null>(null);
   const [loadStatus, setLoadStatus] = React.useState<LoadStatus>("loading");
   const [gridLoading, setGridLoading] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -113,10 +175,11 @@ function JadwalConfigContent() {
     };
   }, []);
 
-  React.useEffect(() => {
-    if (step !== 3 || !classId) return;
+  const loadGrid = React.useCallback(() => {
+    if (!classId) return;
     let active = true;
     setGridLoading(true);
+    setGridError(false);
     getSchedule(Number(classId))
       .then((records) => {
         if (!active) return;
@@ -130,9 +193,11 @@ function JadwalConfigContent() {
           };
         }
         setGrid(next);
+        setServerSnapshot(serializeGrid(next));
+        setApiConflicts([]);
       })
       .catch(() => {
-        if (active) setToast({ message: "Gagal memuat jadwal kelas.", tone: "error" });
+        if (active) setGridError(true);
       })
       .finally(() => {
         if (active) setGridLoading(false);
@@ -140,9 +205,15 @@ function JadwalConfigContent() {
     return () => {
       active = false;
     };
-  }, [step, classId]);
+  }, [classId]);
 
-  const conflicts = React.useMemo(() => {
+  React.useEffect(() => {
+    if (step !== 3 || !classId) return;
+    const cleanup = loadGrid();
+    return cleanup;
+  }, [step, classId, gridKey, loadGrid]);
+
+  const localConflicts = React.useMemo(() => {
     const flagged = new Set<string>();
     const entries = Object.entries(grid);
     for (let i = 0; i < entries.length; i += 1) {
@@ -161,6 +232,17 @@ function JadwalConfigContent() {
     }
     return flagged;
   }, [grid]);
+
+  const apiConflictKeys = React.useMemo(
+    () => conflictCellKeys(apiConflicts, grid, Number(classId) || 0),
+    [apiConflicts, grid, classId]
+  );
+
+  const conflictCells = React.useMemo(() => {
+    const merged = new Set(localConflicts);
+    for (const key of apiConflictKeys) merged.add(key);
+    return merged;
+  }, [localConflicts, apiConflictKeys]);
 
   function addPoolEntry() {
     setPool((current) => [...current, { subjectId: 0, teacherId: 0 }]);
@@ -186,7 +268,7 @@ function JadwalConfigContent() {
     const poolDefault = pool[0];
     setDraft({
       subjectId: String(existing?.subjectId ?? poolDefault?.subjectId ?? ""),
-      teacherId: String(existing?.teacherId ?? poolDefault?.teacherId ?? ""),
+      teacherId: String(existing?.teacherId ?? poolDefault?.teacherId ?? teacherFilter ?? ""),
       start: existing?.start ?? DEFAULT_PERIOD_TIMES[period]?.start ?? "07:00",
       end: existing?.end ?? DEFAULT_PERIOD_TIMES[period]?.end ?? "07:40",
     });
@@ -229,16 +311,19 @@ function JadwalConfigContent() {
   }
 
   async function save() {
-    const nextErrors: string[] = [];
-    if (!classId) nextErrors.push("Kelas belum dipilih.");
-    if (Object.keys(grid).length === 0) nextErrors.push("Belum ada slot jadwal yang diisi.");
-    if (nextErrors.length > 0) {
-      setErrors(nextErrors);
+    if (!classId) {
+      setErrors(["Kelas belum dipilih."]);
+      return;
+    }
+    if (serializeGrid(grid) === serverSnapshot) {
+      setToast({ message: "Tidak ada perubahan jadwal.", tone: "warning" });
       return;
     }
     if (saving) return;
     setSaving(true);
-    const schedules = Object.entries(grid).map(([key, slot]) => {
+    setErrors([]);
+    setApiConflicts([]);
+    const entries: ScheduleBulkEntry[] = Object.entries(grid).map(([key, slot]) => {
       const [day, period] = key.split(":");
       return {
         subject_id: slot.subjectId,
@@ -250,18 +335,14 @@ function JadwalConfigContent() {
       };
     });
     try {
-      const result = await bulkSaveSchedules({
-        class_id: Number(classId),
-        schedules,
-      });
+      const saved = await bulkReplaceSchedules(Number(classId), entries);
+      setServerSnapshot(serializeGrid(grid));
       setErrors([]);
-      setToast({
-        message: `${result.created} slot jadwal tersimpan`,
-        tone: "success",
-      });
+      setApiConflicts([]);
+      setToast({ message: `${saved.length} slot jadwal tersimpan`, tone: "success" });
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setErrors(["Konflik jadwal: guru/kelas sudah terisi pada hari dan jam tersebut."]);
+        setApiConflicts(extractConflicts(err));
         setToast({ message: "Konflik jadwal terdeteksi.", tone: "error" });
       } else {
         const detail = err instanceof ApiError ? err.detail : "Gagal menyimpan jadwal.";
@@ -274,6 +355,7 @@ function JadwalConfigContent() {
 
   function resetGrid() {
     setGrid({});
+    setApiConflicts([]);
     setResetOpen(false);
     setErrors([]);
     setToast({ message: "Grid jadwal dikosongkan.", tone: "warning" });
@@ -472,12 +554,52 @@ function JadwalConfigContent() {
           <CardHeader className="flex-wrap items-center border-b border-outline-variant pb-3">
             <CardTitle>Grid Jadwal · {selectedClass?.name ?? "Kelas"}</CardTitle>
             <div className="flex items-center gap-2">
-              {conflicts.size > 0 && (
-                <StatusChip tone="danger">{conflicts.size} slot bentrok</StatusChip>
+              {conflictCells.size > 0 && (
+                <StatusChip tone="danger">{conflictCells.size} slot bentrok</StatusChip>
               )}
+              <label className="flex items-center gap-1.5 text-2xs text-muted-foreground">
+                Filter guru
+                <select
+                  aria-label="Filter guru"
+                  value={teacherFilter ?? ""}
+                  onChange={(event) =>
+                    setTeacherFilter(event.target.value ? Number(event.target.value) : null)
+                  }
+                  className={cn(inputClass, "min-h-8 py-0 text-2xs")}
+                >
+                  <option value="">Semua guru</option>
+                  {teachers.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.full_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <span className="text-2xs text-muted-foreground">Klik sel untuk mengisi</span>
             </div>
           </CardHeader>
+
+          {conflictCells.size > 0 && (
+            <div
+              role="alert"
+              data-testid="conflict-banner"
+              className="border-b border-destructive/40 bg-destructive-container px-5 py-3 text-xs text-destructive-container-foreground"
+            >
+              <p className="font-semibold">{conflictCells.size} jadwal bentrok</p>
+              {apiConflicts.length > 0 && (
+                <ul className="list-disc pl-5 text-2xs">
+                  {apiConflicts.map((conflict, index) => (
+                    <li key={`${conflict.schedule_id}-${conflict.type}-${index}`}>
+                      {conflict.type} ·{" "}
+                      {DAYS.find((day) => day.value === conflict.day_of_week)?.label ??
+                        conflict.day_of_week}{" "}
+                      {conflict.start_time.slice(0, 5)}–{conflict.end_time.slice(0, 5)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {errors.length > 0 && (
             <div
@@ -493,6 +615,18 @@ function JadwalConfigContent() {
           {gridLoading ? (
             <div className="p-4">
               <SkeletonTable rows={6} cols={7} />
+            </div>
+          ) : gridError ? (
+            <div role="alert" className="flex flex-col items-start gap-3 p-5 text-sm">
+              <p className="text-destructive">Gagal memuat jadwal. Coba lagi.</p>
+              <Button
+                variant="tonal"
+                icon={RotateCcw}
+                type="button"
+                onClick={() => setGridKey((current) => current + 1)}
+              >
+                Coba lagi
+              </Button>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -528,20 +662,24 @@ function JadwalConfigContent() {
                       {DAYS.map((day) => {
                         const key = `${day.value}:${period}`;
                         const slot = grid[key];
-                        const conflict = conflicts.has(key);
+                        const conflict = conflictCells.has(key);
+                        const dimmed =
+                          teacherFilter !== null && slot && slot.teacherId !== teacherFilter;
                         return (
                           <td key={key} className="border-l border-outline-variant p-1 align-top">
                             <button
                               type="button"
                               onClick={() => openCell(day.value, period)}
                               aria-label={`${day.label} jam ke-${period}`}
+                              data-conflict={conflict ? "true" : undefined}
                               className={cn(
                                 "flex min-h-[52px] w-full flex-col items-start gap-0.5 rounded-sm border px-2 py-1.5 text-left transition-colors",
                                 conflict
                                   ? "border-destructive bg-destructive-container text-destructive-container-foreground"
                                   : slot
                                     ? "border-outline-variant bg-primary-container text-primary-container-foreground"
-                                    : "border-dashed border-outline-variant text-muted-foreground hover:bg-surface-container"
+                                    : "border-dashed border-outline-variant text-muted-foreground hover:bg-surface-container",
+                                dimmed && "opacity-40"
                               )}
                             >
                               {slot ? (
