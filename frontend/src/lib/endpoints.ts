@@ -434,7 +434,7 @@ export interface TeacherOption {
    Rapor (#18) — compiled report cards
    ========================================================================== */
 
-export type ReportCardStatus = "draft" | "published";
+export type ReportCardStatus = "draft" | "finalized" | "published" | "superseded";
 
 export interface NarrativeRaporEntry {
   aspek: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, Download, FileText, Printer, RotateCcw } from "lucide-react";
+import { AlertCircle, FileText, Printer, RotateCcw } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -12,17 +12,48 @@ import { Skeleton, SkeletonList } from "@/components/ui/Skeleton";
 import { cn } from "@/components/ui/cn";
 import {
   fetchParentChildren,
+  fetchRaporList,
   fetchStudents,
-  getRapor,
   type ChildSummary,
   type RaporCompiledData,
   type ReportCardRecord,
   type StudentRecord,
 } from "@/lib/endpoints";
-import { fetchActiveSemester, semesterLabel, semesterOptions, type Semester } from "@/lib/academic";
+import { fetchActiveSemester, semesterLabel, type Semester } from "@/lib/academic";
 import type { UserMe } from "@/lib/auth";
 
-type LoadStatus = "loading" | "ready" | "error";
+type RaporState =
+  | { kind: "loading" }
+  | { kind: "error"; message: string; onRetry: () => void }
+  | { kind: "no-rapor"; semester: string }
+  | { kind: "not-yet-published"; semester: string; status: "draft" | "finalized" }
+  | { kind: "published"; rapor: ReportCardRecord };
+
+interface RaporQuery {
+  isLoading: boolean;
+  isError: boolean;
+  data: ReportCardRecord[] | null;
+}
+
+/** Exhaustive UI state for the rapor viewer (never collapses errors into empty). */
+export function deriveRaporState(
+  query: RaporQuery,
+  semester: string,
+  onRetry: () => void
+): RaporState {
+  if (query.isLoading) return { kind: "loading" };
+  if (query.isError) return { kind: "error", message: "Gagal memuat rapor", onRetry };
+  const rows = query.data ?? [];
+  const rapor = rows.find((record) => record.semester === semester);
+  if (!rapor) return { kind: "no-rapor", semester };
+  if (rapor.status === "draft" || rapor.status === "finalized") {
+    return { kind: "not-yet-published", semester, status: rapor.status };
+  }
+  if (rapor.status === "superseded") {
+    return { kind: "error", message: "Rapor ini telah diperbarui", onRetry };
+  }
+  return { kind: "published", rapor };
+}
 
 function formatScore(value: number): string {
   return value.toFixed(2).replace(".", ",");
@@ -135,6 +166,95 @@ function AttendanceSummary({ kehadiran }: { kehadiran: Record<string, number> })
   );
 }
 
+function RaporContent({ rapor, studentName }: { rapor: ReportCardRecord; studentName: string }) {
+  const data = rapor.compiled_data;
+  if (data === null) {
+    return (
+      <EmptyState
+        icon={FileText}
+        title="Konten rapor belum tersedia"
+        description="Rapor sudah dipublikasikan tetapi isinya belum dapat dimuat."
+      />
+    );
+  }
+  return (
+    <Card>
+      <CardHeader className="flex-wrap items-start gap-3 border-b border-outline-variant pb-4">
+        <div className="flex items-center gap-3">
+          <Avatar name={studentName} size="md" />
+          <div>
+            <CardTitle>{studentName}</CardTitle>
+            <p className="text-2xs text-muted-foreground">
+              {semesterLabel(rapor.semester)} · Fase {data.fase} · {data.jenjang}
+            </p>
+          </div>
+        </div>
+        <StatusChip tone="success">published</StatusChip>
+      </CardHeader>
+      <CompiledBody data={data} />
+      {data.kehadiran && <AttendanceSummary kehadiran={data.kehadiran} />}
+    </Card>
+  );
+}
+
+function RaporStateView({ state, studentName }: { state: RaporState; studentName: string }) {
+  switch (state.kind) {
+    case "loading":
+      return (
+        <Card>
+          <CardHeader className="border-b border-outline-variant pb-3">
+            <Skeleton className="h-5 w-48" />
+          </CardHeader>
+          <div className="p-5">
+            <SkeletonList rows={5} />
+          </div>
+        </Card>
+      );
+    case "error":
+      return (
+        <div role="alert">
+          <EmptyState
+            icon={AlertCircle}
+            title={state.message}
+            description="Tidak dapat mengambil data rapor. Periksa koneksi lalu coba lagi."
+            action={
+              <Button variant="tonal" icon={RotateCcw} onClick={state.onRetry}>
+                Coba lagi
+              </Button>
+            }
+          />
+        </div>
+      );
+    case "no-rapor":
+      return (
+        <EmptyState
+          icon={FileText}
+          title="Belum ada rapor"
+          description={`Belum ada catatan rapor untuk ${studentName} pada ${semesterLabel(state.semester)}.`}
+        />
+      );
+    case "not-yet-published":
+      return (
+        <div
+          role="status"
+          className="rounded-lg bg-warning-container p-5 text-warning-container-foreground"
+        >
+          <p className="text-sm font-semibold">
+            Rapor semester {semesterLabel(state.semester)} belum dipublikasikan.
+          </p>
+          <p className="mt-1 text-sm">
+            Status:{" "}
+            {state.status === "draft"
+              ? "Disusun wali kelas"
+              : "Difinalisasi wali kelas, menunggu persetujuan kepala sekolah"}
+          </p>
+        </div>
+      );
+    case "published":
+      return <RaporContent rapor={state.rapor} studentName={studentName} />;
+  }
+}
+
 export interface RaporPanelProps {
   me: UserMe;
   audience: "parent" | "student";
@@ -143,28 +263,34 @@ export interface RaporPanelProps {
 /**
  * Shared rapor viewer for the parent and student dashboards. Parent context
  * adds a child selector; student context is scoped to the signed-in student.
+ *
+ * Semester options are derived from the rapors the backend exposes for the
+ * student (parents only ever receive published ones), never hardcoded, and the
+ * viewer renders an exhaustive state machine so a failed request is never
+ * mistaken for "no rapor".
  */
 export function RaporPanel({ me, audience }: RaporPanelProps) {
   const [children, setChildren] = React.useState<ChildSummary[]>([]);
   const [studentName, setStudentName] = React.useState(me.user.full_name);
   const [selectedStudentId, setSelectedStudentId] = React.useState<number | null>(null);
-  const [semesters, setSemesters] = React.useState<Semester[]>([]);
+  const [activeSemester, setActiveSemester] = React.useState<Semester>("2026/2027-ganjil");
   const [semester, setSemester] = React.useState<string>("");
-  const [available, setAvailable] = React.useState<Record<string, boolean>>({});
-  const [records, setRecords] = React.useState<Record<string, ReportCardRecord | null>>({});
-  const [rapor, setRapor] = React.useState<ReportCardRecord | null>(null);
-  const [status, setStatus] = React.useState<LoadStatus>("loading");
-  const [reloadKey, setReloadKey] = React.useState(0);
-  const initializedFor = React.useRef<number | null>(null);
+  const [fetchKey, setFetchKey] = React.useState(0);
+  const [childrenKey, setChildrenKey] = React.useState(0);
+  const [childrenStatus, setChildrenStatus] = React.useState<"loading" | "ready" | "error">(
+    "loading"
+  );
+  const [query, setQuery] = React.useState<RaporQuery>({
+    isLoading: true,
+    isError: false,
+    data: null,
+  });
 
   React.useEffect(() => {
     let active = true;
     fetchActiveSemester()
-      .then((activeSemester) => {
-        if (!active) return;
-        const options = semesterOptions(activeSemester);
-        setSemesters(options);
-        setSemester((current) => current || options[0]);
+      .then((value) => {
+        if (active) setActiveSemester(value);
       })
       .catch(() => undefined);
     return () => {
@@ -174,24 +300,16 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
 
   React.useEffect(() => {
     let active = true;
-    setStatus("loading");
+    setChildrenStatus("loading");
     const loadChildren: Promise<{ id: number; full_name: string }[]> =
       audience === "parent"
         ? fetchParentChildren(me.user.id).then((kids) =>
             kids.map((kid) => ({ id: kid.id, full_name: kid.full_name }))
           )
         : fetchStudents({ size: 100 }).then((page) => {
-            const own =
-              page.items.find((student: StudentRecord) => student.user_id === me.user.id) ??
-              page.items[0];
-            return own
-              ? [
-                  {
-                    id: own.id,
-                    full_name: own.full_name ?? me.user.full_name,
-                  },
-                ]
-              : [];
+            // Identity comes from the authenticated user link, never the first roster row.
+            const own = page.items.find((student: StudentRecord) => student.user_id === me.user.id);
+            return own ? [{ id: own.id, full_name: own.full_name ?? me.user.full_name }] : [];
           });
     loadChildren
       .then((list) => {
@@ -212,67 +330,87 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
           setSelectedStudentId(list[0].id);
           setStudentName(list[0].full_name);
         } else {
-          setStatus("ready");
+          setSelectedStudentId(null);
         }
+        setChildrenStatus("ready");
       })
       .catch(() => {
-        if (active) setStatus("error");
+        if (active) setChildrenStatus("error");
       });
     return () => {
       active = false;
     };
-  }, [audience, me.user.full_name, me.user.id, reloadKey]);
+  }, [audience, me.user.full_name, me.user.id, childrenKey]);
+
+  const refetch = React.useCallback(() => setFetchKey((current) => current + 1), []);
 
   React.useEffect(() => {
-    if (selectedStudentId === null || semesters.length === 0) return;
+    if (selectedStudentId === null) {
+      setQuery({ isLoading: false, isError: false, data: [] });
+      return;
+    }
     let active = true;
-    setStatus("loading");
-    Promise.all(
-      semesters.map((value) =>
-        getRapor({ studentId: selectedStudentId, semester: value })
-          .then((record) => [value, record] as const)
-          .catch(() => [value, null] as const)
-      )
-    )
-      .then((results) => {
+    setQuery((current) => ({ ...current, isLoading: true, isError: false }));
+    fetchRaporList(selectedStudentId, { size: 100 })
+      .then((page) => {
         if (!active) return;
-        const availability: Record<string, boolean> = {};
-        const bySemester: Record<string, ReportCardRecord | null> = {};
-        for (const [value, record] of results) {
-          availability[value] = record !== null;
-          bySemester[value] = record;
-        }
-        setAvailable(availability);
-        setRecords(bySemester);
-
-        if (initializedFor.current !== selectedStudentId) {
-          initializedFor.current = selectedStudentId;
-          const firstAvailable = semesters.find((value) => availability[value]);
-          if (firstAvailable) {
-            setSemester(firstAvailable);
-            return;
-          }
-          setRapor(null);
-          setStatus("ready");
-          return;
-        }
-
-        setRapor(bySemester[semester] ?? null);
-        setStatus("ready");
+        const mine = page.items.filter((record) => record.student_id === selectedStudentId);
+        setQuery({ isLoading: false, isError: false, data: mine });
       })
       .catch(() => {
-        if (active) setStatus("error");
+        if (active) setQuery({ isLoading: false, isError: true, data: null });
       });
     return () => {
       active = false;
     };
-  }, [selectedStudentId, semester, reloadKey, semesters]);
+  }, [selectedStudentId, fetchKey]);
 
-  const data = rapor?.compiled_data ?? null;
-  const hasAnyRecord = semesters.some((value) => records[value] != null);
-  const selectedRecord = records[semester] ?? null;
-  const notPublished =
-    status === "ready" && selectedRecord !== null && selectedRecord.status !== "published";
+  const availableSemesters = React.useMemo(() => {
+    const set = new Set<string>();
+    set.add(activeSemester);
+    for (const record of query.data ?? []) set.add(record.semester);
+    return Array.from(set).sort();
+  }, [query.data, activeSemester]);
+
+  React.useEffect(() => {
+    if (availableSemesters.length === 0) return;
+    setSemester((current) => {
+      if (current && availableSemesters.includes(current)) return current;
+      if (availableSemesters.includes(activeSemester)) return activeSemester;
+      return availableSemesters[availableSemesters.length - 1];
+    });
+  }, [availableSemesters, activeSemester]);
+
+  const onSemesterChange = (value: string) => {
+    setSemester(value);
+    // Force a refetch even when the dropdown value is unchanged.
+    setFetchKey((current) => current + 1);
+  };
+
+  const state: RaporState =
+    childrenStatus === "loading"
+      ? { kind: "loading" }
+      : childrenStatus === "error"
+        ? {
+            kind: "error",
+            message: "Gagal memuat rapor",
+            onRetry: () => setChildrenKey((k) => k + 1),
+          }
+        : selectedStudentId === null
+          ? { kind: "no-rapor", semester }
+          : deriveRaporState(query, semester, refetch);
+
+  if (childrenStatus === "ready" && children.length === 0) {
+    return (
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+        <EmptyState
+          icon={FileText}
+          title="Belum ada data siswa"
+          description="Akun ini belum tertaut ke data siswa mana pun."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
@@ -289,18 +427,9 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
             icon={Printer}
             type="button"
             onClick={() => window.print()}
-            disabled={status !== "ready" || rapor === null}
+            disabled={state.kind !== "published"}
           >
-            Cetak
-          </Button>
-          <Button
-            variant="outlined"
-            icon={Download}
-            type="button"
-            disabled
-            title="Unduh PDF akan tersedia pada rilis berikutnya"
-          >
-            Unduh PDF
+            Cetak / Simpan PDF
           </Button>
         </div>
       </div>
@@ -332,13 +461,12 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
             <select
               id="rapor-semester"
               value={semester}
-              onChange={(event) => setSemester(event.target.value)}
+              onChange={(event) => onSemesterChange(event.target.value)}
               className={inputClass}
             >
-              {semesters.map((value) => (
-                <option key={value} value={value} disabled={available[value] === false}>
+              {availableSemesters.map((value) => (
+                <option key={value} value={value}>
                   {semesterLabel(value)}
-                  {available[value] === false ? " (belum tersedia)" : ""}
                 </option>
               ))}
             </select>
@@ -346,74 +474,9 @@ export function RaporPanel({ me, audience }: RaporPanelProps) {
         </CardHeader>
       </Card>
 
-      {status === "loading" ? (
-        <Card>
-          <CardHeader className="border-b border-outline-variant pb-3">
-            <Skeleton className="h-5 w-48" />
-          </CardHeader>
-          <div className="p-5">
-            <SkeletonList rows={5} />
-          </div>
-        </Card>
-      ) : status === "error" ? (
-        <EmptyState
-          icon={AlertCircle}
-          title="Gagal memuat rapor"
-          description="Tidak dapat mengambil data rapor. Periksa koneksi lalu coba lagi."
-          action={
-            <Button
-              variant="tonal"
-              icon={RotateCcw}
-              onClick={() => setReloadKey((current) => current + 1)}
-            >
-              Coba lagi
-            </Button>
-          }
-        />
-      ) : children.length === 0 ? (
-        <EmptyState
-          icon={FileText}
-          title="Belum ada data siswa"
-          description="Akun ini belum tertaut ke data siswa mana pun."
-        />
-      ) : notPublished ? (
-        <EmptyState
-          icon={FileText}
-          title="Rapor belum diterbitkan"
-          description={`Rapor ${studentName} untuk ${semesterLabel(semester)} masih berstatus draft dan belum dapat dilihat.`}
-        />
-      ) : rapor === null || data === null ? (
-        hasAnyRecord ? (
-          <EmptyState
-            icon={FileText}
-            title="Rapor belum diterbitkan"
-            description={`Rapor ${studentName} untuk ${semesterLabel(semester)} belum diterbitkan oleh sekolah.`}
-          />
-        ) : (
-          <EmptyState
-            icon={FileText}
-            title="Belum ada rapor"
-            description={`Belum ada catatan rapor untuk ${studentName} pada semester ini. Rapor akan tersedia setelah wali kelas menerbitkannya.`}
-          />
-        )
-      ) : (
-        <Card>
-          <CardHeader className="flex-wrap items-start gap-3 border-b border-outline-variant pb-4">
-            <div className="flex items-center gap-3">
-              <Avatar name={studentName} size="md" />
-              <div>
-                <CardTitle>{studentName}</CardTitle>
-                <p className="text-2xs text-muted-foreground">
-                  {semesterLabel(rapor.semester)} · Fase {data.fase} · {data.jenjang}
-                </p>
-              </div>
-            </div>
-            <StatusChip tone="success">published</StatusChip>
-          </CardHeader>
-          <CompiledBody data={data} />
-          {data.kehadiran && <AttendanceSummary kehadiran={data.kehadiran} />}
-        </Card>
-      )}
+      <div className="rapor-print">
+        <RaporStateView state={state} studentName={studentName} />
+      </div>
     </div>
   );
 }

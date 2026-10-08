@@ -349,4 +349,18 @@
   main {
     padding: 0 !important;
   }
+  /* Print-to-PDF: show only the rapor body, hide chrome/nav. */
+  body * {
+    visibility: hidden;
+  }
+  .rapor-print,
+  .rapor-print * {
+    visibility: visible;
+  }
+  .rapor-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
 }
