@@ -372,3 +372,176 @@ def test_tenant_boundary_enforced(client: TestClient, db_session: Session) -> No
     assert client.get("/api/schedules/class/10", headers=_auth(PRINCIPAL)).status_code == 403
     assert client.get("/api/schedules?class_id=10", headers=_auth(PRINCIPAL)).status_code == 403
     assert client.get("/api/schedules/class/10", headers=_auth(SUPER)).status_code == 200
+
+
+def test_no_conflict_same_teacher_different_day(
+    client: TestClient, db_session: Session
+) -> None:
+    first = client.post(
+        "/api/schedules",
+        headers=_auth(PRINCIPAL),
+        json={
+            "class_id": 1,
+            "subject_id": 1,
+            "teacher_id": 4,
+            "day_of_week": 6,
+            "period_number": 9,
+            "start_time": "16:00:00",
+            "end_time": "16:45:00",
+        },
+    )
+    assert first.status_code == 201, first.text
+    second = client.post(
+        "/api/schedules",
+        headers=_auth(PRINCIPAL),
+        json={
+            "class_id": 1,
+            "subject_id": 1,
+            "teacher_id": 4,
+            "day_of_week": 7,
+            "period_number": 9,
+            "start_time": "16:00:00",
+            "end_time": "16:45:00",
+        },
+    )
+    assert second.status_code == 201, second.text
+
+
+def test_no_conflict_same_teacher_same_day_different_time(
+    client: TestClient, db_session: Session
+) -> None:
+    first = client.post(
+        "/api/schedules",
+        headers=_auth(PRINCIPAL),
+        json={
+            "class_id": 1,
+            "subject_id": 1,
+            "teacher_id": 4,
+            "day_of_week": 6,
+            "period_number": 9,
+            "start_time": "16:00:00",
+            "end_time": "16:45:00",
+        },
+    )
+    assert first.status_code == 201, first.text
+    second = client.post(
+        "/api/schedules",
+        headers=_auth(PRINCIPAL),
+        json={
+            "class_id": 1,
+            "subject_id": 1,
+            "teacher_id": 4,
+            "day_of_week": 6,
+            "period_number": 10,
+            "start_time": "16:45:00",
+            "end_time": "17:30:00",
+        },
+    )
+    assert second.status_code == 201, second.text
+
+
+def test_conflict_same_teacher_same_day_lists_conflicts(
+    client: TestClient, db_session: Session
+) -> None:
+    first = client.post(
+        "/api/schedules",
+        headers=_auth(PRINCIPAL),
+        json={
+            "class_id": 1,
+            "subject_id": 1,
+            "teacher_id": 4,
+            "day_of_week": 6,
+            "period_number": 9,
+            "start_time": "16:00:00",
+            "end_time": "16:45:00",
+        },
+    )
+    assert first.status_code == 201, first.text
+    conflict = client.post(
+        "/api/schedules",
+        headers=_auth(PRINCIPAL),
+        json={
+            "class_id": 2,
+            "subject_id": 1,
+            "teacher_id": 4,
+            "day_of_week": 6,
+            "period_number": 9,
+            "start_time": "16:00:00",
+            "end_time": "16:45:00",
+        },
+    )
+    assert conflict.status_code == 409, conflict.text
+    detail = conflict.json()["detail"]
+    assert isinstance(detail["conflicts"], list)
+    assert detail["conflicts"], "conflict detail must include the clashing entry"
+    assert detail["conflicts"][0]["schedule_id"] == first.json()["id"]
+
+
+def test_bulk_replace_atomic(client: TestClient, db_session: Session) -> None:
+    response = client.post(
+        "/api/schedules/bulk-replace/1",
+        headers=_auth(PRINCIPAL),
+        json=[
+            {
+                "subject_id": 1,
+                "teacher_id": 4,
+                "day_of_week": 6,
+                "period_number": 9,
+                "start_time": "16:00:00",
+                "end_time": "16:45:00",
+            },
+            {
+                "subject_id": 2,
+                "teacher_id": 5,
+                "day_of_week": 6,
+                "period_number": 10,
+                "start_time": "16:45:00",
+                "end_time": "17:30:00",
+            },
+        ],
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert len(body) == 2
+    db_session.expire_all()
+    rows = db_session.scalars(
+        select(Schedule).where(Schedule.class_id == 1)
+    ).all()
+    assert {row.id for row in rows} == {item["id"] for item in body}
+
+
+def test_bulk_replace_conflict_rolls_back(
+    client: TestClient, db_session: Session
+) -> None:
+    before = db_session.scalar(
+        select(func.count()).select_from(Schedule).where(Schedule.class_id == 1)
+    )
+    response = client.post(
+        "/api/schedules/bulk-replace/1",
+        headers=_auth(PRINCIPAL),
+        json=[
+            {
+                "subject_id": 1,
+                "teacher_id": 4,
+                "day_of_week": 6,
+                "period_number": 9,
+                "start_time": "16:00:00",
+                "end_time": "16:45:00",
+            },
+            {
+                "subject_id": 2,
+                "teacher_id": 5,
+                "day_of_week": 4,
+                "period_number": 1,
+                "start_time": "07:00:00",
+                "end_time": "07:45:00",
+            },
+        ],
+    )
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["conflicts"]
+    db_session.expire_all()
+    after = db_session.scalar(
+        select(func.count()).select_from(Schedule).where(Schedule.class_id == 1)
+    )
+    assert after == before
