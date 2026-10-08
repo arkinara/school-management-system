@@ -630,6 +630,61 @@ export function fetchGradeAggregate(params: {
   return apiFetch<GradeAggregate>(`/api/grades/aggregate${toQuery(params)}`);
 }
 
+/** Per-category rollup inside a class-grade aggregate (ticket #53). */
+export interface ClassAggregateCategory {
+  scores: number[];
+  avg: number | null;
+  complete: boolean;
+  missing: string[];
+}
+
+/** One student's row inside a class-grade aggregate. */
+export interface ClassAggregateStudent {
+  student_id: number;
+  student_name: string;
+  categories: Record<string, ClassAggregateCategory>;
+  total_avg: number | null;
+}
+
+/** One subject's block inside a class-grade aggregate. */
+export interface ClassAggregateSubject {
+  subject_id: number;
+  subject_name: string;
+  students: ClassAggregateStudent[];
+}
+
+/** GET /api/grades/aggregate?class_id=&semester= — full class grid state. */
+export interface ClassGradeAggregate {
+  class_id: number;
+  semester: string;
+  subjects: ClassAggregateSubject[];
+}
+
+/** GET /api/grades/aggregate — per-student, per-subject, per-category grid. */
+export function fetchClassGradeAggregate(params: {
+  class_id: number;
+  semester: string;
+}): Promise<ClassGradeAggregate> {
+  return apiFetch<ClassGradeAggregate>(`/api/grades/aggregate${toQuery(params)}`);
+}
+
+/** A teacher–subject–class assignment row (ticket #48). */
+export interface TeacherAssignmentRecord {
+  id: number;
+  teacher_id: number;
+  subject_id: number;
+  class_id: number;
+  academic_year: string;
+  created_at: string;
+}
+
+/** GET /api/teacher-assignments — list assignments, filterable by teacher. */
+export function fetchTeacherAssignments(teacherId?: number): Promise<TeacherAssignmentRecord[]> {
+  return apiFetch<TeacherAssignmentRecord[]>(
+    `/api/teacher-assignments${toQuery({ teacher_id: teacherId })}`
+  );
+}
+
 /** Aggregate billing figures returned by GET /api/spp/summary. */
 export interface SppSummary {
   bill_count: number;

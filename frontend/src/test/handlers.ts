@@ -287,6 +287,62 @@ export const handlers = [
 
   http.get(`${API}/api/grades`, () => HttpResponse.json(page<GradeRecord>([], 0))),
 
+  http.get(`${API}/api/teacher-assignments`, () =>
+    HttpResponse.json([
+      {
+        id: 1,
+        teacher_id: TEACHER_ID,
+        subject_id: 1,
+        class_id: 1,
+        academic_year: "2025/2026",
+        created_at: "2026-01-01T00:00:00Z",
+      },
+      {
+        id: 2,
+        teacher_id: TEACHER_ID,
+        subject_id: 1,
+        class_id: 2,
+        academic_year: "2025/2026",
+        created_at: "2026-01-01T00:00:00Z",
+      },
+    ])
+  ),
+
+  http.get(`${API}/api/grades/aggregate`, ({ request }) => {
+    const url = new URL(request.url);
+    const classId = Number(url.searchParams.get("class_id") ?? 1);
+    const semester = url.searchParams.get("semester") ?? "2026/2027-ganjil";
+    const emptyCategory = () => ({
+      scores: [],
+      avg: null,
+      complete: false,
+      missing: ["assessment_1"],
+    });
+    return HttpResponse.json({
+      class_id: classId,
+      semester,
+      subjects: [
+        {
+          subject_id: 1,
+          subject_name: "Matematika",
+          students: students
+            .filter((student) => student.class_id === classId)
+            .map((student) => ({
+              student_id: student.id,
+              student_name: student.full_name,
+              categories: {
+                formatif: emptyCategory(),
+                sumatif: emptyCategory(),
+                PR: emptyCategory(),
+                tugas: emptyCategory(),
+              },
+              total_avg: null,
+            })),
+        },
+      ],
+    });
+  }),
+
   http.post(`${API}/api/grades/bulk`, async ({ request }) => {
     const body = (await request.json()) as {
       class_id: number;
