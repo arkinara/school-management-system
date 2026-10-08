@@ -28,6 +28,7 @@ from sqlalchemy import (
     Time,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -104,7 +105,9 @@ class GradeCategory(StrEnum):
 
 class ReportCardStatus(StrEnum):
     DRAFT = "draft"
+    FINALIZED = "finalized"
     PUBLISHED = "published"
+    SUPERSEDED = "superseded"
 
 
 class SppBillStatus(StrEnum):
@@ -388,7 +391,15 @@ class Grade(Base):
 
 
 class ReportCard(Base):
-    """A compiled report card, whose shape depends on kurikulum_version."""
+    """A compiled report card, whose shape depends on kurikulum_version.
+
+    A report card moves through a linear workflow: ``draft`` (wali kelas
+    compiles) → ``finalized`` (wali kelas signs off) → ``published`` (principal
+    approves). Correcting a published rapor creates a new ``draft`` row at
+    ``version + 1`` and marks the previous row ``superseded``; the previous
+    version is retained for staff, while parents only ever see the active
+    ``published`` version.
+    """
 
     __tablename__ = "report_cards"
 
@@ -398,12 +409,33 @@ class ReportCard(Base):
     status: Mapped[ReportCardStatus] = mapped_column(
         _str_enum(ReportCardStatus, 16), nullable=False, default=ReportCardStatus.DRAFT
     )
+    version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
     kurikulum_version: Mapped[str] = mapped_column(String(64), nullable=False)
     compiled_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    superseded_by: Mapped[int | None] = mapped_column(
+        ForeignKey("report_cards.id"), nullable=True
+    )
     finalized_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    published_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
+    gap_override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     student: Mapped[Student] = relationship(back_populates="report_cards")
+
+    __table_args__ = (
+        Index(
+            "uq_report_card_active",
+            "student_id",
+            "semester",
+            unique=True,
+            sqlite_where=text("status IN ('draft', 'finalized', 'published')"),
+            postgresql_where=text("status IN ('draft', 'finalized', 'published')"),
+        ),
+    )
 
 
 class SppBill(Base):
