@@ -22,6 +22,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Table,
     Text,
@@ -112,6 +113,7 @@ class ReportCardStatus(StrEnum):
 
 class SppBillStatus(StrEnum):
     UNPAID = "unpaid"
+    PARTIALLY_PAID = "partially_paid"
     PAID = "paid"
     OVERDUE = "overdue"
 
@@ -439,7 +441,13 @@ class ReportCard(Base):
 
 
 class SppBill(Base):
-    """A tuition bill owed by a student for a billing period."""
+    """A tuition bill owed by a student for a billing period.
+
+    ``paid_amount`` and ``balance`` are denormalised totals kept in step with the
+    non-voided :class:`SppPayment` rows so a bill can be rendered without an
+    aggregate query. ``(student_id, period)`` is unique — a student may not have
+    two bills for the same period.
+    """
 
     __tablename__ = "spp_bills"
 
@@ -451,26 +459,65 @@ class SppBill(Base):
     status: Mapped[SppBillStatus] = mapped_column(
         _str_enum(SppBillStatus, 16), nullable=False, default=SppBillStatus.UNPAID
     )
+    paid_amount: Mapped[float] = mapped_column(
+        Numeric(12, 2), default=0, server_default="0", nullable=False
+    )
+    balance: Mapped[float] = mapped_column(
+        Numeric(12, 2), default=0, server_default="0", nullable=False
+    )
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
 
     student: Mapped[Student] = relationship(back_populates="spp_bills")
     payments: Mapped[list[SppPayment]] = relationship(back_populates="bill")
 
+    __table_args__ = (
+        Index("uq_spp_bill_student_period", "student_id", "period", unique=True),
+    )
+
+
+class SchoolReceiptCounter(Base):
+    """Per-school monotonic counter backing server-assigned receipt numbers."""
+
+    __tablename__ = "school_receipt_counters"
+
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("schools.id"), primary_key=True
+    )
+    next_receipt_no: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1", nullable=False
+    )
+
 
 class SppPayment(Base):
-    """A payment applied against an SPP bill."""
+    """A payment applied against an SPP bill.
+
+    ``receipt_no`` is server-assigned from :class:`SchoolReceiptCounter` and is
+    unique within a school. Voiding (soft delete) records who/when/why and the
+    owning bill's totals are recomputed.
+    """
 
     __tablename__ = "spp_payments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    school_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     bill_id: Mapped[int] = mapped_column(ForeignKey("spp_bills.id"), nullable=False, index=True)
     paid_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     method: Mapped[str] = mapped_column(String(64), nullable=False)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
-    receipt_no: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    receipt_no: Mapped[int] = mapped_column(Integer, nullable=False)
     recorded_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    voided: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    voided_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    void_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     bill: Mapped[SppBill] = relationship(back_populates="payments")
+
+    __table_args__ = (
+        Index("uq_spp_payment_school_receipt", "school_id", "receipt_no", unique=True),
+    )
 
 
 class Announcement(Base):

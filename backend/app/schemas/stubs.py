@@ -73,7 +73,7 @@ class SppPaymentOut(BaseModel):
     paid_at: datetime
     method: str
     amount: float
-    receipt_no: str
+    receipt_no: int
     recorded_by: int
 
 

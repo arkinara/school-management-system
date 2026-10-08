@@ -6,7 +6,6 @@ from datetime import date as date_type
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, or_, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.audit import log_audit_event
@@ -14,6 +13,7 @@ from app.auth.deps import get_current_user, require_role
 from app.db.models import (
     Class,
     School,
+    SchoolReceiptCounter,
     SppBill,
     SppBillStatus,
     SppPayment,
@@ -29,16 +29,20 @@ from app.notifications.triggers import (
 )
 from app.pagination import PageParams
 from app.schemas.spp import (
+    BillWithPaymentsOut,
     SppBillBulkCreate,
     SppBillBulkResult,
     SppBillCreate,
     SppBillListResponse,
     SppBillOut,
     SppBillUpdate,
+    SppBulkGenerateRequest,
+    SppBulkGenerateResult,
     SppPaymentCreate,
     SppPaymentListResponse,
     SppPaymentOut,
     SppSummary,
+    VoidPaymentRequest,
 )
 from app.scoping import visible_student_ids
 
@@ -50,6 +54,7 @@ _manage = require_role(*_MANAGER_ROLES)
 _PAID = SppBillStatus.PAID
 _OVERDUE = SppBillStatus.OVERDUE
 _UNPAID = SppBillStatus.UNPAID
+_PARTIALLY_PAID = SppBillStatus.PARTIALLY_PAID
 
 
 def _can_manage_school(user: User, school: School | None) -> bool:
@@ -101,14 +106,77 @@ def _authorize_bill(db: Session, user: User, bill: SppBill) -> School:
 
 
 def _paid_total(db: Session, bill_id: int) -> float:
+    """Sum of non-voided payments applied to ``bill_id``."""
     return float(
         db.scalar(
             select(func.coalesce(func.sum(SppPayment.amount), 0.0)).where(
-                SppPayment.bill_id == bill_id
+                SppPayment.bill_id == bill_id,
+                SppPayment.voided.is_(False),
             )
         )
         or 0.0
     )
+
+
+def _next_receipt_no(db: Session, school_id: int) -> int:
+    """Atomically allocate the next server-side receipt number for a school."""
+    counter = db.get(SchoolReceiptCounter, school_id)
+    if counter is None:
+        counter = SchoolReceiptCounter(school_id=school_id, next_receipt_no=1)
+        db.add(counter)
+        db.flush()
+    receipt_no = counter.next_receipt_no
+    counter.next_receipt_no = receipt_no + 1
+    db.flush()
+    return receipt_no
+
+
+def _recompute_bill(db: Session, bill: SppBill) -> None:
+    """Refresh a bill's denormalised totals + status from its live payments."""
+    paid = round(_paid_total(db, bill.id), 2)
+    bill.paid_amount = paid
+    bill.balance = round(max(bill.amount - paid, 0.0), 2)
+    if paid <= 0:
+        bill.status = _UNPAID
+    elif paid < round(bill.amount, 2):
+        bill.status = _PARTIALLY_PAID
+    else:
+        bill.balance = 0
+        bill.status = _PAID
+
+
+def _apply_payment(
+    db: Session, bill: SppBill, school: School, user: User, payload: SppPaymentCreate
+) -> SppPayment:
+    """Validate + persist a payment, updating the bill's aggregates and status."""
+    if bill.status == _PAID:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="bill is already paid"
+        )
+
+    outstanding = round(bill.amount - _paid_total(db, bill.id), 2)
+    if payload.amount > outstanding:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="payment exceeds the outstanding balance",
+        )
+
+    receipt_no = _next_receipt_no(db, school.id)
+    payment = SppPayment(
+        school_id=school.id,
+        bill_id=bill.id,
+        paid_at=payload.paid_at or utcnow(),
+        method=payload.method,
+        amount=payload.amount,
+        receipt_no=receipt_no,
+        recorded_by=user.id,
+        voided=False,
+    )
+    db.add(payment)
+    db.flush()
+    _recompute_bill(db, bill)
+    db.flush()
+    return payment
 
 
 def _bill_out(db: Session, bill: SppBill) -> SppBillOut:
@@ -180,6 +248,8 @@ def create_bills_bulk(
                 amount=payload.amount,
                 due_date=payload.due_date,
                 status=_UNPAID,
+                paid_amount=0,
+                balance=payload.amount,
                 created_by=user.id,
             )
         )
@@ -191,6 +261,93 @@ def create_bills_bulk(
         period=payload.period,
         created=created,
         skipped=skipped,
+    )
+
+
+@router.post(
+    "/bills/bulk-generate",
+    status_code=status.HTTP_201_CREATED,
+    response_model=SppBulkGenerateResult,
+)
+def bulk_generate_bills(
+    payload: SppBulkGenerateRequest,
+    user: User = Depends(_manage),
+    db: Session = Depends(get_db),
+) -> SppBulkGenerateResult:
+    """Generate bills for a class or an entire school; existing bills skipped."""
+    if payload.class_id is None and payload.school_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="class_id or school_id required",
+        )
+
+    if payload.class_id is not None:
+        klass = _load_class(db, payload.class_id)
+        _authorize_class(db, user, klass)
+        students = db.scalars(
+            select(Student)
+            .where(
+                Student.class_id == klass.id,
+                Student.enrollment_status == "active",
+            )
+            .order_by(Student.id)
+        ).all()
+    else:
+        school = db.get(School, payload.school_id)
+        if school is None or not _can_manage_school(user, school):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="school not found"
+            )
+        students = db.scalars(
+            select(Student)
+            .where(
+                Student.school_id == school.id,
+                Student.enrollment_status == "active",
+            )
+            .order_by(Student.id)
+        ).all()
+
+    if not students:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="no students found in scope"
+        )
+
+    student_ids = [s.id for s in students]
+    existing = set(
+        db.scalars(
+            select(SppBill.student_id).where(
+                SppBill.period == payload.period,
+                SppBill.student_id.in_(student_ids),
+            )
+        ).all()
+    )
+
+    created = 0
+    skipped = 0
+    for student in students:
+        if student.id in existing:
+            skipped += 1
+            continue
+        db.add(
+            SppBill(
+                student_id=student.id,
+                period=payload.period,
+                amount=payload.amount,
+                due_date=payload.due_date,
+                status=_UNPAID,
+                paid_amount=0,
+                balance=payload.amount,
+                created_by=user.id,
+            )
+        )
+        created += 1
+
+    db.commit()
+    return SppBulkGenerateResult(
+        created=created,
+        skipped=skipped,
+        no_students=len(students),
+        message=f"{created} bill created, {skipped} skipped (already exist)",
     )
 
 
@@ -229,6 +386,8 @@ def create_bill(
         amount=payload.amount,
         due_date=payload.due_date,
         status=_UNPAID,
+        paid_amount=0,
+        balance=payload.amount,
         created_by=user.id,
     )
     db.add(bill)
@@ -364,6 +523,16 @@ def update_bill(
         )
     for field, value in data.items():
         setattr(bill, field, value)
+    bill.paid_amount = round(paid, 2)
+    bill.balance = round(max(bill.amount - paid, 0.0), 2)
+    if "status" not in data:
+        if paid <= 0:
+            bill.status = _UNPAID
+        elif paid < round(bill.amount, 2):
+            bill.status = _PARTIALLY_PAID
+        else:
+            bill.balance = 0
+            bill.status = _PAID
     db.commit()
     db.refresh(bill)
     return _bill_out(db, bill)
@@ -416,7 +585,47 @@ def mark_overdue_bills(
 
 
 @router.post(
-    "/payments", status_code=status.HTTP_201_CREATED, response_model=SppPaymentOut
+    "/bills/{bill_id}/payments",
+    status_code=status.HTTP_201_CREATED,
+    response_model=BillWithPaymentsOut,
+)
+def record_bill_payment(
+    bill_id: int,
+    payload: SppPaymentCreate,
+    request: Request,
+    user: User = Depends(_manage),
+    db: Session = Depends(get_db),
+) -> BillWithPaymentsOut:
+    """Record a payment against one bill; returns the updated bill + payment."""
+    bill = _bill_or_404(db, bill_id)
+    school = _authorize_bill(db, user, bill)
+
+    payment = _apply_payment(db, bill, school, user, payload)
+
+    log_audit_event(
+        db,
+        user=user,
+        action="record_payment",
+        entity_type="spp_payment",
+        entity_id=payment.id,
+        tenant_id=school.tenant_id,
+        school_id=school.id,
+        detail=f"bill={bill.id};amount={payload.amount};receipt_no={payment.receipt_no}",
+        request=request,
+    )
+    db.commit()
+    db.refresh(bill)
+    db.refresh(payment)
+    return BillWithPaymentsOut(
+        bill=_bill_out(db, bill), payment=SppPaymentOut.model_validate(payment)
+    )
+
+
+@router.post(
+    "/payments",
+    status_code=status.HTTP_201_CREATED,
+    response_model=SppPaymentOut,
+    deprecated=True,
 )
 def create_payment(
     payload: SppPaymentCreate,
@@ -424,53 +633,83 @@ def create_payment(
     user: User = Depends(_manage),
     db: Session = Depends(get_db),
 ) -> SppPaymentOut:
-    """Record a payment; marks the bill paid once fully covered."""
+    """Deprecated alias: record a payment and return just the payment row."""
+    if payload.bill_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="bill_id is required"
+        )
     bill = _bill_or_404(db, payload.bill_id)
     school = _authorize_bill(db, user, bill)
-    if bill.status == _PAID:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="bill is already paid"
-        )
 
-    outstanding = round(bill.amount - _paid_total(db, bill.id), 2)
-    if payload.amount > outstanding:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="payment exceeds the outstanding balance",
-        )
+    payment = _apply_payment(db, bill, school, user, payload)
 
-    payment = SppPayment(
-        bill_id=bill.id,
-        paid_at=payload.paid_at or utcnow(),
-        method=payload.method,
-        amount=payload.amount,
-        receipt_no=payload.receipt_no,
-        recorded_by=user.id,
-    )
-    db.add(payment)
-    try:
-        db.flush()
-    except IntegrityError as exc:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="receipt_no already used"
-        ) from exc
-
-    if round(_paid_total(db, bill.id), 2) >= round(bill.amount, 2):
-        bill.status = _PAID
-    db.commit()
-    db.refresh(payment)
     log_audit_event(
         db,
         user=user,
         action="payment",
         entity_type="spp_payment",
         entity_id=payment.id,
-        tenant_id=school.tenant_id if school is not None else None,
-        school_id=school.id if school is not None else None,
+        tenant_id=school.tenant_id,
+        school_id=school.id,
         request=request,
     )
+    db.commit()
+    db.refresh(payment)
     return SppPaymentOut.model_validate(payment)
+
+
+@router.delete("/payments/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def void_payment(
+    payment_id: int,
+    request: Request,
+    payload: VoidPaymentRequest | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Void (soft-delete) a payment; admins/principals only. Audit logged."""
+    if user.role not in (UserRole.SUPER_ADMIN, UserRole.PRINCIPAL):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="only admin can void payments"
+        )
+
+    payment = db.get(SppPayment, payment_id)
+    if payment is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="payment not found"
+        )
+    bill = db.get(SppBill, payment.bill_id)
+    if bill is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="bill not found"
+        )
+    _authorize_bill(db, user, bill)
+
+    if payment.voided:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="payment already voided"
+        )
+
+    reason = payload.reason if payload is not None else None
+    payment.voided = True
+    payment.voided_at = utcnow()
+    payment.voided_by = user.id
+    payment.void_reason = reason
+    db.flush()
+    _recompute_bill(db, bill)
+
+    log_audit_event(
+        db,
+        user=user,
+        action="void_payment",
+        entity_type="spp_payment",
+        entity_id=payment.id,
+        tenant_id=user.tenant_id,
+        school_id=payment.school_id,
+        detail=f"before=voided:False;after=voided:True;reason={reason or ''}",
+        request=request,
+    )
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/payments", response_model=SppPaymentListResponse)

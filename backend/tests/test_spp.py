@@ -4,17 +4,21 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+import pytest
 from fastapi.testclient import TestClient
 from passlib.hash import bcrypt
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.jwt import create_access_token
 from app.db.models import (
+    AuditLog,
     Class,
     JenjangType,
     School,
     SppBill,
     SppBillStatus,
+    SppPayment,
     Student,
     Tenant,
     User,
@@ -217,7 +221,7 @@ def test_partial_payment_keeps_unpaid_and_rejects_overpay(
     assert partial.status_code == 201, partial.text
 
     bill = client.get(f"/api/spp/bills/{bill_id}", headers=_auth(ADMIN)).json()
-    assert bill["status"] == "unpaid"
+    assert bill["status"] == "partially_paid"
     assert bill["balance"] == 60000
 
     over = client.post(
@@ -343,3 +347,224 @@ def test_teacher_forbidden_from_managing(client: TestClient, db_session: Session
         json={"class_id": 1, "period": "2024-08", "amount": 100000, "due_date": FUTURE},
     )
     assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Ticket #59: bill-scoped payment, partially_paid, receipts, void, uniqueness
+# ---------------------------------------------------------------------------
+
+ADMIN3 = _token(300, 1, 3, "admin")
+
+
+def _add_school3(db_session: Session) -> None:
+    """A second school in the same tenant, with its own admin + student."""
+    db_session.add_all(
+        [
+            School(
+                id=3,
+                tenant_id=1,
+                name="SDN Menteng 03",
+                address="Jl. Baru",
+                kurikulum_version="Merdeka 2024",
+            ),
+            User(
+                id=300,
+                tenant_id=1,
+                school_id=3,
+                email="admin3@menteng.sch.id",
+                hashed_auth_ref=bcrypt.hash(SEED_PASSWORD),
+                role=UserRole.ADMIN,
+                full_name="Admin Tiga",
+            ),
+            User(
+                id=301,
+                tenant_id=1,
+                school_id=3,
+                email="student3@menteng.sch.id",
+                hashed_auth_ref=bcrypt.hash(SEED_PASSWORD),
+                role=UserRole.STUDENT,
+                full_name="Student Tiga",
+            ),
+        ]
+    )
+    db_session.flush()
+    db_session.add(Class(id=11, school_id=3, name="1C", grade_level=1, academic_year="2026/2027"))
+    db_session.add(Student(id=21, user_id=301, school_id=3, class_id=11, nis="S3001"))
+    db_session.commit()
+
+
+def _new_bill(
+    client: TestClient, headers: dict[str, str], student_id: int, period: str, amount: float
+) -> int:
+    created = client.post(
+        "/api/spp/bills",
+        headers=headers,
+        json={"student_id": student_id, "period": period, "amount": amount, "due_date": FUTURE},
+    )
+    assert created.status_code == 201, created.text
+    return created.json()["id"]
+
+
+def test_payment_returns_updated_bill(client: TestClient, db_session: Session) -> None:
+    bill_id = _new_bill(client, _auth(ADMIN), 2, "2031-01", 100000)
+    response = client.post(
+        f"/api/spp/bills/{bill_id}/payments",
+        headers=_auth(ADMIN),
+        json={"amount": 40000, "method": "cash"},
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["payment"]["amount"] == 40000
+    assert body["bill"]["paid_amount"] == 40000
+    assert body["bill"]["balance"] == 60000
+
+
+def test_partially_paid_status(client: TestClient, db_session: Session) -> None:
+    bill_id = _new_bill(client, _auth(ADMIN), 2, "2031-02", 100000)
+    client.post(
+        f"/api/spp/bills/{bill_id}/payments",
+        headers=_auth(ADMIN),
+        json={"amount": 25000, "method": "cash"},
+    )
+    bill = client.get(f"/api/spp/bills/{bill_id}", headers=_auth(ADMIN)).json()
+    assert bill["status"] == "partially_paid"
+    assert bill["paid_amount"] == 25000
+    assert bill["balance"] == 75000
+
+
+def test_full_payment_status(client: TestClient, db_session: Session) -> None:
+    bill_id = _new_bill(client, _auth(ADMIN), 2, "2031-03", 100000)
+    body = client.post(
+        f"/api/spp/bills/{bill_id}/payments",
+        headers=_auth(ADMIN),
+        json={"amount": 100000, "method": "transfer"},
+    ).json()
+    assert body["bill"]["status"] == "paid"
+    assert body["bill"]["balance"] == 0
+
+
+def test_receipt_no_increments_per_school(client: TestClient, db_session: Session) -> None:
+    _add_school3(db_session)
+    bill_id = _new_bill(client, _auth(ADMIN3), 21, "2031-04", 100000)
+    first = client.post(
+        f"/api/spp/bills/{bill_id}/payments",
+        headers=_auth(ADMIN3),
+        json={"amount": 40000, "method": "cash"},
+    )
+    second = client.post(
+        f"/api/spp/bills/{bill_id}/payments",
+        headers=_auth(ADMIN3),
+        json={"amount": 30000, "method": "cash"},
+    )
+    assert first.json()["payment"]["receipt_no"] == 1
+    assert second.json()["payment"]["receipt_no"] == 2
+
+
+def test_receipt_no_per_school_independent(client: TestClient, db_session: Session) -> None:
+    _add_school3(db_session)
+    bill3 = _new_bill(client, _auth(ADMIN3), 21, "2031-05", 100000)
+    pay3 = client.post(
+        f"/api/spp/bills/{bill3}/payments",
+        headers=_auth(ADMIN3),
+        json={"amount": 10000, "method": "cash"},
+    )
+    # School 3 starts its own sequence at 1, regardless of school 1's receipts.
+    assert pay3.json()["payment"]["receipt_no"] == 1
+
+    bill1 = _new_bill(client, _auth(ADMIN), 2, "2031-06", 100000)
+    pay1 = client.post(
+        f"/api/spp/bills/{bill1}/payments",
+        headers=_auth(ADMIN),
+        json={"amount": 10000, "method": "cash"},
+    )
+    assert pay1.json()["payment"]["receipt_no"] == 2
+
+
+def test_unique_constraint_blocks_duplicate_bill(
+    client: TestClient, db_session: Session
+) -> None:
+    db_session.add(
+        SppBill(
+            student_id=2,
+            period="2099-01",
+            amount=100000.0,
+            due_date=date.today() + timedelta(days=10),
+            status=SppBillStatus.UNPAID,
+            created_by=2,
+        )
+    )
+    db_session.commit()
+
+    db_session.add(
+        SppBill(
+            student_id=2,
+            period="2099-01",
+            amount=100000.0,
+            due_date=date.today() + timedelta(days=10),
+            status=SppBillStatus.UNPAID,
+            created_by=2,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+
+def test_void_payment_by_non_admin_403(client: TestClient, db_session: Session) -> None:
+    response = client.request(
+        "DELETE",
+        "/api/spp/payments/1",
+        headers=_auth(TEACHER4),
+        json={"reason": "nope"},
+    )
+    assert response.status_code == 403
+
+
+def test_void_payment_reduces_paid_amount(client: TestClient, db_session: Session) -> None:
+    bill_id = _new_bill(client, _auth(PRINCIPAL), 3, "2031-07", 100000)
+    payment = client.post(
+        f"/api/spp/bills/{bill_id}/payments",
+        headers=_auth(PRINCIPAL),
+        json={"amount": 60000, "method": "cash"},
+    ).json()["payment"]
+
+    voided = client.request(
+        "DELETE",
+        f"/api/spp/payments/{payment['id']}",
+        headers=_auth(PRINCIPAL),
+        json={"reason": "salah input"},
+    )
+    assert voided.status_code == 204, voided.text
+
+    bill = client.get(f"/api/spp/bills/{bill_id}", headers=_auth(PRINCIPAL)).json()
+    assert bill["paid_amount"] == 0
+    assert bill["balance"] == 100000
+    assert bill["status"] == "unpaid"
+
+    db_session.expire_all()
+    assert db_session.get(SppPayment, payment["id"]).voided is True
+
+
+def test_void_payment_audit_logged(client: TestClient, db_session: Session) -> None:
+    bill_id = _new_bill(client, _auth(PRINCIPAL), 3, "2031-08", 100000)
+    payment = client.post(
+        f"/api/spp/bills/{bill_id}/payments",
+        headers=_auth(PRINCIPAL),
+        json={"amount": 60000, "method": "cash"},
+    ).json()["payment"]
+
+    client.request(
+        "DELETE",
+        f"/api/spp/payments/{payment['id']}",
+        headers=_auth(PRINCIPAL),
+        json={"reason": "audit check"},
+    )
+    db_session.expire_all()
+    row = (
+        db_session.query(AuditLog)
+        .filter(AuditLog.action == "void_payment", AuditLog.actor_id == 3)
+        .order_by(AuditLog.id.desc())
+        .first()
+    )
+    assert row is not None
+    assert "audit check" in (row.reason or "")

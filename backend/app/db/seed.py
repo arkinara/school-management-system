@@ -31,6 +31,7 @@ from app.db.models import (
     ReportCardStatus,
     Schedule,
     School,
+    SchoolReceiptCounter,
     SppBill,
     SppBillStatus,
     SppPayment,
@@ -60,6 +61,7 @@ def clear_all(session: Session) -> None:
         TeacherAssignment,
         Message,
         SppPayment,
+        SchoolReceiptCounter,
         Attendance,
         Grade,
         Schedule,
@@ -403,6 +405,7 @@ def seed(session: Session) -> None:
 
     # --- SPP bills + one payment ------------------------------------------
     for idx, student in enumerate(students, start=1):
+        is_paid = idx == 1
         session.add(
             SppBill(
                 id=idx,
@@ -410,7 +413,9 @@ def seed(session: Session) -> None:
                 period="2024-07",
                 amount=350000.0,
                 due_date=today + timedelta(days=10),
-                status=SppBillStatus.PAID if idx == 1 else SppBillStatus.UNPAID,
+                status=SppBillStatus.PAID if is_paid else SppBillStatus.UNPAID,
+                paid_amount=350000.0 if is_paid else 0.0,
+                balance=0.0 if is_paid else 350000.0,
                 created_by=2,
             )
         )
@@ -418,14 +423,17 @@ def seed(session: Session) -> None:
     session.add(
         SppPayment(
             id=1,
+            school_id=1,
             bill_id=1,
             paid_at=utcnow(),
             method="transfer",
             amount=350000.0,
-            receipt_no="RCPT-2024-0001",
+            receipt_no=1,
             recorded_by=2,
+            voided=False,
         )
     )
+    session.add(SchoolReceiptCounter(school_id=1, next_receipt_no=2))
 
     # --- announcements -----------------------------------------------------
     session.add_all(
