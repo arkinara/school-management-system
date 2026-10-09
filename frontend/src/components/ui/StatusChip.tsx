@@ -30,6 +30,7 @@ export const statusTone: Record<string, ChipTone> = {
   paid: "success",
   unpaid: "warning",
   overdue: "danger",
+  partially_paid: "info",
 };
 
 export interface StatusChipProps extends React.HTMLAttributes<HTMLSpanElement> {

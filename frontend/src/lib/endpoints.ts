@@ -543,7 +543,7 @@ export function getRapor(params: {
    SPP (#23) — bills and payments
    ========================================================================== */
 
-export type SppBillStatus = "unpaid" | "paid" | "overdue";
+export type SppBillStatus = "unpaid" | "paid" | "overdue" | "partially_paid";
 
 export interface SppBill {
   id: number;
@@ -567,12 +567,37 @@ export interface SppBillBulkResult {
 
 export interface SppPayment {
   id: number;
+  school_id: number;
   bill_id: number;
   paid_at: string;
   method: string;
   amount: number;
-  receipt_no: string;
+  /** Server-assigned sequential receipt number (#59). */
+  receipt_no: number;
   recorded_by: number;
+  voided?: boolean;
+}
+
+/** Result of a class/school wide bill generation run (#59). */
+export interface SppBulkGenerateResult {
+  created: number;
+  skipped: number;
+  no_students: number;
+  message: string;
+}
+
+export interface BulkGenerateRequest {
+  period: string;
+  amount: number;
+  due_date: string;
+  class_id?: number;
+  school_id?: number;
+}
+
+/** `{ bill, payment }` returned by the bill-scoped payment route (#59). */
+export interface BillWithPayment {
+  bill: SppBill;
+  payment: SppPayment;
 }
 
 export const SPP_PAYMENT_METHODS = [
@@ -621,12 +646,48 @@ export function createBill(input: {
   });
 }
 
-/** POST /api/spp/payments — record a payment against a bill. */
+/**
+ * POST /api/spp/bills/bulk-generate — generate bills for a class or a whole
+ * school (#59). Zero students in scope answers 404.
+ */
+export function bulkGenerateBills(input: BulkGenerateRequest): Promise<SppBulkGenerateResult> {
+  return apiFetch<SppBulkGenerateResult>("/api/spp/bills/bulk-generate", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * POST /api/spp/bills/{id}/payments — record a payment against one bill (#59).
+ * The server assigns `receipt_no`; the response carries the updated bill too.
+ */
+export function recordBillPayment(
+  billId: number,
+  input: { amount: number; method: string; note?: string | null }
+): Promise<BillWithPayment> {
+  return apiFetch<BillWithPayment>(`/api/spp/bills/${billId}/payments`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * DELETE /api/spp/payments/{id} — void (soft-delete) a payment (#59).
+ * Admin/principal only; the bill's totals + status are recomputed server-side.
+ */
+export function voidPayment(paymentId: number, reason?: string): Promise<void> {
+  return apiFetch<void>(`/api/spp/payments/${paymentId}`, {
+    method: "DELETE",
+    body: JSON.stringify({ reason: reason ?? null }),
+  });
+}
+
+/** @deprecated Legacy POST /api/spp/payments alias; prefer `recordBillPayment`. */
 export function recordPayment(input: {
   bill_id: number;
   method: string;
   amount: number;
-  receipt_no: string;
+  receipt_no?: string;
   paid_at?: string;
 }): Promise<SppPayment> {
   return apiFetch<SppPayment>("/api/spp/payments", {

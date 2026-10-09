@@ -10,6 +10,8 @@ import {
   Printer,
   Receipt,
   RotateCcw,
+  Search,
+  Trash2,
   Wallet,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -19,7 +21,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormField, inputClass } from "@/components/ui/FormField";
 import { SegmentedButton } from "@/components/ui/SegmentedButton";
-import { StatusChip } from "@/components/ui/StatusChip";
+import { StatusChip, type ChipTone } from "@/components/ui/StatusChip";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import { Toast, ToastViewport } from "@/components/ui/Toast";
 import { cn } from "@/components/ui/cn";
@@ -28,10 +30,13 @@ import {
   fetchAll,
   fetchBillList,
   fetchClasses,
+  fetchPayments,
   fetchStudents,
-  recordPayment,
+  recordBillPayment,
+  voidPayment,
   type ClassRecord,
   type SppBill,
+  type SppBillStatus,
   type SppPayment,
   type StudentRecord,
 } from "@/lib/endpoints";
@@ -39,11 +44,24 @@ import { ApiError } from "@/lib/api";
 
 type LoadStatus = "loading" | "ready" | "error";
 type SortKey = "name" | "period" | "amount" | "balance";
+type RowState = { status: "saved" | "error"; error?: string; receipt_no?: number };
 
 interface DraftRow {
   amount: string;
-  receipt_no: string;
+  note: string;
 }
+
+interface ReceiptEntry {
+  billId: number;
+  payment: SppPayment;
+}
+
+const BILL_STATUS: Record<SppBillStatus, { label: string; tone: ChipTone }> = {
+  unpaid: { label: "belum lunas", tone: "warning" },
+  overdue: { label: "menunggak", tone: "danger" },
+  partially_paid: { label: "sebagian", tone: "info" },
+  paid: { label: "lunas", tone: "success" },
+};
 
 function formatRupiah(amount: number): string {
   return new Intl.NumberFormat("id-ID", {
@@ -58,8 +76,9 @@ function PaymentsContent() {
   const [students, setStudents] = React.useState<Record<number, StudentRecord>>({});
   const [classFilter, setClassFilter] = React.useState("");
   const [periodFilter, setPeriodFilter] = React.useState("");
+  const [search, setSearch] = React.useState("");
   const [bills, setBills] = React.useState<SppBill[]>([]);
-  const [hiddenIds, setHiddenIds] = React.useState<Set<number>>(new Set());
+  const [latestPayments, setLatestPayments] = React.useState<Record<number, SppPayment>>({});
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
   const [sort, setSort] = React.useState<{ key: SortKey; direction: "asc" | "desc" }>({
     key: "period",
@@ -71,27 +90,32 @@ function PaymentsContent() {
   const [method, setMethod] = React.useState<string>(SPP_PAYMENT_METHODS[0].value);
   const [drafts, setDrafts] = React.useState<Record<number, DraftRow>>({});
   const [errors, setErrors] = React.useState<Record<string, string>>({});
+  const [rowStatus, setRowStatus] = React.useState<Record<number, RowState>>({});
   const [submitting, setSubmitting] = React.useState(false);
   const [toast, setToast] = React.useState<{
     message: string;
     tone: "success" | "error";
-    undo?: () => void;
   } | null>(null);
-  const [receipt, setReceipt] = React.useState<{ billId: number; payment: SppPayment }[] | null>(
-    null
-  );
+  const [receipt, setReceipt] = React.useState<ReceiptEntry[] | null>(null);
+  const [voidingId, setVoidingId] = React.useState<number | null>(null);
   const selectAllRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     let active = true;
-    Promise.all([fetchClasses({ size: 100 }), fetchAll((p) => fetchStudents(p))])
-      .then(([classPage, studentList]) => {
+    fetchAll((p) => fetchStudents(p))
+      .then((studentList) => {
         if (!active) return;
-        setClasses(classPage.items);
         setStudents(Object.fromEntries(studentList.map((item) => [item.id, item])));
       })
       .catch(() => {
-        if (active) setToast({ message: "Gagal memuat data kelas/siswa.", tone: "error" });
+        if (active) setToast({ message: "Gagal memuat data siswa.", tone: "error" });
+      });
+    fetchClasses({ size: 100 })
+      .then((classPage) => {
+        if (active) setClasses(classPage.items);
+      })
+      .catch(() => {
+        if (active) setToast({ message: "Gagal memuat data kelas.", tone: "error" });
       });
     return () => {
       active = false;
@@ -101,16 +125,28 @@ function PaymentsContent() {
   React.useEffect(() => {
     let active = true;
     setStatus("loading");
-    fetchAll((p) =>
-      fetchBillList({
-        ...p,
-        class_id: classFilter ? Number(classFilter) : undefined,
-        period: periodFilter || undefined,
-      })
-    )
-      .then((rows) => {
+    Promise.all([
+      // Server caps a page at 100 (#44); `fetchAll` walks the pages instead of
+      // requesting an oversized `size`.
+      fetchAll((p) =>
+        fetchBillList({
+          ...p,
+          class_id: classFilter ? Number(classFilter) : undefined,
+          period: periodFilter || undefined,
+        })
+      ),
+      fetchAll((p) => fetchPayments(p)),
+    ])
+      .then(([billRows, paymentRows]) => {
         if (!active) return;
-        setBills(rows.filter((bill) => bill.status !== "paid"));
+        setBills(billRows.filter((bill) => bill.status !== "paid"));
+        const byBill: Record<number, SppPayment> = {};
+        for (const payment of paymentRows) {
+          if (payment.voided) continue;
+          // Rows are ordered by id, so the last write is the newest payment.
+          byBill[payment.bill_id] = payment;
+        }
+        setLatestPayments(byBill);
         setSelected(new Set());
         setStatus("ready");
       })
@@ -123,7 +159,12 @@ function PaymentsContent() {
   }, [classFilter, periodFilter, reloadKey]);
 
   const visibleBills = React.useMemo(() => {
-    const list = bills.filter((bill) => !hiddenIds.has(bill.id));
+    const query = search.trim().toLowerCase();
+    const list = bills.filter((bill) => {
+      if (!query) return true;
+      const name = students[bill.student_id]?.full_name ?? "";
+      return name.toLowerCase().includes(query);
+    });
     const dir = sort.direction === "asc" ? 1 : -1;
     return [...list].sort((a, b) => {
       if (sort.key === "amount") return (a.amount - b.amount) * dir;
@@ -133,7 +174,7 @@ function PaymentsContent() {
       const nameB = students[b.student_id]?.full_name ?? "";
       return nameA.localeCompare(nameB) * dir;
     });
-  }, [bills, hiddenIds, sort, students]);
+  }, [bills, search, sort, students]);
 
   React.useEffect(() => {
     if (selectAllRef.current) {
@@ -171,13 +212,11 @@ function PaymentsContent() {
     for (const id of selected) {
       const bill = bills.find((item) => item.id === id);
       if (!bill) continue;
-      next[id] = {
-        amount: String(bill.balance),
-        receipt_no: `SPP-${bill.period}-${bill.id}`,
-      };
+      next[id] = { amount: String(bill.balance), note: "" };
     }
     setDrafts(next);
     setErrors({});
+    setRowStatus({});
     setMethod(SPP_PAYMENT_METHODS[0].value);
     setModalOpen(true);
   }
@@ -186,11 +225,9 @@ function PaymentsContent() {
     setDrafts((current) => ({ ...current, [id]: { ...current[id], ...patch } }));
     setErrors((current) => {
       const key = `amount:${id}`;
-      const key2 = `receipt:${id}`;
-      if (!(key in current) && !(key2 in current)) return current;
+      if (!(key in current)) return current;
       const next = { ...current };
       delete next[key];
-      delete next[key2];
       return next;
     });
   }
@@ -207,9 +244,6 @@ function PaymentsContent() {
       } else if (amount > bill.balance + 0.001) {
         nextErrors[`amount:${id}`] = `Melebihi sisa tagihan (${formatRupiah(bill.balance)}).`;
       }
-      if (!draft.receipt_no.trim()) {
-        nextErrors[`receipt:${id}`] = "Nomor kwitansi wajib diisi.";
-      }
     }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -220,55 +254,92 @@ function PaymentsContent() {
     if (!validate()) return;
     setSubmitting(true);
     const paidIds = [...selected];
-    const recorded: { billId: number; payment: SppPayment }[] = [];
-    const fullyPaid: number[] = [];
-    try {
-      for (const id of paidIds) {
-        const draft = drafts[id];
-        const bill = bills.find((item) => item.id === id);
-        if (!draft || !bill) continue;
-        const payment = await recordPayment({
-          bill_id: id,
-          method,
+    const recorded: ReceiptEntry[] = [];
+    const nextStatus: Record<number, RowState> = {};
+    let lastReceipt: number | null = null;
+
+    for (const id of paidIds) {
+      const draft = drafts[id];
+      if (!draft) continue;
+      try {
+        const result = await recordBillPayment(id, {
           amount: Number(draft.amount),
-          receipt_no: draft.receipt_no.trim(),
+          method,
+          note: draft.note.trim() || null,
         });
-        recorded.push({ billId: id, payment });
-        if (Number(draft.amount) >= bill.balance - 0.001) fullyPaid.push(id);
+        nextStatus[id] = { status: "saved", receipt_no: result.payment.receipt_no };
+        recorded.push({ billId: id, payment: result.payment });
+        lastReceipt = result.payment.receipt_no;
+      } catch (err) {
+        const detail = err instanceof ApiError ? err.detail : "Gagal mencatat pembayaran.";
+        nextStatus[id] = { status: "error", error: detail };
       }
-      setReceipt(recorded);
-      setHiddenIds((current) => new Set([...current, ...fullyPaid]));
-      setSelected(new Set());
-      setModalOpen(false);
-      const partial = recorded.length - fullyPaid.length;
+    }
+
+    setRowStatus(nextStatus);
+    setReceipt(recorded);
+    const failed = paidIds.filter((id) => nextStatus[id]?.status === "error");
+    const succeeded = paidIds.filter((id) => nextStatus[id]?.status === "saved");
+
+    if (succeeded.length > 0) {
       setToast({
         message:
-          partial > 0
-            ? `${recorded.length} pembayaran tercatat · ${partial} sebagian, tagihan tetap terbuka`
-            : `${recorded.length} pembayaran tercatat`,
+          lastReceipt !== null
+            ? `Payment recorded: receipt #${lastReceipt}`
+            : `${succeeded.length} pembayaran tercatat`,
         tone: "success",
-        undo: () => {
-          setHiddenIds((current) => {
-            const next = new Set(current);
-            for (const id of fullyPaid) next.delete(id);
-            return next;
-          });
-          setToast({ message: "Pembayaran dikembalikan ke daftar", tone: "success" });
-        },
       });
-    } catch (err) {
-      const detail = err instanceof ApiError ? err.detail : "Gagal mencatat pembayaran.";
-      setToast({ message: detail, tone: "error" });
-      setReloadKey((current) => current + 1);
-    } finally {
-      setSubmitting(false);
+    } else if (failed.length > 0) {
+      setToast({
+        message: nextStatus[failed[0]]?.error ?? "Gagal mencatat pembayaran.",
+        tone: "error",
+      });
     }
+
+    if (failed.length === 0) {
+      setSelected(new Set());
+      setModalOpen(false);
+    } else {
+      setSelected(new Set(failed));
+    }
+
+    setReloadKey((current) => current + 1);
+    setSubmitting(false);
+  }
+
+  async function onUndo(payment: SppPayment) {
+    if (
+      !window.confirm(`Void payment ${payment.receipt_no}? This will update the bill's status.`)
+    ) {
+      return;
+    }
+    setVoidingId(payment.id);
+    try {
+      await voidPayment(payment.id, "user_undo");
+      setToast({ message: "Payment voided", tone: "success" });
+      setReloadKey((current) => current + 1);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        setToast({ message: "Only admin can void payments", tone: "error" });
+      } else {
+        setToast({
+          message: err instanceof ApiError ? err.detail : "Gagal membatalkan pembayaran.",
+          tone: "error",
+        });
+      }
+    } finally {
+      setVoidingId(null);
+    }
+  }
+
+  function openReceipt(entry: ReceiptEntry) {
+    setReceipt([entry]);
   }
 
   const totalOutstanding = visibleBills.reduce((sum, bill) => sum + bill.balance, 0);
 
   const columns: {
-    key: SortKey | "student" | "status" | "select";
+    key: SortKey | "student" | "status" | "receipt" | "select" | "actions";
     header: string;
     align?: "left" | "right";
   }[] = [
@@ -278,6 +349,8 @@ function PaymentsContent() {
     { key: "amount", header: "Tagihan", align: "right" },
     { key: "balance", header: "Sisa", align: "right" },
     { key: "status", header: "Status" },
+    { key: "receipt", header: "Kwitansi" },
+    { key: "actions", header: "" },
   ];
 
   return (
@@ -291,7 +364,13 @@ function PaymentsContent() {
             Tata Usaha · rekam pembayaran untuk tagihan belum lunas
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/dashboard/tu/spp/bills/new"
+            className="flex min-h-10 items-center rounded-full border border-outline px-4 text-xs font-medium text-primary hover:bg-surface-container-high"
+          >
+            Buat Tagihan Tunggal
+          </Link>
           <Button
             variant="outlined"
             icon={RotateCcw}
@@ -308,7 +387,23 @@ function PaymentsContent() {
 
       <Card>
         <CardHeader className="flex-wrap items-end gap-3 border-b border-outline-variant pb-4">
-          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:grid-cols-2">
+          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:grid-cols-3">
+            <FormField label="Cari siswa" htmlFor="spp-filter-search">
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
+                <input
+                  id="spp-filter-search"
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Nama siswa…"
+                  className={cn(inputClass, "pl-9")}
+                />
+              </div>
+            </FormField>
             <FormField label="Kelas" htmlFor="spp-filter-class">
               <select
                 id="spp-filter-class"
@@ -348,7 +443,7 @@ function PaymentsContent() {
           <div className="p-4">
             <EmptyState
               icon={AlertCircle}
-              title="Gagal memuat tagihan"
+              title="Gagal memuat data SPP"
               description="Tidak dapat mengambil daftar tagihan. Periksa koneksi lalu coba lagi."
               action={
                 <Button
@@ -428,6 +523,9 @@ function PaymentsContent() {
               <tbody className="divide-y divide-outline-variant">
                 {visibleBills.map((bill) => {
                   const student = students[bill.student_id];
+                  const chip = BILL_STATUS[bill.status];
+                  const payment = latestPayments[bill.id];
+                  const row = rowStatus[bill.id];
                   return (
                     <tr key={bill.id} className="hover:bg-surface-container-low">
                       <td className="px-4 py-2.5">
@@ -441,6 +539,11 @@ function PaymentsContent() {
                       </td>
                       <td className="px-4 py-2.5 font-medium text-foreground">
                         {student?.full_name ?? `Siswa #${bill.student_id}`}
+                        {row?.status === "error" && (
+                          <span className="mt-0.5 block text-2xs text-destructive">
+                            {row.error ?? "Gagal"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 font-mono text-xs tabular-nums text-muted-foreground">
                         {bill.period}
@@ -458,9 +561,39 @@ function PaymentsContent() {
                         {formatRupiah(bill.balance)}
                       </td>
                       <td className="px-4 py-2.5">
-                        <StatusChip tone={bill.status === "overdue" ? "danger" : "warning"}>
-                          {bill.status === "overdue" ? "menunggak" : "belum lunas"}
-                        </StatusChip>
+                        <StatusChip tone={chip.tone}>{chip.label}</StatusChip>
+                        {bill.status === "partially_paid" && (
+                          <span className="mt-1 block text-2xs text-muted-foreground">
+                            {formatRupiah(bill.paid_amount)} / {formatRupiah(bill.amount)} — sisa{" "}
+                            {formatRupiah(bill.balance)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 font-mono text-xs tabular-nums text-muted-foreground">
+                        {row?.receipt_no ?? payment?.receipt_no ?? "—"}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {payment && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              aria-label={`Kwitansi ${student?.full_name ?? bill.id}`}
+                              onClick={() => openReceipt({ billId: bill.id, payment })}
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-container-high hover:text-foreground"
+                            >
+                              <Printer className="h-4 w-4" aria-hidden />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Void pembayaran ${student?.full_name ?? bill.id}`}
+                              disabled={voidingId === payment.id}
+                              onClick={() => onUndo(payment)}
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive-container hover:text-destructive disabled:opacity-40"
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -507,6 +640,10 @@ function PaymentsContent() {
             />
           </FormField>
 
+          <p className="text-2xs text-muted-foreground">
+            Nomor kwitansi dibuat otomatis oleh server.
+          </p>
+
           <div className="max-h-80 overflow-y-auto">
             <ul className="flex flex-col gap-3">
               {[...selected].map((id) => {
@@ -514,6 +651,7 @@ function PaymentsContent() {
                 const student = bill ? students[bill.student_id] : undefined;
                 const draft = drafts[id];
                 if (!bill || !draft) return null;
+                const row = rowStatus[id];
                 return (
                   <li
                     key={id}
@@ -545,21 +683,24 @@ function PaymentsContent() {
                           className={cn(inputClass, "font-mono tabular-nums")}
                         />
                       </FormField>
-                      <FormField
-                        label="No. Kwitansi"
-                        htmlFor={`pay-receipt-${id}`}
-                        error={errors[`receipt:${id}`]}
-                      >
+                      <FormField label="Catatan" htmlFor={`pay-note-${id}`}>
                         <input
-                          id={`pay-receipt-${id}`}
+                          id={`pay-note-${id}`}
                           type="text"
-                          value={draft.receipt_no}
-                          onChange={(event) => updateDraft(id, { receipt_no: event.target.value })}
-                          aria-invalid={Boolean(errors[`receipt:${id}`])}
-                          className={cn(inputClass, "font-mono")}
+                          value={draft.note}
+                          onChange={(event) => updateDraft(id, { note: event.target.value })}
+                          className={inputClass}
                         />
                       </FormField>
                     </div>
+                    {row?.status === "saved" && (
+                      <p className="mt-1 text-2xs text-success">
+                        Tersimpan · kwitansi #{row.receipt_no}
+                      </p>
+                    )}
+                    {row?.status === "error" && (
+                      <p className="mt-1 text-2xs text-destructive">{row.error}</p>
+                    )}
                   </li>
                 );
               })}
@@ -574,17 +715,17 @@ function PaymentsContent() {
         title="Kwitansi Pembayaran"
         className="max-w-xl"
         actions={
-          <>
+          <div className="no-print flex gap-2">
             <Button variant="outlined" onClick={() => setReceipt(null)}>
               Tutup
             </Button>
             <Button icon={Printer} onClick={() => window.print()}>
               Cetak
             </Button>
-          </>
+          </div>
         }
       >
-        <ul className="flex flex-col gap-3">
+        <ul className="spp-receipt flex flex-col gap-3">
           {(receipt ?? []).map(({ billId, payment }) => {
             const bill = bills.find((item) => item.id === billId);
             const student = bill ? students[bill.student_id] : undefined;
@@ -593,12 +734,13 @@ function PaymentsContent() {
                 key={payment.id}
                 className="rounded-md border border-outline-variant bg-surface-container-low p-3"
               >
-                <div className="flex items-center justify-between gap-2">
+                <h1 className="text-base font-semibold text-foreground">Kwitansi Pembayaran SPP</h1>
+                <div className="mt-2 flex items-center justify-between gap-2">
                   <p className="text-sm font-semibold text-foreground">
                     {student?.full_name ?? `Siswa #${bill?.student_id ?? "-"}`}
                   </p>
                   <span className="font-mono text-2xs tabular-nums text-muted-foreground">
-                    {payment.receipt_no}
+                    No: {payment.receipt_no}
                   </span>
                 </div>
                 <dl className="mt-2 grid grid-cols-2 gap-1 text-2xs text-muted-foreground">
@@ -614,13 +756,13 @@ function PaymentsContent() {
                     </dd>
                   </div>
                   <div>
-                    <dt>Nominal</dt>
+                    <dt>Jumlah</dt>
                     <dd className="font-mono font-medium tabular-nums text-foreground">
                       {formatRupiah(payment.amount)}
                     </dd>
                   </div>
                   <div>
-                    <dt>Waktu</dt>
+                    <dt>Tanggal</dt>
                     <dd className="font-medium text-foreground">
                       {new Date(payment.paid_at).toLocaleString("id-ID")}
                     </dd>
@@ -634,12 +776,7 @@ function PaymentsContent() {
 
       <ToastViewport>
         {toast && (
-          <Toast
-            message={toast.message}
-            tone={toast.tone}
-            action={toast.undo ? { label: "Undo", onClick: toast.undo } : undefined}
-            onDismiss={() => setToast(null)}
-          />
+          <Toast message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />
         )}
       </ToastViewport>
     </div>

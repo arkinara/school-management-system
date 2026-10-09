@@ -55,7 +55,7 @@ interface BillItem {
   id: number;
   label: string;
   amount: number;
-  status: "paid" | "overdue" | "unpaid";
+  status: "paid" | "overdue" | "unpaid" | "partially_paid";
 }
 
 interface ChildData {
@@ -540,12 +540,22 @@ function OrangTuaContent({ me }: { me: UserMe }) {
                         {formatRupiah(bill.amount)}
                       </p>
                     </div>
-                    <StatusChip tone={bill.status === "paid" ? "success" : "danger"}>
+                    <StatusChip
+                      tone={
+                        bill.status === "paid"
+                          ? "success"
+                          : bill.status === "partially_paid"
+                            ? "info"
+                            : "danger"
+                      }
+                    >
                       {bill.status === "paid"
                         ? "lunas"
                         : bill.status === "overdue"
                           ? "menunggak"
-                          : "belum lunas"}
+                          : bill.status === "partially_paid"
+                            ? "sebagian"
+                            : "belum lunas"}
                     </StatusChip>
                   </li>
                 ))}

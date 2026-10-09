@@ -12,28 +12,17 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { Toast, ToastViewport } from "@/components/ui/Toast";
 import { cn } from "@/components/ui/cn";
 import {
-  createBillBulk,
+  bulkGenerateBills,
   fetchBillList,
   fetchClasses,
   fetchStudents,
   type ClassRecord,
-  type SppBillBulkResult,
+  type SppBulkGenerateResult,
 } from "@/lib/endpoints";
 import { ApiError } from "@/lib/api";
+import { currentPeriod, endOfMonth, todayIso } from "@/lib/dates";
 
-function currentPeriod(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function endOfMonth(period: string): string {
-  const [year, month] = period.split("-").map(Number);
-  if (!year || !month) return "";
-  const last = new Date(year, month, 0);
-  return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, "0")}-${String(
-    last.getDate()
-  ).padStart(2, "0")}`;
-}
+type Scope = "class" | "school";
 
 function formatRupiah(amount: number): string {
   return new Intl.NumberFormat("id-ID", {
@@ -43,8 +32,9 @@ function formatRupiah(amount: number): string {
   }).format(amount);
 }
 
-function SppGenerateContent() {
+function SppGenerateContent({ schoolId }: { schoolId: number | null }) {
   const [classes, setClasses] = React.useState<ClassRecord[]>([]);
+  const [scope, setScope] = React.useState<Scope>("class");
   const [classId, setClassId] = React.useState("");
   const [period, setPeriod] = React.useState(currentPeriod());
   const [amount, setAmount] = React.useState("350000");
@@ -60,7 +50,8 @@ function SppGenerateContent() {
     amount?: string;
     dueDate?: string;
   }>({});
-  const [result, setResult] = React.useState<SppBillBulkResult | null>(null);
+  const [result, setResult] = React.useState<SppBulkGenerateResult | null>(null);
+  const [zeroInfo, setZeroInfo] = React.useState(false);
   const [toast, setToast] = React.useState<{
     message: string;
     tone: "success" | "error";
@@ -69,7 +60,7 @@ function SppGenerateContent() {
   const periodRef = React.useRef<HTMLInputElement>(null);
   const amountRef = React.useRef<HTMLInputElement>(null);
   const dueRef = React.useRef<HTMLInputElement>(null);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
 
   React.useEffect(() => {
     let active = true;
@@ -88,13 +79,16 @@ function SppGenerateContent() {
   }, []);
 
   React.useEffect(() => {
-    if (!classId || !period) return;
+    if (!period || (scope === "class" && !classId)) return;
     let active = true;
     setLoadingPreview(true);
-    Promise.all([
-      fetchStudents({ class_id: Number(classId), size: 1 }),
-      fetchBillList({ class_id: Number(classId), period, size: 1 }),
-    ])
+    const studentQuery =
+      scope === "class"
+        ? { class_id: Number(classId), size: 1 }
+        : { school_id: schoolId ?? undefined, size: 1 };
+    const billQuery =
+      scope === "class" ? { class_id: Number(classId), period, size: 1 } : { period, size: 1 };
+    Promise.all([fetchStudents(studentQuery), fetchBillList(billQuery)])
       .then(([students, bills]) => {
         if (!active) return;
         setStudentCount(students.total);
@@ -112,7 +106,7 @@ function SppGenerateContent() {
     return () => {
       active = false;
     };
-  }, [classId, period]);
+  }, [scope, classId, period, schoolId]);
 
   function onPeriodChange(value: string) {
     setPeriod(value);
@@ -123,12 +117,14 @@ function SppGenerateContent() {
   function validate(): boolean {
     const nextErrors: typeof errors = {};
     const numericAmount = Number(amount);
-    if (!classId) nextErrors.classId = "Kelas wajib dipilih.";
+    if (scope === "class" && !classId) nextErrors.classId = "Kelas wajib dipilih.";
+    if (scope === "school" && schoolId === null)
+      nextErrors.classId = "Sekolah tidak diketahui untuk akun ini.";
     if (!period) nextErrors.period = "Periode wajib diisi.";
     if (!Number.isFinite(numericAmount) || numericAmount <= 0)
       nextErrors.amount = "Nominal harus lebih dari 0.";
     if (!dueDate) nextErrors.dueDate = "Tanggal jatuh tempo wajib diisi.";
-    else if (dueDate < todayIso) nextErrors.dueDate = "Jatuh tempo tidak boleh di masa lalu.";
+    else if (dueDate < today) nextErrors.dueDate = "Jatuh tempo tidak boleh di masa lalu.";
     setErrors(nextErrors);
     const firstInvalid = (Object.keys(nextErrors) as (keyof typeof errors)[])[0];
     if (firstInvalid === "classId") classRef.current?.focus();
@@ -147,22 +143,35 @@ function SppGenerateContent() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const created = await createBillBulk({
-        class_id: Number(classId),
+      const created = await bulkGenerateBills({
         period,
         amount: Number(amount),
         due_date: dueDate,
+        ...(scope === "class"
+          ? { class_id: Number(classId) }
+          : { school_id: schoolId ?? undefined }),
       });
-      setResult(created);
       setConfirmOpen(false);
-      setToast({
-        message: `${created.created} tagihan dibuat, ${created.skipped.length} dilewati`,
-        tone: "success",
-      });
+      if (created.created === 0 && created.skipped === 0) {
+        setZeroInfo(true);
+        setResult(null);
+      } else {
+        setZeroInfo(false);
+        setResult(created);
+        setToast({
+          message: `${created.created} tagihan dibuat, ${created.skipped} dilewati`,
+          tone: "success",
+        });
+      }
     } catch (err) {
-      const detail = err instanceof ApiError ? err.detail : "Gagal membuat tagihan.";
-      setToast({ message: detail, tone: "error" });
       setConfirmOpen(false);
+      if (err instanceof ApiError && err.status === 404) {
+        setZeroInfo(true);
+        setResult(null);
+      } else {
+        const detail = err instanceof ApiError ? err.detail : "Gagal membuat tagihan.";
+        setToast({ message: detail, tone: "error" });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -171,9 +180,11 @@ function SppGenerateContent() {
   function reset() {
     setResult(null);
     setExistingCount(null);
+    setZeroInfo(false);
   }
 
   const selectedClass = classes.find((klass) => String(klass.id) === classId);
+  const scopeLabel = scope === "class" ? (selectedClass?.name ?? "kelas") : "seluruh sekolah";
 
   if (result) {
     return (
@@ -192,21 +203,15 @@ function SppGenerateContent() {
                 {result.created} tagihan berhasil dibuat
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Periode {result.period} ·{" "}
-                {result.skipped.length > 0
-                  ? `${result.skipped.length} siswa dilewati (tagihan sudah ada)`
+                Periode {period} ·{" "}
+                {result.skipped > 0
+                  ? `${result.skipped} siswa dilewati (tagihan sudah ada)`
                   : "tidak ada siswa yang dilewati"}
               </p>
             </div>
-            {result.skipped.length > 0 && (
-              <p className="text-2xs text-muted-foreground">
-                ID siswa dilewati:{" "}
-                <span className="font-mono tabular-nums">{result.skipped.join(", ")}</span>
-              </p>
-            )}
             <div className="flex gap-2">
               <Button variant="outlined" icon={RotateCcw} onClick={reset}>
-                Buat untuk kelas lain
+                Buat untuk scope lain
               </Button>
               <Link
                 href="/dashboard/tu/spp/payments"
@@ -229,7 +234,7 @@ function SppGenerateContent() {
             Generate Tagihan SPP
           </h1>
           <p className="text-xs text-muted-foreground">
-            Tata Usaha · buat tagihan bulanan per kelas
+            Tata Usaha · buat tagihan bulanan per kelas atau seluruh sekolah
           </p>
         </div>
         <Link
@@ -239,6 +244,15 @@ function SppGenerateContent() {
           Catat Pembayaran
         </Link>
       </div>
+
+      {zeroInfo && (
+        <div
+          role="status"
+          className="rounded-md border border-warning/50 bg-warning-container p-3 text-sm text-warning-container-foreground"
+        >
+          Tidak ada siswa di scope ini. Pilih kelas atau sekolah yang memiliki siswa aktif.
+        </div>
+      )}
 
       <div className="grid gap-3 lg:grid-cols-5">
         <Card className="lg:col-span-3">
@@ -252,26 +266,58 @@ function SppGenerateContent() {
               openConfirm();
             }}
           >
-            <FormField label="Kelas" htmlFor="spp-class" required error={errors.classId}>
-              <select
-                id="spp-class"
-                ref={classRef}
-                value={classId}
-                onChange={(event) => {
-                  setClassId(event.target.value);
-                  setErrors((current) => ({ ...current, classId: undefined }));
-                }}
-                aria-invalid={Boolean(errors.classId)}
-                className={inputClass}
-              >
-                <option value="">Pilih kelas…</option>
-                {classes.map((klass) => (
-                  <option key={klass.id} value={klass.id}>
-                    {klass.name} · {klass.academic_year}
-                  </option>
-                ))}
-              </select>
-            </FormField>
+            <fieldset className="flex flex-col gap-2">
+              <legend className="text-sm font-medium text-foreground">Scope</legend>
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="radio"
+                  name="scope"
+                  value="class"
+                  checked={scope === "class"}
+                  onChange={() => setScope("class")}
+                  className="h-4 w-4 accent-[hsl(var(--primary))]"
+                />
+                Satu kelas
+              </label>
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="radio"
+                  name="scope"
+                  value="school"
+                  checked={scope === "school"}
+                  onChange={() => setScope("school")}
+                  className="h-4 w-4 accent-[hsl(var(--primary))]"
+                />
+                Satu sekolah (semua siswa)
+              </label>
+            </fieldset>
+
+            {scope === "class" ? (
+              <FormField label="Kelas" htmlFor="spp-class" required error={errors.classId}>
+                <select
+                  id="spp-class"
+                  ref={classRef}
+                  value={classId}
+                  onChange={(event) => {
+                    setClassId(event.target.value);
+                    setErrors((current) => ({ ...current, classId: undefined }));
+                  }}
+                  aria-invalid={Boolean(errors.classId)}
+                  className={inputClass}
+                >
+                  <option value="">Pilih kelas…</option>
+                  {classes.map((klass) => (
+                    <option key={klass.id} value={klass.id}>
+                      {klass.name} · {klass.academic_year}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            ) : (
+              <div className="rounded-md bg-surface-container-low p-3 text-2xs text-muted-foreground">
+                Generate tagihan untuk semua siswa aktif di sekolah ini.
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField label="Periode" htmlFor="spp-period" required error={errors.period}>
@@ -291,7 +337,7 @@ function SppGenerateContent() {
                   ref={dueRef}
                   type="date"
                   value={dueDate}
-                  min={todayIso}
+                  min={today}
                   onChange={(event) => {
                     setDueDate(event.target.value);
                     setErrors((current) => ({ ...current, dueDate: undefined }));
@@ -340,7 +386,7 @@ function SppGenerateContent() {
               >
                 Reset
               </Button>
-              <Button type="submit" icon={Receipt}>
+              <Button type="submit" icon={Receipt} disabled={!amount || !period}>
                 Tinjau & Buat
               </Button>
             </div>
@@ -360,10 +406,8 @@ function SppGenerateContent() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">Kelas</span>
-              <span className="ml-auto font-medium text-foreground">
-                {selectedClass?.name ?? "—"}
-              </span>
+              <span className="text-muted-foreground">Scope</span>
+              <span className="ml-auto font-medium text-foreground">{scopeLabel}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">Nominal</span>
@@ -400,7 +444,7 @@ function SppGenerateContent() {
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         title="Buat tagihan sekarang?"
-        description={`${studentCount ?? 0} siswa di ${selectedClass?.name ?? "kelas"} akan menerima tagihan ${formatRupiah(
+        description={`${studentCount ?? 0} siswa di ${scopeLabel} akan menerima tagihan ${formatRupiah(
           Number(amount)
         )} untuk periode ${period}.`}
         actions={
@@ -434,7 +478,7 @@ function SppGenerateContent() {
 export default function SppGeneratePage() {
   return (
     <DashboardShell role="admin" allow={["principal"]} title="Generate Tagihan SPP">
-      {() => <SppGenerateContent />}
+      {(me) => <SppGenerateContent schoolId={me.school_id ?? null} />}
     </DashboardShell>
   );
 }

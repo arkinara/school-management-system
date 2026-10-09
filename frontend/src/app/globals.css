@@ -363,4 +363,16 @@
     top: 0;
     width: 100%;
   }
+  /* SPP receipt (#60): print only the receipt, never the whole page. */
+  .spp-receipt,
+  .spp-receipt * {
+    visibility: visible;
+  }
+  .spp-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 24px;
+  }
 }

@@ -142,12 +142,22 @@ export const bills: SppBill[] = [
     period: "2026-01",
     amount: 500_000,
     due_date: "2026-01-10",
-    status: "overdue",
+    status: "partially_paid",
     created_by: 3,
     paid_amount: 100_000,
     balance: 400_000,
   },
 ];
+
+export const payments: SppPayment[] = [];
+
+/** Build an updated bill after applying a payment amount. */
+export function applyPaymentToBill(bill: SppBill, amount: number): SppBill {
+  const paid = bill.paid_amount + amount;
+  const balance = Math.max(bill.amount - paid, 0);
+  const status: SppBill["status"] = paid >= bill.amount ? "paid" : "partially_paid";
+  return { ...bill, paid_amount: paid, balance, status };
+}
 
 export const announcements: AnnouncementRecord[] = [
   {
@@ -371,23 +381,87 @@ export const handlers = [
 
   http.get(`${API}/api/spp/bills`, () => HttpResponse.json(page(bills, bills.length))),
 
+  http.post(`${API}/api/spp/bills`, async ({ request }) => {
+    const body = (await request.json()) as {
+      student_id: number;
+      period: string;
+      amount: number;
+      due_date: string;
+    };
+    const bill: SppBill = {
+      id: 500,
+      student_id: body.student_id,
+      class_id: 1,
+      period: body.period,
+      amount: body.amount,
+      due_date: body.due_date,
+      status: "unpaid",
+      created_by: 3,
+      paid_amount: 0,
+      balance: body.amount,
+    };
+    return HttpResponse.json(bill, { status: 201 });
+  }),
+
+  http.post(`${API}/api/spp/bills/bulk-generate`, async ({ request }) => {
+    const body = (await request.json()) as { class_id?: number; period: string };
+    return HttpResponse.json(
+      {
+        created: 2,
+        skipped: 0,
+        no_students: 2,
+        message: `2 bill created for ${body.period}`,
+      },
+      { status: 201 }
+    );
+  }),
+
+  http.post(`${API}/api/spp/bills/:billId/payments`, async ({ request, params }) => {
+    const body = (await request.json()) as {
+      amount: number;
+      method: string;
+      note?: string | null;
+    };
+    const billId = Number(params.billId);
+    const base = bills.find((bill) => bill.id === billId) ?? bills[0];
+    const payment: SppPayment = {
+      id: 99,
+      school_id: 1,
+      bill_id: billId,
+      paid_at: "2026-01-15T09:00:00Z",
+      method: body.method,
+      amount: body.amount,
+      receipt_no: 42,
+      recorded_by: 3,
+      voided: false,
+    };
+    return HttpResponse.json(
+      { bill: applyPaymentToBill(base, body.amount), payment },
+      { status: 201 }
+    );
+  }),
+
+  http.delete(`${API}/api/spp/payments/:paymentId`, () => new HttpResponse(null, { status: 204 })),
+
+  http.get(`${API}/api/spp/payments`, () => HttpResponse.json(page(payments, payments.length))),
+
   http.post(`${API}/api/spp/payments`, async ({ request }) => {
     const body = (await request.json()) as {
       bill_id: number;
       method: string;
       amount: number;
-      receipt_no: string;
     };
     const payment: SppPayment = {
       id: 99,
+      school_id: 1,
       bill_id: body.bill_id,
       paid_at: "2026-01-15T09:00:00Z",
       method: body.method,
       amount: body.amount,
-      receipt_no: body.receipt_no,
+      receipt_no: 42,
       recorded_by: 3,
     };
-    return HttpResponse.json(payment);
+    return HttpResponse.json(payment, { status: 201 });
   }),
 
   http.get(`${API}/api/spp/summary`, () => HttpResponse.json(sppSummary)),
