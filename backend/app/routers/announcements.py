@@ -11,6 +11,7 @@ from app.auth.deps import get_current_user
 from app.db.models import (
     Announcement,
     AnnouncementAudience,
+    AnnouncementRevision,
     Class,
     School,
     Tenant,
@@ -24,7 +25,9 @@ from app.schemas.announcement import (
     AnnouncementCreate,
     AnnouncementListResponse,
     AnnouncementOut,
+    AnnouncementRevisionOut,
     AnnouncementUpdate,
+    RetractRequest,
 )
 
 router = APIRouter()
@@ -38,6 +41,7 @@ _WRITE_ROLES = {
 }
 _ADMIN_ROLES = {UserRole.ADMIN, UserRole.PRINCIPAL, UserRole.SUPER_ADMIN}
 _READ_ONLY_ROLES = {UserRole.PARENT, UserRole.STUDENT, UserRole.TEACHER}
+_VIEWER_ROLES = {UserRole.PARENT, UserRole.STUDENT}
 
 
 def _out(announcement: Announcement) -> AnnouncementOut:
@@ -153,11 +157,27 @@ def create_announcement(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AnnouncementOut:
-    """Create a draft announcement (principal/TU/guru/super_admin only)."""
+    """Create an announcement (principal/TU/guru/super_admin only).
+
+    ``publish=True`` publishes immediately and is reserved for admin roles;
+    teachers create drafts (``publish=True`` is rejected with 403).
+    """
     if user.role not in _WRITE_ROLES:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
+    publish = bool(payload.publish)
+    if publish and user.role not in _ADMIN_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="only admin can publish immediately; use draft + request publish",
+        )
+
     tenant_id, school_id = _resolve_scope(db, user, payload)
+    target_class_id = (
+        payload.target_class_id
+        if payload.audience == AnnouncementAudience.CLASS
+        else None
+    )
     announcement = Announcement(
         tenant_id=tenant_id,
         school_id=school_id,
@@ -165,9 +185,22 @@ def create_announcement(
         audience=payload.audience,
         title=payload.title,
         body=payload.body,
-        published_at=None,
+        published_at=utcnow() if publish else None,
+        target_class_id=target_class_id,
     )
     db.add(announcement)
+    db.flush()
+
+    db.add(
+        AnnouncementRevision(
+            announcement_id=announcement.id,
+            version=1,
+            title=announcement.title,
+            body=announcement.body,
+            edited_by=user.id,
+            change_note="initial",
+        )
+    )
     db.commit()
     db.refresh(announcement)
 
@@ -179,6 +212,7 @@ def create_announcement(
         entity_id=announcement.id,
         tenant_id=tenant_id,
         school_id=school_id,
+        detail=f"publish={publish}; target_class_id={target_class_id}",
     )
     return _out(announcement)
 
@@ -189,6 +223,9 @@ def list_announcements(
     audience: AnnouncementAudience | None = Query(None),
     status_filter: str | None = Query(None, alias="status"),
     class_id: int | None = Query(None),
+    target_class_id: int | None = Query(None),
+    include_drafts: bool = Query(False),
+    include_retracted: bool = Query(False),
     page: PageParams = Depends(PageParams),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -208,8 +245,27 @@ def list_announcements(
                 )
             )
 
-    if user.role in _READ_ONLY_ROLES:
+    # Parents/students only ever see published, unretracted announcements.
+    if user.role in _VIEWER_ROLES:
         conditions.append(Announcement.published_at.isnot(None))
+        conditions.append(Announcement.retracted_at.is_(None))
+    else:
+        if not include_drafts:
+            conditions.append(Announcement.published_at.isnot(None))
+        elif user.role not in _ADMIN_ROLES:
+            conditions.append(
+                or_(
+                    Announcement.published_at.isnot(None),
+                    Announcement.author_id == user.id,
+                )
+            )
+        if not include_retracted:
+            conditions.append(
+                or_(
+                    Announcement.retracted_at.is_(None),
+                    Announcement.author_id == user.id,
+                )
+            )
 
     if school_id is not None:
         conditions.append(Announcement.school_id == school_id)
@@ -225,6 +281,13 @@ def list_announcements(
         if klass is not None:
             conditions.append(Announcement.audience == AnnouncementAudience.CLASS)
             conditions.append(Announcement.school_id == klass.school_id)
+    if target_class_id is not None:
+        conditions.append(
+            or_(
+                Announcement.target_class_id == target_class_id,
+                Announcement.target_class_id.is_(None),
+            )
+        )
 
     total = db.scalar(select(func.count()).select_from(Announcement).where(*conditions)) or 0
     rows = db.scalars(
@@ -293,11 +356,31 @@ def update_announcement(
         tenant_id, school_id = _resolve_scope(db, user, merged)
         announcement.tenant_id = tenant_id
         announcement.school_id = school_id
+        if announcement.audience == AnnouncementAudience.CLASS:
+            announcement.target_class_id = merged.target_class_id
+        else:
+            announcement.target_class_id = None
 
     for field in ("title", "body", "audience"):
         if field in data and data[field] is not None:
             setattr(announcement, field, data[field])
 
+    latest = db.scalar(
+        select(AnnouncementRevision)
+        .where(AnnouncementRevision.announcement_id == announcement.id)
+        .order_by(AnnouncementRevision.version.desc())
+    )
+    next_version = (latest.version + 1) if latest is not None else 2
+    db.add(
+        AnnouncementRevision(
+            announcement_id=announcement.id,
+            version=next_version,
+            title=announcement.title,
+            body=announcement.body,
+            edited_by=user.id,
+            change_note=payload.change_note,
+        )
+    )
     db.commit()
     db.refresh(announcement)
     log_audit_event(
@@ -306,6 +389,7 @@ def update_announcement(
         action="update_announcement",
         entity_type="announcement",
         entity_id=announcement.id,
+        detail=f"version={next_version}",
     )
     return _out(announcement)
 
@@ -316,15 +400,19 @@ def publish_announcement(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AnnouncementOut:
-    """Publish a draft (author or same-school admin)."""
+    """Publish a draft (same-school admin only)."""
     announcement = db.get(Announcement, announcement_id)
     if announcement is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="announcement not found"
         )
-    if user.role != UserRole.SUPER_ADMIN and not _is_admin_of(user, announcement):
-        if announcement.author_id != user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    if announcement.retracted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="announcement has been retracted",
+        )
+    if not _is_admin_of(user, announcement):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
     announcement.published_at = utcnow()
     db.commit()
@@ -337,6 +425,72 @@ def publish_announcement(
         entity_id=announcement.id,
     )
     return _out(announcement)
+
+
+@router.post("/{announcement_id}/retract", response_model=AnnouncementOut)
+def retract_announcement(
+    announcement_id: int,
+    payload: RetractRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AnnouncementOut:
+    """Soft-retract an announcement (author or same-school admin).
+
+    Retraction never deletes: ``retracted_at`` hides the announcement from
+    non-author viewers, who can still see it via ``include_retracted``.
+    """
+    announcement = db.get(Announcement, announcement_id)
+    if announcement is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="announcement not found"
+        )
+    if announcement.author_id != user.id and not _is_admin_of(user, announcement):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
+    announcement.retracted_at = utcnow()
+    announcement.retracted_by = user.id
+    announcement.retract_reason = payload.reason
+    db.commit()
+    db.refresh(announcement)
+    log_audit_event(
+        db,
+        user=user,
+        action="retract_announcement",
+        entity_type="announcement",
+        entity_id=announcement.id,
+        detail=f"reason={payload.reason}",
+    )
+    return _out(announcement)
+
+
+@router.get(
+    "/{announcement_id}/history", response_model=list[AnnouncementRevisionOut]
+)
+def get_announcement_history(
+    announcement_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[AnnouncementRevision]:
+    """Return the full edit history, oldest first (author/admin/published)."""
+    # scope: author/admin, else same-school published announcement
+    announcement = db.get(Announcement, announcement_id)
+    if announcement is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="announcement not found"
+        )
+    is_privileged = announcement.author_id == user.id or _is_admin_of(user, announcement)
+    if not is_privileged:
+        if announcement.published_at is None or announcement.retracted_at is not None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+        if not _same_school(user, announcement):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    return list(
+        db.scalars(
+            select(AnnouncementRevision)
+            .where(AnnouncementRevision.announcement_id == announcement.id)
+            .order_by(AnnouncementRevision.version)
+        ).all()
+    )
 
 
 @router.post("/{announcement_id}/unpublish", response_model=AnnouncementOut)

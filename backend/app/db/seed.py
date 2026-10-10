@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.db.models import (
     Announcement,
     AnnouncementAudience,
+    AnnouncementRevision,
     Attendance,
     AttendanceStatus,
     AuditLog,
@@ -26,6 +27,7 @@ from app.db.models import (
     JenjangType,
     Message,
     MessageThread,
+    MessageThreadRead,
     Notification,
     ReportCard,
     ReportCardStatus,
@@ -59,6 +61,7 @@ def clear_all(session: Session) -> None:
     delete_order = [
         Notification,
         TeacherAssignment,
+        MessageThreadRead,
         Message,
         SppPayment,
         SchoolReceiptCounter,
@@ -67,6 +70,7 @@ def clear_all(session: Session) -> None:
         Schedule,
         ReportCard,
         MessageThread,
+        AnnouncementRevision,
         Announcement,
         SppBill,
         Student,

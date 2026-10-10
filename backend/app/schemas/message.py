@@ -8,8 +8,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class MessageThreadCreate(BaseModel):
-    """Create a thread; the caller is always added as a participant."""
+    """Create a thread about a student; the caller is always a participant.
 
+    ``participant_ids`` are validated server-side against the student's linked
+    parents and class teachers.
+    """
+
+    student_id: int
     participant_ids: list[int] = Field(default_factory=list)
     subject: str = Field(min_length=1, max_length=255)
     school_id: int | None = None
@@ -21,6 +26,8 @@ class MessageThreadOut(BaseModel):
     id: int
     tenant_id: int
     school_id: int | None = None
+    student_id: int | None = None
+    created_by: int | None = None
     participant_ids: list[int] = []
     subject: str
     created_at: datetime
@@ -68,6 +75,13 @@ class MessageThreadListResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+class MessageThreadModerationOut(BaseModel):
+    """Read-only moderator view: the thread plus its full message history."""
+
+    thread: MessageThreadOut
+    messages: list[MessageOut]
 
 
 MessageThreadOut.model_rebuild()

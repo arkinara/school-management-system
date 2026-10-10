@@ -537,6 +537,35 @@ class Announcement(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     body: Mapped[str] = mapped_column(String, nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    target_class_id: Mapped[int | None] = mapped_column(
+        ForeignKey("classes.id"), nullable=True, index=True
+    )
+    retracted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    retracted_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    retract_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class AnnouncementRevision(Base):
+    """An append-only, versioned snapshot of an announcement's content."""
+
+    __tablename__ = "announcement_revisions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    announcement_id: Mapped[int] = mapped_column(
+        ForeignKey("announcements.id"), nullable=False, index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    edited_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    edited_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), server_default=func.now(), nullable=False
+    )
+    change_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("announcement_id", "version", name="uq_announcement_version"),
+    )
 
 
 class Notification(Base):
@@ -577,8 +606,27 @@ class MessageThread(Base):
     participant_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
     subject: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    student_id: Mapped[int | None] = mapped_column(
+        ForeignKey("students.id"), nullable=True, index=True
+    )
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    moderation_audit: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     messages: Mapped[list[Message]] = relationship(back_populates="thread")
+
+
+class MessageThreadRead(Base):
+    """An explicit, per-user read marker for a message thread."""
+
+    __tablename__ = "message_thread_reads"
+
+    thread_id: Mapped[int] = mapped_column(
+        ForeignKey("message_threads.id"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    read_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utcnow, server_default=func.now(), nullable=False
+    )
 
 
 class Message(Base):

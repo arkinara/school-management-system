@@ -10,7 +10,11 @@ from app.db.models import AnnouncementAudience
 
 
 class AnnouncementCreate(BaseModel):
-    """Create a draft announcement scoped to an audience."""
+    """Create an announcement scoped to an audience.
+
+    ``publish=True`` publishes immediately and is reserved for admin roles;
+    teachers create drafts (``publish=True`` is rejected with 403).
+    """
 
     title: str = Field(min_length=1, max_length=255)
     body: str = Field(min_length=1)
@@ -18,6 +22,7 @@ class AnnouncementCreate(BaseModel):
     school_id: int | None = None
     target_class_id: int | None = None
     target_tenant_id: int | None = None
+    publish: bool = False
 
 
 class AnnouncementUpdate(BaseModel):
@@ -29,6 +34,13 @@ class AnnouncementUpdate(BaseModel):
     school_id: int | None = None
     target_class_id: int | None = None
     target_tenant_id: int | None = None
+    change_note: str | None = None
+
+
+class RetractRequest(BaseModel):
+    """Optional reason supplied when soft-retracting an announcement."""
+
+    reason: str | None = None
 
 
 class AnnouncementOut(BaseModel):
@@ -45,6 +57,22 @@ class AnnouncementOut(BaseModel):
     status: str = "draft"
     target_class_id: int | None = None
     target_tenant_id: int | None = None
+    retracted_at: datetime | None = None
+    retracted_by: int | None = None
+    retract_reason: str | None = None
+
+
+class AnnouncementRevisionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    announcement_id: int
+    version: int
+    title: str
+    body: str
+    edited_by: int
+    edited_at: datetime
+    change_note: str | None = None
 
 
 class AnnouncementListResponse(BaseModel):

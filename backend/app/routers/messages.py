@@ -6,8 +6,22 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.audit import log_audit_event
 from app.auth.deps import get_current_user
-from app.db.models import Message, MessageThread, School, User, UserRole, utcnow
+from app.db.models import (
+    Class,
+    Message,
+    MessageThread,
+    MessageThreadRead,
+    Schedule,
+    School,
+    Student,
+    TeacherAssignment,
+    User,
+    UserRole,
+    parent_links,
+    utcnow,
+)
 from app.db.scoping import can_user_read_school
 from app.db.session import get_db
 from app.pagination import PageParams
@@ -17,6 +31,7 @@ from app.schemas.message import (
     MessageOut,
     MessageThreadCreate,
     MessageThreadListResponse,
+    MessageThreadModerationOut,
     MessageThreadOut,
     ThreadParticipant,
 )
@@ -24,6 +39,7 @@ from app.schemas.message import (
 router = APIRouter()
 
 _MODERATOR_ROLES = {UserRole.ADMIN, UserRole.PRINCIPAL}
+_MODERATION_ROLES = {UserRole.ADMIN, UserRole.PRINCIPAL, UserRole.SUPER_ADMIN}
 
 
 def _participants(thread: MessageThread) -> list[int]:
@@ -76,17 +92,63 @@ def _load_thread(db: Session, thread_id: int) -> MessageThread:
     return thread
 
 
+def _valid_participant_ids(db: Session, student: Student) -> set[int]:
+    """Participants allowed on a thread about ``student``.
+
+    Linked parents, the student's own account, and teachers who teach the
+    student's class (wali kelas / assignment / schedule).
+    """
+    valid: set[int] = set()
+    if student.user_id is not None:
+        valid.add(student.user_id)
+    valid.update(
+        db.scalars(
+            select(parent_links.c.parent_id).where(parent_links.c.student_id == student.id)
+        ).all()
+    )
+    if student.class_id is not None:
+        klass = db.get(Class, student.class_id)
+        if klass is not None and klass.wali_kelas_id is not None:
+            valid.add(klass.wali_kelas_id)
+        valid.update(
+            db.scalars(
+                select(TeacherAssignment.teacher_id).where(
+                    TeacherAssignment.class_id == student.class_id
+                )
+            ).all()
+        )
+        valid.update(
+            db.scalars(
+                select(Schedule.teacher_id).where(Schedule.class_id == student.class_id)
+            ).all()
+        )
+    return valid
+
+
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=MessageThreadOut)
 def create_thread(
     payload: MessageThreadCreate,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MessageThreadOut:
-    """Create a thread with the caller as the first participant."""
+    """Create a thread about ``student_id`` with validated participants."""
+    if user.role == UserRole.STUDENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="students cannot create threads",
+        )
+
+    student = db.get(Student, payload.student_id)
+    if student is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="student not found")
+
     participant_ids: list[int] = [user.id]
     for uid in payload.participant_ids:
         if uid not in participant_ids:
             participant_ids.append(uid)
+
+    valid_ids = _valid_participant_ids(db, student)
+    valid_ids.add(user.id)
 
     for uid in participant_ids:
         member = db.get(User, uid)
@@ -110,6 +172,11 @@ def create_thread(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="cannot add a participant from another school",
             )
+        if uid not in valid_ids:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"user {uid} is not a valid participant for this student",
+            )
 
     school_id = payload.school_id if payload.school_id is not None else user.school_id
     if school_id is not None:
@@ -131,12 +198,22 @@ def create_thread(
     thread = MessageThread(
         tenant_id=user.tenant_id,
         school_id=school_id,
+        student_id=student.id,
+        created_by=user.id,
         participant_ids=participant_ids,
         subject=payload.subject,
     )
     db.add(thread)
     db.commit()
     db.refresh(thread)
+    log_audit_event(
+        db,
+        user=user,
+        action="create_message_thread",
+        entity_type="message_thread",
+        entity_id=thread.id,
+        detail=f"student_id={student.id}; participants={participant_ids}",
+    )
     return _thread_out(db, thread)
 
 
@@ -189,19 +266,6 @@ def list_messages(
     thread = _load_thread(db, thread_id)
     if not _is_participant(thread, user) or not _same_school(user, thread):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
-
-    unread = db.scalars(
-        select(Message).where(
-            Message.thread_id == thread_id,
-            Message.sender_id != user.id,
-            Message.read_at.is_(None),
-        )
-    ).all()
-    if unread:
-        now = utcnow()
-        for message in unread:
-            message.read_at = now
-        db.commit()
 
     total = (
         db.scalar(
@@ -280,6 +344,63 @@ def add_participant(
     return _thread_out(db, thread)
 
 
+@router.post("/{thread_id}/read", status_code=status.HTTP_204_NO_CONTENT)
+def mark_thread_read(
+    thread_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Explicitly mark a thread read for the caller (idempotent)."""
+    thread = _load_thread(db, thread_id)
+    if not _is_participant(thread, user) and user.role not in _MODERATION_ROLES:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
+    existing = db.get(MessageThreadRead, (thread_id, user.id))
+    if existing is None:
+        db.add(MessageThreadRead(thread_id=thread_id, user_id=user.id, read_at=utcnow()))
+        db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{thread_id}/moderator-view", response_model=MessageThreadModerationOut)
+def moderator_view_thread(
+    thread_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MessageThreadModerationOut:
+    """Read-only moderator view of a thread; every access is audit-logged."""
+    # scope: moderator (same school)
+    if user.role not in _MODERATION_ROLES:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="moderator only")
+
+    thread = _load_thread(db, thread_id)
+    if user.role != UserRole.SUPER_ADMIN and thread.school_id != user.school_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="thread not found in your school"
+        )
+
+    messages = list(
+        db.scalars(
+            select(Message)
+            .where(Message.thread_id == thread_id)
+            .order_by(Message.sent_at, Message.id)
+        ).all()
+    )
+    log_audit_event(
+        db,
+        user=user,
+        action="moderator_view_thread",
+        entity_type="message_thread",
+        entity_id=thread_id,
+        detail="reason=moderation_review",
+    )
+    db.commit()
+    return MessageThreadModerationOut(
+        thread=_thread_out(db, thread),
+        messages=[MessageOut.model_validate(m) for m in messages],
+    )
+
+
 @router.delete("/{thread_id}/participants/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_participant(
     thread_id: int,
@@ -287,14 +408,27 @@ def remove_participant(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Response:
-    """Remove a participant; caller must be a participant."""
+    """Remove a participant (thread creator or school moderator only)."""
     thread = _load_thread(db, thread_id)
-    if not _is_participant(thread, user):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    is_creator = thread.created_by == user.id
+    is_moderator = user.role in _MODERATION_ROLES and _same_school(user, thread)
+    if not is_creator and not is_moderator:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="only creator or moderator can remove participants",
+        )
 
     participants = _participants(thread)
     if user_id not in participants:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="participant not found")
     thread.participant_ids = [p for p in participants if p != user_id]
+    log_audit_event(
+        db,
+        user=user,
+        action="remove_thread_participant",
+        entity_type="message_thread",
+        entity_id=thread_id,
+        detail=f"removed_user={user_id}",
+    )
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
