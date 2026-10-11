@@ -8,9 +8,12 @@ import type {
   ClassRecord,
   GradeBulkResult,
   GradeRecord,
+  MessageRecord,
+  MessageThreadRecord,
   Paginated,
   ScheduleRecord,
   SchoolRecord,
+  ServerNotification,
   SppBill,
   SppPayment,
   SppSummary,
@@ -175,6 +178,115 @@ export const announcements: AnnouncementRecord[] = [
   },
 ];
 
+export const messageThreads: MessageThreadRecord[] = [
+  {
+    id: 5,
+    tenant_id: 1,
+    school_id: 1,
+    student_id: 1,
+    created_by: 3,
+    participant_ids: [3, 2],
+    subject: "Perkembangan Ahmad",
+    created_at: "2026-01-14T08:00:00Z",
+    last_message: {
+      id: 51,
+      thread_id: 5,
+      sender_id: 2,
+      body: "Ahmad aktif di kelas.",
+      sent_at: "2026-01-14T09:00:00Z",
+      read_at: null,
+    },
+  },
+];
+
+export const messages: MessageRecord[] = [
+  {
+    id: 50,
+    thread_id: 5,
+    sender_id: 3,
+    body: "Bagaimana perkembangan Ahmad?",
+    sent_at: "2026-01-14T08:30:00Z",
+    read_at: "2026-01-14T08:40:00Z",
+  },
+  {
+    id: 51,
+    thread_id: 5,
+    sender_id: 2,
+    body: "Ahmad aktif di kelas.",
+    sent_at: "2026-01-14T09:00:00Z",
+    read_at: null,
+  },
+];
+
+export const serverNotifications: ServerNotification[] = [
+  {
+    id: 1,
+    user_id: 3,
+    type: "attendance_alert",
+    title: "Kehadiran Ahmad",
+    body: "Ahmad ditandai alpa pada 2026-01-15",
+    link: "/dashboard/orang-tua/attendance/1",
+    is_read: false,
+    created_at: "2026-01-15T07:00:00Z",
+    read_at: null,
+  },
+  {
+    id: 2,
+    user_id: 3,
+    type: "spp_overdue",
+    title: "SPP Ahmad Jatuh Tempo",
+    body: "Tagihan SPP periode 2026-01 telah jatuh tempo.",
+    link: "/dashboard/orang-tua/spp",
+    is_read: false,
+    created_at: "2026-01-15T06:00:00Z",
+    read_at: null,
+  },
+  {
+    id: 3,
+    user_id: 3,
+    type: "announcement",
+    title: "Libur Semester",
+    body: "Sekolah libur mulai 20 Januari.",
+    link: "/dashboard/announcements",
+    is_read: true,
+    created_at: "2026-01-14T05:00:00Z",
+    read_at: "2026-01-14T06:00:00Z",
+  },
+  {
+    id: 4,
+    user_id: 3,
+    type: "message",
+    title: "Perkembangan Ahmad",
+    body: "Ahmad aktif di kelas.",
+    link: "/dashboard/messages?thread=5",
+    is_read: true,
+    created_at: "2026-01-13T05:00:00Z",
+    read_at: "2026-01-13T06:00:00Z",
+  },
+  {
+    id: 5,
+    user_id: 3,
+    type: "attendance_alert",
+    title: "Kehadiran Siti",
+    body: "Siti ditandai izin pada 2026-01-12",
+    link: "/dashboard/orang-tua/attendance/2",
+    is_read: true,
+    created_at: "2026-01-12T05:00:00Z",
+    read_at: "2026-01-12T06:00:00Z",
+  },
+  {
+    id: 6,
+    user_id: 3,
+    type: "spp_overdue",
+    title: "SPP Siti Jatuh Tempo",
+    body: "Tagihan SPP periode 2025-12 telah jatuh tempo.",
+    link: "/dashboard/orang-tua/spp",
+    is_read: true,
+    created_at: "2026-01-11T05:00:00Z",
+    read_at: "2026-01-11T06:00:00Z",
+  },
+];
+
 /** GET /api/attendances/today is aggregated; return a fresh summary each call. */
 export const handlers = [
   http.post(`${API}/api/auth/login`, async ({ request }) => {
@@ -304,6 +416,8 @@ export const handlers = [
   }),
 
   http.get(`${API}/api/grades`, () => HttpResponse.json(page<GradeRecord>([], 0))),
+
+  http.get(`${API}/api/report-cards`, () => HttpResponse.json(page([], 0))),
 
   http.get(`${API}/api/teacher-assignments`, () =>
     HttpResponse.json([
@@ -494,4 +608,99 @@ export const handlers = [
     };
     return HttpResponse.json(response);
   }),
+
+  http.post(`${API}/api/announcements/:id/reject`, ({ params }) =>
+    HttpResponse.json({
+      ...announcements[0],
+      id: Number(params.id),
+      status: "denied",
+    })
+  ),
+
+  http.get(`${API}/api/tenants`, () =>
+    HttpResponse.json([
+      {
+        id: 1,
+        name: "SDN Menteng 01",
+        jenjang_type: "SD",
+        kurikulum_version: "kurikulum_merdeka",
+        config: null,
+        created_at: "2026-01-01",
+        school_count: 1,
+      },
+      {
+        id: 2,
+        name: "SMP Nusantara",
+        jenjang_type: "SMP",
+        kurikulum_version: "kurikulum_merdeka",
+        config: null,
+        created_at: "2026-01-01",
+        school_count: 1,
+      },
+    ])
+  ),
+
+  http.get(`${API}/api/message-threads`, () =>
+    HttpResponse.json(page(messageThreads, messageThreads.length))
+  ),
+
+  http.post(`${API}/api/message-threads`, async ({ request }) => {
+    const body = (await request.json()) as { student_id: number; subject: string };
+    const thread: MessageThreadRecord = {
+      id: 90,
+      tenant_id: 1,
+      school_id: 1,
+      student_id: body.student_id,
+      created_by: 3,
+      participant_ids: [3, 2],
+      subject: body.subject,
+      created_at: "2026-01-16T08:00:00Z",
+      last_message: null,
+    };
+    return HttpResponse.json(thread, { status: 201 });
+  }),
+
+  http.get(`${API}/api/message-threads/:threadId/messages`, ({ params }) =>
+    HttpResponse.json(page(messages, messages.length))
+  ),
+
+  http.post(`${API}/api/message-threads/:threadId/messages`, async ({ request, params }) => {
+    const body = (await request.json()) as { body: string };
+    const record: MessageRecord = {
+      id: 999,
+      thread_id: Number(params.threadId),
+      sender_id: 3,
+      body: body.body,
+      sent_at: "2026-01-16T09:00:00Z",
+      read_at: null,
+    };
+    return HttpResponse.json(record, { status: 201 });
+  }),
+
+  http.post(
+    `${API}/api/message-threads/:threadId/read`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+
+  http.get(`${API}/api/message-threads/:threadId/moderator-view`, ({ params }) =>
+    HttpResponse.json({
+      thread:
+        messageThreads.find((thread) => thread.id === Number(params.threadId)) ?? messageThreads[0],
+      messages,
+    })
+  ),
+
+  http.get(`${API}/api/notifications/unread-count`, () => HttpResponse.json({ count: 2 })),
+
+  http.get(`${API}/api/notifications`, ({ request }) => {
+    const limit = Number(new URL(request.url).searchParams.get("limit") ?? 50);
+    return HttpResponse.json(serverNotifications.slice(0, limit));
+  }),
+
+  http.post(
+    `${API}/api/notifications/mark-all-read`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+
+  http.post(`${API}/api/notifications/:id/read`, () => new HttpResponse(null, { status: 204 })),
 ];

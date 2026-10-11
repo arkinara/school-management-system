@@ -9,6 +9,7 @@ import {
   Plus,
   RotateCcw,
   Send,
+  ShieldAlert,
   UserPlus,
   X,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FormField, inputClass } from "@/components/ui/FormField";
 import { Skeleton, SkeletonList } from "@/components/ui/Skeleton";
+import { StatusChip } from "@/components/ui/StatusChip";
 import { Toast, ToastViewport } from "@/components/ui/Toast";
 import { cn } from "@/components/ui/cn";
 import { ApiError } from "@/lib/api";
@@ -28,17 +30,49 @@ import {
   createMessageThread,
   fetchAll,
   fetchMessages,
+  fetchModerationView,
+  fetchParentChildren,
+  fetchStudents,
   fetchThreads,
   fetchUsers,
+  markThreadRead,
   removeThreadParticipant,
   sendMessage,
   type MessageRecord,
+  type MessageThreadModeration,
   type MessageThreadRecord,
   type UserRecord,
 } from "@/lib/endpoints";
 import type { UserMe } from "@/lib/auth";
 
 type LoadStatus = "loading" | "ready" | "error";
+
+interface StudentOption {
+  id: number;
+  full_name: string;
+}
+
+interface MessageError {
+  kind: "forbidden" | "not_found" | "network" | "server";
+  message: string;
+}
+
+/** Distinguish 403 / 404 / network / server so the UI never hides real errors. */
+function classifyMessageError(err: unknown): MessageError {
+  if (err instanceof ApiError) {
+    if (err.status === 403) {
+      return { kind: "forbidden", message: "Anda tidak memiliki akses ke thread ini" };
+    }
+    if (err.status === 404) {
+      return { kind: "not_found", message: "Thread tidak ditemukan" };
+    }
+    if (err.status === 0 || err.status >= 500) {
+      return { kind: "network", message: "Gagal memuat. Periksa koneksi Anda." };
+    }
+    return { kind: "server", message: err.detail || "Terjadi kesalahan server" };
+  }
+  return { kind: "network", message: "Gagal memuat. Periksa koneksi Anda." };
+}
 
 interface LocalMessage extends MessageRecord {
   local?: boolean;
@@ -90,6 +124,7 @@ function isUnread(thread: MessageThreadRecord, meId: number): boolean {
 function NewThreadDialog({
   open,
   users,
+  students,
   me,
   onClose,
   onCreated,
@@ -97,11 +132,13 @@ function NewThreadDialog({
 }: {
   open: boolean;
   users: UserRecord[];
+  students: StudentOption[];
   me: UserMe;
   onClose: () => void;
   onCreated: (thread: MessageThreadRecord) => void;
   onToast: (toast: ToastState) => void;
 }) {
+  const [studentId, setStudentId] = React.useState<number | null>(null);
   const [selectedIds, setSelectedIds] = React.useState<Set<number>>(new Set());
   const [subject, setSubject] = React.useState("");
   const [body, setBody] = React.useState("");
@@ -114,6 +151,7 @@ function NewThreadDialog({
 
   React.useEffect(() => {
     if (!open) {
+      setStudentId(null);
       setSelectedIds(new Set());
       setSubject("");
       setBody("");
@@ -147,11 +185,14 @@ function NewThreadDialog({
 
   function validate(): boolean {
     const next: Record<string, string> = {};
+    if (studentId === null) next.student = "Pilih siswa terkait.";
     if (selectedIds.size === 0) next.participants = "Pilih minimal satu peserta.";
     if (!subject.trim()) next.subject = "Subjek wajib diisi.";
     if (!body.trim()) next.body = "Pesan pertama wajib diisi.";
     setErrors(next);
-    if (next.participants) {
+    if (next.student) {
+      document.getElementById("new-thread-student")?.focus();
+    } else if (next.participants) {
       document.getElementById("new-thread-participants")?.focus();
     } else if (next.subject) subjectRef.current?.focus();
     else if (next.body) bodyRef.current?.focus();
@@ -164,6 +205,7 @@ function NewThreadDialog({
     setSubmitting(true);
     try {
       const thread = await createMessageThread({
+        student_id: studentId as number,
         participant_ids: [...selectedIds],
         subject: subject.trim(),
       });
@@ -199,6 +241,25 @@ function NewThreadDialog({
       }
     >
       <div className="flex flex-col gap-4">
+        <FormField label="Siswa" htmlFor="new-thread-student" required error={errors.student}>
+          <select
+            id="new-thread-student"
+            value={studentId ?? ""}
+            onChange={(event) =>
+              setStudentId(event.target.value ? Number(event.target.value) : null)
+            }
+            aria-invalid={Boolean(errors.student)}
+            className={inputClass}
+          >
+            <option value="">Pilih siswa…</option>
+            {students.map((student) => (
+              <option key={student.id} value={student.id}>
+                {student.full_name}
+              </option>
+            ))}
+          </select>
+        </FormField>
+
         <div id="new-thread-participants" tabIndex={-1} className="flex flex-col gap-1.5">
           <span className="text-sm font-medium text-foreground">
             Peserta
@@ -381,16 +442,191 @@ function AddParticipantDialog({
 }
 
 /* -------------------------------------------------------------------------- */
+/* Moderator (read-only) view                                                 */
+/* -------------------------------------------------------------------------- */
+
+function ModeratorView({ users }: { users: UserRecord[] }) {
+  const [threads, setThreads] = React.useState<MessageThreadRecord[]>([]);
+  const [status, setStatus] = React.useState<LoadStatus>("loading");
+  const [selectedId, setSelectedId] = React.useState<number | null>(null);
+  const [detail, setDetail] = React.useState<MessageThreadModeration | null>(null);
+  const [detailStatus, setDetailStatus] = React.useState<LoadStatus>("loading");
+
+  function nameFor(id: number): string {
+    return users.find((user) => user.id === id)?.full_name ?? `Pengguna #${id}`;
+  }
+
+  React.useEffect(() => {
+    let active = true;
+    setStatus("loading");
+    fetchThreads({ size: 100 })
+      .then((page) => {
+        if (!active) return;
+        setThreads(page.items);
+        setStatus("ready");
+      })
+      .catch(() => {
+        if (active) setStatus("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (selectedId === null) {
+      setDetail(null);
+      return;
+    }
+    let active = true;
+    setDetailStatus("loading");
+    fetchModerationView(selectedId)
+      .then((data) => {
+        if (!active) return;
+        setDetail(data);
+        setDetailStatus("ready");
+      })
+      .catch(() => {
+        if (active) setDetailStatus("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedId]);
+
+  return (
+    <div className="grid min-h-[65vh] grid-cols-1 gap-3 lg:grid-cols-[20rem_1fr]">
+      <Card className="flex min-h-0 flex-col">
+        <CardHeader className="items-center border-b border-outline-variant pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4 text-primary" aria-hidden />
+            Moderasi
+          </CardTitle>
+          <span className="rounded-full bg-surface-container-high px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums text-muted-foreground">
+            {threads.length}
+          </span>
+        </CardHeader>
+        {status === "loading" ? (
+          <div className="p-4">
+            <SkeletonList rows={5} />
+          </div>
+        ) : status === "error" ? (
+          <div className="p-4">
+            <EmptyState
+              icon={AlertCircle}
+              title="Gagal memuat percakapan"
+              description="Periksa koneksi lalu coba lagi."
+            />
+          </div>
+        ) : threads.length === 0 ? (
+          <div className="p-4">
+            <EmptyState
+              icon={MessageSquare}
+              title="Belum ada percakapan"
+              description="Percakapan yang dapat dimoderasi akan tampil di sini."
+            />
+          </div>
+        ) : (
+          <ul className="flex-1 divide-y divide-outline-variant overflow-y-auto">
+            {threads.map((thread) => (
+              <li key={thread.id}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(thread.id)}
+                  aria-current={thread.id === selectedId ? "true" : undefined}
+                  className={cn(
+                    "flex w-full flex-col gap-0.5 px-4 py-3 text-left transition-colors hover:bg-surface-container-low",
+                    thread.id === selectedId && "bg-secondary-container/40"
+                  )}
+                >
+                  <span className="truncate text-sm font-medium text-foreground">
+                    {thread.subject}
+                  </span>
+                  <span className="truncate text-2xs text-muted-foreground">
+                    {thread.participant_ids.map(nameFor).join(", ")}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card className="flex min-h-0 flex-col">
+        {selectedId === null ? (
+          <div className="flex flex-1 items-center justify-center p-6">
+            <EmptyState
+              icon={ShieldAlert}
+              title="Pilih percakapan"
+              description="Pilih percakapan untuk ditinjau dalam mode baca-saja. Akses ini dicatat di jejak audit."
+            />
+          </div>
+        ) : detailStatus === "loading" ? (
+          <div className="p-4" aria-busy>
+            <SkeletonList rows={4} />
+          </div>
+        ) : detailStatus === "error" || detail === null ? (
+          <div className="flex flex-1 items-center justify-center p-6">
+            <EmptyState
+              icon={AlertCircle}
+              title="Gagal memuat percakapan"
+              description="Tidak dapat memuat percakapan ini."
+            />
+          </div>
+        ) : (
+          <>
+            <CardHeader className="items-center border-b border-outline-variant pb-3">
+              <div className="min-w-0">
+                <CardTitle className="truncate">{detail.thread.subject}</CardTitle>
+                <p className="truncate text-2xs text-muted-foreground">
+                  {detail.thread.participant_ids.map(nameFor).join(", ")}
+                </p>
+              </div>
+              <StatusChip tone="neutral">Baca-saja</StatusChip>
+            </CardHeader>
+            <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
+              {detail.messages.length === 0 ? (
+                <EmptyState
+                  icon={MessageSquare}
+                  title="Belum ada pesan"
+                  description="Percakapan ini belum memiliki pesan."
+                />
+              ) : (
+                detail.messages.map((message) => (
+                  <div key={message.id} className="flex flex-col gap-1">
+                    <span className="px-1 text-2xs font-medium text-muted-foreground">
+                      {nameFor(message.sender_id)} · {formatTime(message.sent_at)}
+                    </span>
+                    <div className="rounded-lg bg-surface-container-high px-3.5 py-2 text-sm text-foreground">
+                      <p className="whitespace-pre-wrap">{message.body}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Page content                                                               */
 /* -------------------------------------------------------------------------- */
 
 function MessagesContent({ me }: { me: UserMe }) {
+  const isModerator = me.role === "principal" || me.role === "admin" || me.role === "super_admin";
+  const [mode, setMode] = React.useState<"inbox" | "moderate">("inbox");
   const [users, setUsers] = React.useState<UserRecord[]>([]);
+  const [students, setStudents] = React.useState<StudentOption[]>([]);
+  const [studentsLoaded, setStudentsLoaded] = React.useState(false);
   const [threads, setThreads] = React.useState<MessageThreadRecord[]>([]);
   const [threadStatus, setThreadStatus] = React.useState<LoadStatus>("loading");
   const [activeId, setActiveId] = React.useState<number | null>(null);
   const [messages, setMessages] = React.useState<LocalMessage[]>([]);
   const [messageStatus, setMessageStatus] = React.useState<LoadStatus>("loading");
+  const [messageError, setMessageError] = React.useState<MessageError | null>(null);
   const [draft, setDraft] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [newOpen, setNewOpen] = React.useState(false);
@@ -437,6 +673,54 @@ function MessagesContent({ me }: { me: UserMe }) {
   }, []);
 
   React.useEffect(() => {
+    let active = true;
+    setStudentsLoaded(false);
+    const load =
+      me.role === "parent"
+        ? fetchParentChildren(me.user.id).then((children) =>
+            children.map((child) => ({ id: child.id, full_name: child.full_name }))
+          )
+        : fetchStudents({ size: 100 }).then((page) =>
+            page.items.map((student) => ({
+              id: student.id,
+              full_name: student.full_name ?? student.nis,
+            }))
+          );
+    load
+      .then((list) => {
+        if (!active) return;
+        setStudents(list);
+        setStudentsLoaded(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setStudents([]);
+        setStudentsLoaded(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [me.role, me.user.id]);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const threadId = Number(params.get("thread") ?? 0);
+    if (threadId) setActiveId(threadId);
+  }, []);
+
+  React.useEffect(() => {
+    const url = new URL(window.location.href);
+    if (activeId) url.searchParams.set("thread", String(activeId));
+    else url.searchParams.delete("thread");
+    window.history.replaceState({}, "", url.toString());
+  }, [activeId]);
+
+  React.useEffect(() => {
+    if (activeId === null) return;
+    void markThreadRead(activeId).catch(() => undefined);
+  }, [activeId]);
+
+  React.useEffect(() => {
     void loadThreads(false);
   }, [loadThreads]);
 
@@ -458,10 +742,12 @@ function MessagesContent({ me }: { me: UserMe }) {
   React.useEffect(() => {
     if (activeId === null) {
       setMessages([]);
+      setMessageError(null);
       return;
     }
     let active = true;
     setMessageStatus("loading");
+    setMessageError(null);
     fetchAll((p) => fetchMessages(activeId, p))
       .then((list) => {
         if (!active) return;
@@ -469,8 +755,10 @@ function MessagesContent({ me }: { me: UserMe }) {
         setMessageStatus("ready");
         void loadThreads(true);
       })
-      .catch(() => {
-        if (active) setMessageStatus("error");
+      .catch((err) => {
+        if (!active) return;
+        setMessageError(classifyMessageError(err));
+        setMessageStatus("error");
       });
     return () => {
       active = false;
@@ -595,6 +883,18 @@ function MessagesContent({ me }: { me: UserMe }) {
     setActiveId(thread.id);
   }
 
+  if (me.role === "parent" && studentsLoaded && students.length === 0) {
+    return (
+      <div className="mx-auto w-full max-w-3xl">
+        <EmptyState
+          icon={MessageSquare}
+          title="Belum ada siswa tertaut"
+          description="Anda belum ditautkan ke siswa manapun. Hubungi pihak sekolah untuk menautkan akun Anda."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -605,6 +905,27 @@ function MessagesContent({ me }: { me: UserMe }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {isModerator && (
+            <div role="tablist" aria-label="Mode pesan" className="flex gap-2">
+              <Button
+                variant={mode === "inbox" ? "filled" : "outlined"}
+                type="button"
+                aria-pressed={mode === "inbox"}
+                onClick={() => setMode("inbox")}
+              >
+                Kotak Masuk
+              </Button>
+              <Button
+                variant={mode === "moderate" ? "filled" : "outlined"}
+                icon={ShieldAlert}
+                type="button"
+                aria-pressed={mode === "moderate"}
+                onClick={() => setMode("moderate")}
+              >
+                Moderasi
+              </Button>
+            </div>
+          )}
           <Button
             variant="outlined"
             icon={RotateCcw}
@@ -613,308 +934,348 @@ function MessagesContent({ me }: { me: UserMe }) {
           >
             Muat ulang
           </Button>
-          <Button icon={Plus} type="button" onClick={() => setNewOpen(true)}>
-            Percakapan Baru
-          </Button>
+          {mode === "inbox" && (
+            <Button icon={Plus} type="button" onClick={() => setNewOpen(true)}>
+              Percakapan Baru
+            </Button>
+          )}
         </div>
       </div>
 
-      <div className="grid min-h-[65vh] grid-cols-1 gap-3 lg:grid-cols-[20rem_1fr]">
-        <Card className={cn("flex min-h-0 flex-col", activeId !== null && "hidden lg:flex")}>
-          <CardHeader className="items-center border-b border-outline-variant pb-3">
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-primary" aria-hidden />
-              Percakapan
-            </CardTitle>
-            <span className="rounded-full bg-surface-container-high px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums text-muted-foreground">
-              {sortedThreads.length}
-            </span>
-          </CardHeader>
+      {mode === "moderate" ? (
+        <ModeratorView users={users} />
+      ) : (
+        <div className="grid min-h-[65vh] grid-cols-1 gap-3 lg:grid-cols-[20rem_1fr]">
+          <Card className={cn("flex min-h-0 flex-col", activeId !== null && "hidden lg:flex")}>
+            <CardHeader className="items-center border-b border-outline-variant pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-primary" aria-hidden />
+                Percakapan
+              </CardTitle>
+              <span className="rounded-full bg-surface-container-high px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums text-muted-foreground">
+                {sortedThreads.length}
+              </span>
+            </CardHeader>
 
-          {threadStatus === "loading" ? (
-            <div className="p-4">
-              <SkeletonList rows={5} />
-            </div>
-          ) : threadStatus === "error" ? (
-            <div className="p-4">
-              <EmptyState
-                icon={AlertCircle}
-                title="Gagal memuat percakapan"
-                description="Periksa koneksi lalu coba lagi."
-                action={
-                  <Button variant="tonal" icon={RotateCcw} onClick={() => void loadThreads(false)}>
-                    Coba lagi
-                  </Button>
-                }
-              />
-            </div>
-          ) : sortedThreads.length === 0 ? (
-            <div className="p-4">
-              <EmptyState
-                icon={MessageSquare}
-                title="Belum ada percakapan"
-                description="Mulai percakapan baru dengan guru atau orang tua."
-              />
-            </div>
-          ) : (
-            <ul className="flex-1 divide-y divide-outline-variant overflow-y-auto">
-              {sortedThreads.map((thread) => {
-                const unread = isUnread(thread, me.user.id);
-                const others = thread.participant_ids.filter((id) => id !== me.user.id);
-                return (
-                  <li key={thread.id}>
-                    <button
-                      type="button"
-                      onClick={() => setActiveId(thread.id)}
-                      aria-current={thread.id === activeId ? "true" : undefined}
-                      className={cn(
-                        "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors duration-short ease-standard hover:bg-surface-container-low",
-                        thread.id === activeId && "bg-secondary-container/40"
-                      )}
+            {threadStatus === "loading" ? (
+              <div className="p-4">
+                <SkeletonList rows={5} />
+              </div>
+            ) : threadStatus === "error" ? (
+              <div className="p-4">
+                <EmptyState
+                  icon={AlertCircle}
+                  title="Gagal memuat percakapan"
+                  description="Periksa koneksi lalu coba lagi."
+                  action={
+                    <Button
+                      variant="tonal"
+                      icon={RotateCcw}
+                      onClick={() => void loadThreads(false)}
                     >
-                      <span className="flex shrink-0 -space-x-2">
-                        {(others.length > 0 ? others : [me.user.id]).slice(0, 3).map((id) => (
-                          <Avatar
-                            key={id}
-                            name={nameFor(id)}
-                            size="sm"
-                            className="ring-2 ring-surface-container-low"
-                          />
-                        ))}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-2">
-                          <span
-                            className={cn(
-                              "truncate text-sm",
-                              unread
-                                ? "font-semibold text-foreground"
-                                : "font-medium text-foreground"
-                            )}
-                          >
-                            {participantNames(thread)}
-                          </span>
-                          {unread && (
-                            <span
-                              className="ml-auto h-2 w-2 shrink-0 rounded-full bg-accent"
-                              aria-label="Belum dibaca"
-                            />
-                          )}
-                        </span>
-                        <span className="mt-0.5 block truncate text-2xs text-muted-foreground">
-                          {thread.subject}
-                        </span>
-                        {thread.last_message && (
-                          <span className="mt-0.5 block truncate text-2xs text-muted-foreground">
-                            {thread.last_message.sender_id === me.user.id ? "Anda: " : ""}
-                            {excerpt(thread.last_message.body)}
-                          </span>
-                        )}
-                      </span>
-                      {thread.last_message && (
-                        <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
-                          {formatTime(threadTimestamp(thread))}
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
-
-        <Card className={cn("flex min-h-0 flex-col", activeId === null && "hidden lg:flex")}>
-          {activeThread === null ? (
-            <div className="flex flex-1 items-center justify-center p-6">
-              <EmptyState
-                icon={MessageSquare}
-                title="Pilih percakapan"
-                description="Pilih percakapan di daftar untuk melihat pesan, atau mulai percakapan baru."
-              />
-            </div>
-          ) : (
-            <>
-              <CardHeader className="items-center border-b border-outline-variant pb-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <Button
-                    variant="text"
-                    className="min-h-10 px-2 lg:hidden"
-                    onClick={() => setActiveId(null)}
-                    aria-label="Kembali ke daftar"
-                  >
-                    <X className="h-4 w-4" aria-hidden />
-                  </Button>
-                  <span className="flex shrink-0 -space-x-2">
-                    {activeThread.participant_ids
-                      .filter((id) => id !== me.user.id)
-                      .slice(0, 3)
-                      .map((id) => (
-                        <Avatar key={id} name={nameFor(id)} size="sm" />
-                      ))}
-                  </span>
-                  <div className="min-w-0">
-                    <CardTitle className="truncate">{participantNames(activeThread)}</CardTitle>
-                    <p className="truncate text-2xs text-muted-foreground">
-                      {activeThread.subject}
-                    </p>
-                  </div>
-                </div>
-                <div className="relative">
-                  <button
-                    type="button"
-                    aria-label="Menu percakapan"
-                    aria-haspopup="menu"
-                    aria-expanded={menuOpen}
-                    onClick={() => setMenuOpen((value) => !value)}
-                    className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-container-high"
-                  >
-                    <MoreHorizontal className="h-5 w-5" aria-hidden />
-                  </button>
-                  {menuOpen && (
-                    <div
-                      role="menu"
-                      className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-md border border-outline-variant bg-surface-container-high py-1 shadow-md"
-                    >
+                      Coba lagi
+                    </Button>
+                  }
+                />
+              </div>
+            ) : sortedThreads.length === 0 ? (
+              <div className="p-4">
+                <EmptyState
+                  icon={MessageSquare}
+                  title="Belum ada percakapan"
+                  description="Mulai percakapan baru dengan guru atau orang tua."
+                />
+              </div>
+            ) : (
+              <ul className="flex-1 divide-y divide-outline-variant overflow-y-auto">
+                {sortedThreads.map((thread) => {
+                  const unread = isUnread(thread, me.user.id);
+                  const others = thread.participant_ids.filter((id) => id !== me.user.id);
+                  return (
+                    <li key={thread.id}>
                       <button
                         type="button"
-                        role="menuitem"
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-surface-container-highest"
-                        onClick={() => {
-                          setMenuOpen(false);
-                          setAddOpen(true);
-                        }}
-                      >
-                        <UserPlus className="h-4 w-4" aria-hidden />
-                        Tambah peserta
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-destructive hover:bg-surface-container-highest"
-                        onClick={() => {
-                          setMenuOpen(false);
-                          setLeaveOpen(true);
-                        }}
-                      >
-                        <X className="h-4 w-4" aria-hidden />
-                        Keluar dari percakapan
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </CardHeader>
-
-              <div
-                ref={listRef}
-                className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
-                aria-live="polite"
-              >
-                {messageStatus === "loading" ? (
-                  <div className="flex flex-col gap-3" aria-busy>
-                    <Skeleton className="h-12 w-2/3" />
-                    <Skeleton className="ml-auto h-12 w-1/2" />
-                    <Skeleton className="h-12 w-3/5" />
-                  </div>
-                ) : messageStatus === "error" ? (
-                  <EmptyState
-                    icon={AlertCircle}
-                    title="Akses ditolak"
-                    description="Anda tidak memiliki akses ke percakapan ini."
-                  />
-                ) : messages.length === 0 ? (
-                  <EmptyState
-                    icon={MessageSquare}
-                    title="Belum ada pesan"
-                    description="Mulai percakapan dengan mengirim pesan pertama."
-                  />
-                ) : (
-                  messages.map((message) => {
-                    const own = message.sender_id === me.user.id;
-                    return (
-                      <div
-                        key={message.id}
+                        onClick={() => setActiveId(thread.id)}
+                        aria-current={thread.id === activeId ? "true" : undefined}
                         className={cn(
-                          "flex max-w-[80%] flex-col gap-1",
-                          own ? "ml-auto items-end" : "items-start"
+                          "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors duration-short ease-standard hover:bg-surface-container-low",
+                          thread.id === activeId && "bg-secondary-container/40"
                         )}
                       >
-                        {!own && (
-                          <span className="px-1 text-2xs font-medium text-muted-foreground">
-                            {nameFor(message.sender_id)}
-                          </span>
-                        )}
-                        <div
-                          className={cn(
-                            "rounded-lg px-3.5 py-2 text-sm",
-                            own
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-surface-container-high text-foreground",
-                            message.failed && "opacity-70"
-                          )}
-                        >
-                          <p className="whitespace-pre-wrap">{message.body}</p>
-                        </div>
-                        <span className="flex items-center gap-1.5 px-1 text-2xs text-muted-foreground">
-                          <span className="font-mono tabular-nums">
-                            {formatTime(message.sent_at)}
-                          </span>
-                          {own && !message.failed && (
+                        <span className="flex shrink-0 -space-x-2">
+                          {(others.length > 0 ? others : [me.user.id]).slice(0, 3).map((id) => (
+                            <Avatar
+                              key={id}
+                              name={nameFor(id)}
+                              size="sm"
+                              className="ring-2 ring-surface-container-low"
+                            />
+                          ))}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2">
                             <span
                               className={cn(
-                                message.read_at ? "text-primary" : "text-muted-foreground"
+                                "truncate text-sm",
+                                unread
+                                  ? "font-semibold text-foreground"
+                                  : "font-medium text-foreground"
                               )}
-                              aria-label={message.read_at ? "Sudah dibaca" : "Terkirim"}
-                              title={message.read_at ? "Sudah dibaca" : "Terkirim"}
                             >
-                              <CheckCheck className="h-3.5 w-3.5" aria-hidden />
+                              {participantNames(thread)}
+                            </span>
+                            {unread && (
+                              <span
+                                className="ml-auto h-2 w-2 shrink-0 rounded-full bg-accent"
+                                aria-label="Belum dibaca"
+                              />
+                            )}
+                          </span>
+                          <span className="mt-0.5 block truncate text-2xs text-muted-foreground">
+                            {thread.subject}
+                          </span>
+                          {thread.last_message && (
+                            <span className="mt-0.5 block truncate text-2xs text-muted-foreground">
+                              {thread.last_message.sender_id === me.user.id ? "Anda: " : ""}
+                              {excerpt(thread.last_message.body)}
                             </span>
                           )}
-                          {own && message.failed && (
-                            <button
-                              type="button"
-                              onClick={() => void retry(message)}
-                              className="font-medium text-destructive hover:underline"
-                            >
-                              Gagal terkirim · Coba lagi
-                            </button>
-                          )}
                         </span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+                        {thread.last_message && (
+                          <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
+                            {formatTime(threadTimestamp(thread))}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
 
-              <div className="flex items-end gap-2 border-t border-outline-variant px-4 py-3">
-                <textarea
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={handleKeyDown}
-                  rows={1}
-                  placeholder="Tulis pesan… (Enter mengirim, Shift+Enter baris baru)"
-                  aria-label="Tulis pesan"
-                  className={cn(inputClass, "max-h-32 min-h-[48px] flex-1 resize-y py-2")}
+          <Card className={cn("flex min-h-0 flex-col", activeId === null && "hidden lg:flex")}>
+            {activeThread === null ? (
+              <div className="flex flex-1 items-center justify-center p-6">
+                <EmptyState
+                  icon={MessageSquare}
+                  title="Pilih percakapan"
+                  description="Pilih percakapan di daftar untuk melihat pesan, atau mulai percakapan baru."
                 />
-                <Button
-                  icon={Send}
-                  onClick={() => void handleSend()}
-                  loading={sending}
-                  disabled={!draft.trim()}
-                  aria-label="Kirim pesan"
-                  type="button"
-                >
-                  Kirim
-                </Button>
               </div>
-            </>
-          )}
-        </Card>
-      </div>
+            ) : (
+              <>
+                <CardHeader className="items-center border-b border-outline-variant pb-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Button
+                      variant="text"
+                      className="min-h-10 px-2 lg:hidden"
+                      onClick={() => setActiveId(null)}
+                      aria-label="Kembali ke daftar"
+                    >
+                      <X className="h-4 w-4" aria-hidden />
+                    </Button>
+                    <span className="flex shrink-0 -space-x-2">
+                      {activeThread.participant_ids
+                        .filter((id) => id !== me.user.id)
+                        .slice(0, 3)
+                        .map((id) => (
+                          <Avatar key={id} name={nameFor(id)} size="sm" />
+                        ))}
+                    </span>
+                    <div className="min-w-0">
+                      <CardTitle className="truncate">{participantNames(activeThread)}</CardTitle>
+                      <p className="truncate text-2xs text-muted-foreground">
+                        {activeThread.subject}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      aria-label="Menu percakapan"
+                      aria-haspopup="menu"
+                      aria-expanded={menuOpen}
+                      onClick={() => setMenuOpen((value) => !value)}
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-container-high"
+                    >
+                      <MoreHorizontal className="h-5 w-5" aria-hidden />
+                    </button>
+                    {menuOpen && (
+                      <div
+                        role="menu"
+                        className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-md border border-outline-variant bg-surface-container-high py-1 shadow-md"
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-surface-container-highest"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            setAddOpen(true);
+                          }}
+                        >
+                          <UserPlus className="h-4 w-4" aria-hidden />
+                          Tambah peserta
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-destructive hover:bg-surface-container-highest"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            setLeaveOpen(true);
+                          }}
+                        >
+                          <X className="h-4 w-4" aria-hidden />
+                          Keluar dari percakapan
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+
+                <div
+                  ref={listRef}
+                  className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
+                  aria-live="polite"
+                >
+                  {messageStatus === "loading" ? (
+                    <div className="flex flex-col gap-3" aria-busy>
+                      <Skeleton className="h-12 w-2/3" />
+                      <Skeleton className="ml-auto h-12 w-1/2" />
+                      <Skeleton className="h-12 w-3/5" />
+                    </div>
+                  ) : messageStatus === "error" ? (
+                    <EmptyState
+                      icon={AlertCircle}
+                      title={
+                        messageError?.kind === "forbidden"
+                          ? "Akses terbatas"
+                          : messageError?.kind === "not_found"
+                            ? "Thread tidak ditemukan"
+                            : "Gagal memuat pesan"
+                      }
+                      description={messageError?.message ?? "Terjadi kesalahan saat memuat pesan."}
+                      action={
+                        activeId !== null ? (
+                          <Button
+                            variant="tonal"
+                            icon={RotateCcw}
+                            onClick={() => {
+                              setMessageStatus("loading");
+                              setMessageError(null);
+                              fetchAll((p) => fetchMessages(activeId, p))
+                                .then((list) => {
+                                  setMessages(list);
+                                  setMessageStatus("ready");
+                                })
+                                .catch((err) => {
+                                  setMessageError(classifyMessageError(err));
+                                  setMessageStatus("error");
+                                });
+                            }}
+                          >
+                            Coba lagi
+                          </Button>
+                        ) : undefined
+                      }
+                    />
+                  ) : messages.length === 0 ? (
+                    <EmptyState
+                      icon={MessageSquare}
+                      title="Belum ada pesan"
+                      description="Mulai percakapan dengan mengirim pesan pertama."
+                    />
+                  ) : (
+                    messages.map((message) => {
+                      const own = message.sender_id === me.user.id;
+                      return (
+                        <div
+                          key={message.id}
+                          className={cn(
+                            "flex max-w-[80%] flex-col gap-1",
+                            own ? "ml-auto items-end" : "items-start"
+                          )}
+                        >
+                          {!own && (
+                            <span className="px-1 text-2xs font-medium text-muted-foreground">
+                              {nameFor(message.sender_id)}
+                            </span>
+                          )}
+                          <div
+                            className={cn(
+                              "rounded-lg px-3.5 py-2 text-sm",
+                              own
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-surface-container-high text-foreground",
+                              message.failed && "opacity-70"
+                            )}
+                          >
+                            <p className="whitespace-pre-wrap">{message.body}</p>
+                          </div>
+                          <span className="flex items-center gap-1.5 px-1 text-2xs text-muted-foreground">
+                            <span className="font-mono tabular-nums">
+                              {formatTime(message.sent_at)}
+                            </span>
+                            {own && !message.failed && (
+                              <span
+                                className={cn(
+                                  message.read_at ? "text-primary" : "text-muted-foreground"
+                                )}
+                                aria-label={message.read_at ? "Sudah dibaca" : "Terkirim"}
+                                title={message.read_at ? "Sudah dibaca" : "Terkirim"}
+                              >
+                                <CheckCheck className="h-3.5 w-3.5" aria-hidden />
+                              </span>
+                            )}
+                            {own && message.failed && (
+                              <button
+                                type="button"
+                                onClick={() => void retry(message)}
+                                className="font-medium text-destructive hover:underline"
+                              >
+                                Gagal terkirim · Coba lagi
+                              </button>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="flex items-end gap-2 border-t border-outline-variant px-4 py-3">
+                  <textarea
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={handleKeyDown}
+                    rows={1}
+                    placeholder="Tulis pesan… (Enter mengirim, Shift+Enter baris baru)"
+                    aria-label="Tulis pesan"
+                    className={cn(inputClass, "max-h-32 min-h-[48px] flex-1 resize-y py-2")}
+                  />
+                  <Button
+                    icon={Send}
+                    onClick={() => void handleSend()}
+                    loading={sending}
+                    disabled={!draft.trim()}
+                    aria-label="Kirim pesan"
+                    type="button"
+                  >
+                    Kirim
+                  </Button>
+                </div>
+              </>
+            )}
+          </Card>
+        </div>
+      )}
 
       <NewThreadDialog
         open={newOpen}
         users={users}
+        students={students}
         me={me}
         onClose={() => setNewOpen(false)}
         onCreated={handleCreated}

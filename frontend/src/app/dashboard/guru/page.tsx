@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { AnnouncementWidget } from "@/components/widgets/AnnouncementWidget";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
@@ -586,6 +587,8 @@ function GuruContent({ me }: { me: UserMe }) {
           </Card>
         </div>
       </div>
+
+      <AnnouncementWidget />
     </div>
   );
 }

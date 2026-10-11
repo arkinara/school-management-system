@@ -1,16 +1,21 @@
 "use client";
 
 /**
- * Notification aggregation hook (#29). There is no dedicated notifications
- * backend for v1, so `fetchNotifications` builds a per-user feed from the
- * existing announcements / message-thread / SPP / attendance endpoints. This
- * hook owns polling (30s), refetch-on-focus, and local read markers.
+ * Notification centre hook (#29/#51).
+ *
+ * Read state is owned by the backend: the feed comes from
+ * `GET /api/notifications` and read mutations POST to
+ * `/api/notifications/{id}/read` (or `/mark-all-read`). There is no
+ * localStorage read marker any more — an existing device marker is ignored.
+ *
+ * The hook owns polling (30s), refetch-on-focus and a cross-component change
+ * event so the bell badge and the feed page stay in sync.
  */
 
 import * as React from "react";
-import { getMe } from "./auth";
 import {
   fetchNotifications,
+  fetchUnreadCount,
   markAllNotificationsRead,
   markNotificationRead,
   type AppNotification,
@@ -28,26 +33,29 @@ export interface NotificationsResult {
   markAllRead: () => void;
 }
 
-/** Polls the aggregated notification feed and exposes read mutations. */
+function emitChanged(): void {
+  try {
+    window.dispatchEvent(new Event(CHANGE_EVENT));
+  } catch {
+    // Ignore environments without a global event target.
+  }
+}
+
+/** Polls the per-user notification feed and exposes read mutations. */
 export function useNotifications(): NotificationsResult {
   const [notifications, setNotifications] = React.useState<AppNotification[]>([]);
+  const [unreadCount, setUnreadCount] = React.useState(0);
   const [status, setStatus] = React.useState<"loading" | "ready" | "error">("loading");
   const [reloadKey, setReloadKey] = React.useState(0);
-  const userIdRef = React.useRef<number | undefined>(undefined);
   const mountedRef = React.useRef(true);
 
   const load = React.useCallback(async (showLoading: boolean) => {
     if (showLoading) setStatus("loading");
     try {
-      if (userIdRef.current === undefined) {
-        const me = await getMe().catch(() => null);
-        userIdRef.current = me?.user.id;
-      }
-      const list = await fetchNotifications({
-        currentUserId: userIdRef.current,
-      });
+      const [list, count] = await Promise.all([fetchNotifications(), fetchUnreadCount()]);
       if (!mountedRef.current) return;
       setNotifications(list);
+      setUnreadCount(count);
       setStatus("ready");
     } catch {
       if (mountedRef.current) setStatus("error");
@@ -74,25 +82,26 @@ export function useNotifications(): NotificationsResult {
     setNotifications((current) =>
       current.map((item) => (item.id === id ? { ...item, read: true } : item))
     );
-    void markNotificationRead(id);
+    void markNotificationRead(Number(id))
+      .then(emitChanged)
+      .catch(() => {
+        /* Keep the optimistic state; the next poll reconciles. */
+      });
   }, []);
 
   const markAllRead = React.useCallback(() => {
-    const ids = notifications.map((item) => item.id);
     setNotifications((current) => current.map((item) => ({ ...item, read: true })));
-    void markAllNotificationsRead(ids);
-  }, [notifications]);
+    setUnreadCount(0);
+    void markAllNotificationsRead()
+      .then(emitChanged)
+      .catch(() => {
+        /* Keep the optimistic state; the next poll reconciles. */
+      });
+  }, []);
 
   const refresh = React.useCallback(() => {
     setReloadKey((current) => current + 1);
   }, []);
 
-  const unreadCount = notifications.filter((item) => !item.read).length;
-
   return { notifications, unreadCount, status, refresh, markRead, markAllRead };
-}
-
-/** Lightweight badge helper used by the AppBar bell. */
-export function useNotificationCount(): number {
-  return useNotifications().unreadCount;
 }

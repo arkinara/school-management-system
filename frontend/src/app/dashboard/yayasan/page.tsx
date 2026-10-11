@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { AnnouncementWidget } from "@/components/widgets/AnnouncementWidget";
 import { BarList, type BarListItem } from "@/components/dashboard/BarList";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -453,6 +454,8 @@ function YayasanContent({ me }: { me: UserMe }) {
           </ul>
         </Card>
       </div>
+
+      <AnnouncementWidget />
     </div>
   );
 }

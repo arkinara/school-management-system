@@ -28,18 +28,21 @@ import { cn } from "@/components/ui/cn";
 import { ApiError } from "@/lib/api";
 import {
   createAnnouncement,
-  deleteAnnouncement,
   fetchAll,
   fetchAnnouncements,
   fetchClasses,
+  fetchSchools,
   fetchTenants,
   fetchUsers,
+  JENJANG_VALUES,
   publishAnnouncement,
+  rejectAnnouncement,
   unpublishAnnouncement,
   updateAnnouncement,
   type AnnouncementAudience,
   type AnnouncementRecord,
   type ClassRecord,
+  type SchoolRecord,
   type TenantRecord,
 } from "@/lib/endpoints";
 import type { UserMe, UserRole } from "@/lib/auth";
@@ -273,25 +276,27 @@ function Composer({
 
         {audience === "jenjang" && (
           <FormField label="Jenjang Tujuan" htmlFor="ann-tenant" required error={errors.tenantId}>
-            <select
-              id="ann-tenant"
-              ref={tenantRef}
-              value={tenantId}
-              onChange={(event) => setTenantId(event.target.value)}
-              aria-invalid={Boolean(errors.tenantId)}
-              className={inputClass}
-            >
-              <option value="">Pilih jenjang…</option>
-              {tenants.length > 0 ? (
-                tenants.map((tenant) => (
+            {tenants.length > 0 ? (
+              <select
+                id="ann-tenant"
+                ref={tenantRef}
+                value={tenantId}
+                onChange={(event) => setTenantId(event.target.value)}
+                aria-invalid={Boolean(errors.tenantId)}
+                className={inputClass}
+              >
+                <option value="">Pilih jenjang…</option>
+                {tenants.map((tenant) => (
                   <option key={tenant.id} value={tenant.id}>
-                    {tenant.name}
+                    {tenant.jenjang_type} · {tenant.name}
                   </option>
-                ))
-              ) : (
-                <option value={me.tenant_id}>Jenjang #{me.tenant_id}</option>
-              )}
-            </select>
+                ))}
+              </select>
+            ) : (
+              <p className="rounded-sm border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-muted-foreground">
+                Pengumuman akan dikirim ke seluruh jenjang sekolah Anda.
+              </p>
+            )}
           </FormField>
         )}
 
@@ -414,6 +419,9 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
   const [authors, setAuthors] = React.useState<Record<number, string>>({});
   const [classes, setClasses] = React.useState<ClassRecord[]>([]);
   const [tenants, setTenants] = React.useState<TenantRecord[]>([]);
+  const [schools, setSchools] = React.useState<SchoolRecord[]>([]);
+  const [jenjangFilter, setJenjangFilter] = React.useState("");
+  const [schoolFilter, setSchoolFilter] = React.useState("");
   const [status, setStatus] = React.useState<LoadStatus>("loading");
   const [reloadKey, setReloadKey] = React.useState(0);
   const [composerOpen, setComposerOpen] = React.useState(false);
@@ -443,6 +451,9 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
     if (me.role === "super_admin") {
       fetchTenants()
         .then((list) => active && setTenants(list))
+        .catch(() => undefined);
+      fetchSchools({ size: 100 })
+        .then((page) => active && setSchools(page.items))
         .catch(() => undefined);
     }
     return () => {
@@ -487,11 +498,23 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
   }, [refresh]);
 
   const visible = React.useMemo(() => {
+    let list = items;
     if (filter === "important") {
-      return items.filter((item) => item.audience === "all" && item.status === "published");
+      list = list.filter((item) => item.audience === "all" && item.status === "published");
     }
-    return items;
-  }, [filter, items]);
+    if (me.role === "super_admin") {
+      if (jenjangFilter) {
+        const tenantIds = new Set(
+          tenants.filter((tenant) => tenant.jenjang_type === jenjangFilter).map((t) => t.id)
+        );
+        list = list.filter((item) => tenantIds.has(item.tenant_id));
+      }
+      if (schoolFilter) {
+        list = list.filter((item) => item.school_id === Number(schoolFilter));
+      }
+    }
+    return list;
+  }, [filter, items, me.role, jenjangFilter, schoolFilter, tenants]);
 
   const draftItems = React.useMemo(
     () => visible.filter((item) => item.status !== "published"),
@@ -546,29 +569,17 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
   async function deny(item: AnnouncementRecord) {
     setBusyIds((current) => new Set(current).add(item.id));
     try {
-      await deleteAnnouncement(item.id);
+      await rejectAnnouncement(item.id);
       removeLocal(item.id);
-      setToast({
-        message: "Pengumuman ditolak dan dihapus.",
-        tone: "success",
-        undo: async () => {
-          try {
-            const restored = await createAnnouncement({
-              title: item.title,
-              body: item.body,
-              audience: item.audience,
-              target_class_id: item.target_class_id ?? undefined,
-              target_tenant_id: item.target_tenant_id ?? undefined,
-            });
-            upsert(restored);
-          } catch {
-            setToast({ message: "Gagal memulihkan pengumuman.", tone: "error" });
-          }
-        },
+      setSelected((current) => {
+        const next = new Set(current);
+        next.delete(item.id);
+        return next;
       });
+      setToast({ message: "Pengumuman ditolak.", tone: "success" });
     } catch (err) {
       setToast({
-        message: err instanceof ApiError ? err.detail : "Gagal menghapus pengumuman.",
+        message: err instanceof ApiError ? err.detail : "Gagal menolak pengumuman.",
         tone: "error",
       });
     } finally {
@@ -658,6 +669,37 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
         </div>
       </div>
 
+      {me.role === "super_admin" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="Saring jenjang"
+            value={jenjangFilter}
+            onChange={(event) => setJenjangFilter(event.target.value)}
+            className={cn(inputClass, "min-h-10 w-auto")}
+          >
+            <option value="">Semua jenjang</option>
+            {JENJANG_VALUES.map((jenjang) => (
+              <option key={jenjang} value={jenjang}>
+                {jenjang}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Saring sekolah"
+            value={schoolFilter}
+            onChange={(event) => setSchoolFilter(event.target.value)}
+            className={cn(inputClass, "min-h-10 w-auto")}
+          >
+            <option value="">Semua sekolah</option>
+            {schools.map((school) => (
+              <option key={school.id} value={school.id}>
+                {school.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div role="tablist" aria-label="Saringan pengumuman" className="flex flex-wrap gap-2">
         {FILTERS.map((option) => {
           const active = filter === option.key;
@@ -716,7 +758,7 @@ function AnnouncementsContent({ me }: { me: UserMe }) {
               onClick={bulkDismiss}
               type="button"
             >
-              Hapus
+              Tolak
             </Button>
             <Button
               className="min-h-10 px-3 text-xs"

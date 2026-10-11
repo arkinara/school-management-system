@@ -6,7 +6,7 @@
  * response shapes. Every list endpoint returns the shared paginated envelope.
  */
 
-import { apiFetch } from "./api";
+import { ApiError, apiFetch } from "./api";
 import type { UserMe } from "./auth";
 import { todayDayOfWeek } from "./days";
 
@@ -885,6 +885,10 @@ export function fetchDashboardCounts(
 export type AnnouncementAudience = "all" | "class" | "jenjang";
 export type AnnouncementStatus = "draft" | "published";
 
+/** Canonical jenjang enum shared by every filter/composer picker. */
+export const JENJANG_VALUES = ["TK", "SD", "SMP", "SMA"] as const;
+export type Jenjang = (typeof JENJANG_VALUES)[number];
+
 export interface AnnouncementRecord {
   id: number;
   tenant_id: number;
@@ -960,6 +964,36 @@ export function deleteAnnouncement(id: number): Promise<void> {
   return apiFetch<void>(`/api/announcements/${id}`, { method: "DELETE" });
 }
 
+/**
+ * POST /api/announcements/{id}/reject — deny a draft without deleting the row.
+ *
+ * When the dedicated reject route is unavailable (older backends), fall back to
+ * the soft-retract route so denying never deletes + recreates an announcement.
+ */
+export function rejectAnnouncement(id: number, reason?: string): Promise<AnnouncementRecord> {
+  const body = JSON.stringify({ reason: reason ?? null });
+  return apiFetch<AnnouncementRecord>(`/api/announcements/${id}/reject`, {
+    method: "POST",
+    body,
+  }).catch((err: unknown) => {
+    if (err instanceof ApiError && (err.status === 404 || err.status === 405)) {
+      return apiFetch<AnnouncementRecord>(`/api/announcements/${id}/retract`, {
+        method: "POST",
+        body,
+      });
+    }
+    throw err;
+  });
+}
+
+/** POST /api/announcements/{id}/retract — soft-retract (never deletes). */
+export function retractAnnouncement(id: number, reason?: string): Promise<AnnouncementRecord> {
+  return apiFetch<AnnouncementRecord>(`/api/announcements/${id}/retract`, {
+    method: "POST",
+    body: JSON.stringify({ reason: reason ?? null }),
+  });
+}
+
 /* --------------------------------------------------------------------------
    Direct message threads (#26)
    -------------------------------------------------------------------------- */
@@ -977,6 +1011,8 @@ export interface MessageThreadRecord {
   id: number;
   tenant_id: number;
   school_id: number | null;
+  student_id?: number | null;
+  created_by?: number | null;
   participant_ids: number[];
   subject: string;
   created_at: string;
@@ -984,9 +1020,17 @@ export interface MessageThreadRecord {
 }
 
 export interface MessageThreadInput {
+  /** Every message thread is about one student (#61). */
+  student_id: number;
   participant_ids: number[];
   subject: string;
   school_id?: number | null;
+}
+
+/** Read-only moderator payload from GET /api/message-threads/{id}/moderator-view. */
+export interface MessageThreadModeration {
+  thread: MessageThreadRecord;
+  messages: MessageRecord[];
 }
 
 /** GET /api/message-threads — threads the caller participates in. */
@@ -1040,15 +1084,38 @@ export function removeThreadParticipant(threadId: number, userId: number): Promi
   });
 }
 
+/** POST /api/message-threads/{threadId}/read — explicit, idempotent read call. */
+export function markThreadRead(threadId: number): Promise<void> {
+  return apiFetch<void>(`/api/message-threads/${threadId}/read`, { method: "POST" });
+}
+
+/** GET /api/message-threads/{threadId}/moderator-view — audited read-only view. */
+export function fetchModerationView(threadId: number): Promise<MessageThreadModeration> {
+  return apiFetch<MessageThreadModeration>(`/api/message-threads/${threadId}/moderator-view`);
+}
+
 /* ==========================================================================
-   Notifikasi (#29) — client-side aggregation over existing domains
+   Notifikasi (#29/#51) — per-user, server-driven feed
    ========================================================================== */
 
 export type NotificationSource = "absensi" | "spp" | "komunikasi";
 export type NotificationType = "attendance" | "payment" | "announcement" | "message";
 
+/** Raw row from `GET /api/notifications` (ticket #51). */
+export interface ServerNotification {
+  id: number;
+  user_id: number;
+  type: string;
+  title: string;
+  body: string;
+  link: string | null;
+  is_read: boolean;
+  created_at: string;
+  read_at: string | null;
+}
+
 export interface AppNotification {
-  /** Stable key derived from the underlying event, e.g. `announcement:12`. */
+  /** Server notification id, stringified for list keys. */
   id: string;
   type: NotificationType;
   source: NotificationSource;
@@ -1059,164 +1126,59 @@ export interface AppNotification {
   read: boolean;
 }
 
-const NOTIFICATION_READ_KEY = "sms_notification_read_ids";
+const NOTIFICATION_TYPE_MAP: Record<
+  string,
+  { type: NotificationType; source: NotificationSource }
+> = {
+  attendance_alert: { type: "attendance", source: "absensi" },
+  spp_overdue: { type: "payment", source: "spp" },
+  announcement: { type: "announcement", source: "komunikasi" },
+  message: { type: "message", source: "komunikasi" },
+};
 
-/** Event ids the user has already read, persisted per device. */
-export function getReadNotificationIds(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(NOTIFICATION_READ_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeReadIds(ids: string[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(NOTIFICATION_READ_KEY, JSON.stringify(ids));
-  } catch {
-    // Ignore storage failures.
-  }
-  try {
-    window.dispatchEvent(new Event("sms:notifications-changed"));
-  } catch {
-    // Ignore environments without a global event target.
-  }
-}
-
-/** Persist a single read marker (fails safe — caller keeps unread on error). */
-export async function markNotificationRead(id: string): Promise<void> {
-  const ids = getReadNotificationIds();
-  if (!ids.includes(id)) writeReadIds([...ids, id]);
-}
-
-/** Persist read markers for every supplied event id. */
-export async function markAllNotificationsRead(ids: string[]): Promise<void> {
-  const existing = new Set(getReadNotificationIds());
-  for (const id of ids) existing.add(id);
-  writeReadIds([...existing]);
-}
-
-function excerpt(text: string, max = 120): string {
-  const clean = text.replace(/\s+/g, " ").trim();
-  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
-}
-
-function statusLabel(status: string): string {
-  const map: Record<string, string> = {
-    hadir: "Hadir",
-    izin: "Izin",
-    sakit: "Sakit",
-    alpa: "Alpa",
+/** Map a server row to the view-model used by the bell + feed. */
+export function toAppNotification(row: ServerNotification): AppNotification {
+  const mapped = NOTIFICATION_TYPE_MAP[row.type] ?? {
+    type: "announcement",
+    source: "komunikasi",
   };
-  return map[status] ?? status;
+  return {
+    id: String(row.id),
+    type: mapped.type,
+    source: mapped.source,
+    title: row.title,
+    body: row.body,
+    timestamp: row.created_at,
+    href: row.link ?? "/dashboard/notifications",
+    read: row.is_read,
+  };
 }
 
-/**
- * GET /api/notifications equivalent for v1: aggregates announcements, message
- * threads, overdue SPP bills and non-hadir attendance. Each source is fetched
- * independently so one failing domain degrades gracefully instead of blanking
- * the whole feed. Read state is layered on from local markers.
- */
+/** GET /api/notifications — the caller's own per-user feed, newest first. */
 export async function fetchNotifications(
-  params: {
-    currentUserId?: number;
-    unreadOnly?: boolean;
-  } = {}
+  params: { limit?: number; unreadOnly?: boolean } = {}
 ): Promise<AppNotification[]> {
-  const readIds = new Set(getReadNotificationIds());
-  const notifications: AppNotification[] = [];
-
-  const [announcements, threads, bills, attendance] = await Promise.allSettled([
-    fetchAnnouncements({ size: 15 }),
-    fetchThreads({ size: 20 }),
-    getBills({ status: "overdue", size: 20 }),
-    fetchAttendances({ size: 20 }),
-  ]);
-
-  if (announcements.status === "fulfilled") {
-    for (const item of announcements.value.items) {
-      if (item.status !== "published" || item.published_at === null) continue;
-      const id = `announcement:${item.id}`;
-      notifications.push({
-        id,
-        type: "announcement",
-        source: "komunikasi",
-        title: item.title,
-        body: excerpt(item.body),
-        timestamp: item.published_at,
-        href: "/dashboard/announcements",
-        read: readIds.has(id),
-      });
-    }
-  }
-
-  if (threads.status === "fulfilled") {
-    for (const thread of threads.value.items) {
-      const last = thread.last_message;
-      if (!last) continue;
-      const isOwn = params.currentUserId === last.sender_id;
-      const id = `message:${last.id}`;
-      notifications.push({
-        id,
-        type: "message",
-        source: "komunikasi",
-        title: thread.subject,
-        body: excerpt(last.body),
-        timestamp: last.sent_at,
-        href: "/dashboard/messages",
-        read: last.read_at !== null || isOwn || readIds.has(id),
-      });
-    }
-  }
-
-  if (bills.status === "fulfilled") {
-    for (const bill of bills.value.items) {
-      const id = `spp:${bill.id}`;
-      notifications.push({
-        id,
-        type: "payment",
-        source: "spp",
-        title: `SPP menunggak · ${bill.period}`,
-        body: `Sisa tagihan ${formatRupiahPlain(bill.balance)} jatuh tempo ${bill.due_date}.`,
-        timestamp: bill.due_date,
-        href: "/dashboard/tu/spp/payments",
-        read: readIds.has(id),
-      });
-    }
-  }
-
-  if (attendance.status === "fulfilled") {
-    for (const record of attendance.value.items) {
-      if (record.status === "hadir") continue;
-      const id = `attendance:${record.id}`;
-      notifications.push({
-        id,
-        type: "attendance",
-        source: "absensi",
-        title: `Absensi: ${statusLabel(record.status)}`,
-        body: `Pencatatan kehadiran tanggal ${record.date}${record.note ? ` · ${record.note}` : ""}.`,
-        timestamp: record.date,
-        href: "/dashboard/guru/absensi",
-        read: readIds.has(id),
-      });
-    }
-  }
-
-  const sorted = notifications.sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  const rows = await apiFetch<ServerNotification[]>(
+    `/api/notifications${toQuery({
+      limit: params.limit,
+      unread_only: params.unreadOnly ? true : undefined,
+    })}`
   );
-  return params.unreadOnly ? sorted.filter((item) => !item.read) : sorted;
+  return rows.map(toAppNotification);
 }
 
-function formatRupiahPlain(amount: number): string {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(amount);
+/** GET /api/notifications/unread-count — authoritative badge count. */
+export async function fetchUnreadCount(): Promise<number> {
+  const res = await apiFetch<{ count: number }>("/api/notifications/unread-count");
+  return res.count;
+}
+
+/** POST /api/notifications/{id}/read — server-driven read state. */
+export function markNotificationRead(id: number): Promise<void> {
+  return apiFetch<void>(`/api/notifications/${id}/read`, { method: "POST" });
+}
+
+/** POST /api/notifications/mark-all-read — clear every unread for the caller. */
+export function markAllNotificationsRead(): Promise<void> {
+  return apiFetch<void>("/api/notifications/mark-all-read", { method: "POST" });
 }
