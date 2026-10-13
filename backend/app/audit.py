@@ -35,11 +35,27 @@ def log_audit_event(
     school_id: int | None = None,
     entity_type: str | None = None,
     entity_id: int | None = None,
+    resource_type: str | None = None,
+    resource_id: int | None = None,
     detail: str | None = None,
+    outcome: str = "success",
+    reason_code: str | None = None,
+    before: dict | None = None,
+    after: dict | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
     bypassed: bool = False,
     request: Request | None = None,
 ) -> None:
-    """Append one immutable audit entry, never raising into the caller."""
+    """Append one immutable audit entry, never raising into the caller.
+
+    ``resource_type``/``resource_id`` fall back to the legacy
+    ``entity_type``/``entity_id`` arguments. ``before``/``after`` are stored
+    both as structured JSON and folded into the human-readable ``reason`` text.
+    """
+    if db is None:
+        return
+
     if user is not None:
         actor_id = user.id
         actor_role = str(user.role)
@@ -48,19 +64,30 @@ def log_audit_event(
         if school_id is None:
             school_id = user.school_id
 
+    resolved_resource_type = resource_type or entity_type
+    resolved_resource_id = resource_id if resource_id is not None else entity_id
+
     reason_parts: list[str] = []
-    entity = _entity_reason(entity_type, entity_id)
+    entity = _entity_reason(resolved_resource_type, resolved_resource_id)
     if entity:
         reason_parts.append(entity)
+    if reason_code:
+        reason_parts.append(f"reason_code={reason_code}")
     if detail:
         reason_parts.append(detail)
+    if before:
+        reason_parts.append(f"before={before}")
+    if after:
+        reason_parts.append(f"after={after}")
     if request is not None:
         client = request.client
         if client is not None:
+            ip_address = ip_address or client.host
             reason_parts.append(f"ip={client.host}")
-        user_agent = request.headers.get("user-agent")
-        if user_agent:
-            reason_parts.append(f"ua={user_agent}")
+        header_ua = request.headers.get("user-agent")
+        if header_ua:
+            user_agent = user_agent or header_ua[:500]
+            reason_parts.append(f"ua={header_ua}")
     reason = "; ".join(reason_parts) or None
 
     try:
@@ -71,6 +98,14 @@ def log_audit_event(
                 action=action,
                 tenant_id=tenant_id,
                 school_id=school_id,
+                resource_type=resolved_resource_type,
+                resource_id=resolved_resource_id,
+                outcome=outcome,
+                reason_code=reason_code,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                before=before,
+                after=after,
                 reason=reason,
                 bypassed=bypassed,
             )

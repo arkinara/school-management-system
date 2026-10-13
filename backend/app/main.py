@@ -131,6 +131,8 @@ app.include_router(
     messages.router, prefix="/api/message-threads", tags=["message-threads"]
 )
 app.include_router(audit.router, prefix="/api/audit-log", tags=["audit-log"])
+# Plural alias (ticket #63); the singular prefix is kept for backward compat.
+app.include_router(audit.router, prefix="/api/audit-logs", tags=["audit-logs"])
 app.include_router(
     notifications.router, prefix="/api/notifications", tags=["notifications"]
 )

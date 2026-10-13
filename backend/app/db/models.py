@@ -647,7 +647,13 @@ class Message(Base):
 
 
 class AuditLog(Base):
-    """Audit trail for explicit cross-tenant super_admin bypass calls."""
+    """Immutable security/audit trail (tickets #30, #63).
+
+    ``resource_type``/``resource_id`` are the structured target of the audited
+    action. ``reason`` remains for human-readable detail and backward
+    compatibility; ``outcome`` classifies the result and is pinned to
+    ``success | denied | error``.
+    """
 
     __tablename__ = "audit_logs"
 
@@ -657,9 +663,31 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(128), nullable=False)
     tenant_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     school_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    resource_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    resource_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    outcome: Mapped[str] = mapped_column(
+        String(20), default="success", server_default="success", nullable=False
+    )
+    reason_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    before: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    after: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     reason: Mapped[str | None] = mapped_column(String(512), nullable=True)
     bypassed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "outcome IN ('success', 'denied', 'error')",
+            name="ck_audit_log_outcome",
+        ),
+        Index("ix_audit_logs_tenant_id", "tenant_id"),
+        Index("ix_audit_logs_school_id", "school_id"),
+        Index("ix_audit_logs_resource_type", "resource_type"),
+        Index("ix_audit_logs_resource_id", "resource_id"),
+        Index("ix_audit_logs_reason_code", "reason_code"),
+    )
 
 
 class TokenDenylist(Base):

@@ -197,6 +197,10 @@ def log_scope_denial(
             action="scope_access_denied",
             entity_type=resource,
             entity_id=resource_id,
+            resource_type=resource,
+            resource_id=resource_id,
+            outcome="denied",
+            reason_code="tenant_boundary_violation",
             detail=reason,
         )
     except Exception:  # noqa: BLE001 - audit must never block the denial path

@@ -96,9 +96,11 @@ def test_spp_payment_writes_audit_entry(client: TestClient, db_session: Session)
 def test_audit_log_requires_privileged_role(
     client: TestClient, db_session: Session
 ) -> None:
+    """The audit trail is super_admin-only (ticket #63)."""
     assert client.get("/api/audit-log", headers=_auth(PARENT10)).status_code == 403
     assert client.get("/api/audit-log", headers=_auth(SUPER)).status_code == 200
-    assert client.get("/api/audit-log", headers=_auth(ADMIN)).status_code == 200
+    assert client.get("/api/audit-log", headers=_auth(ADMIN)).status_code == 403
+    assert client.get("/api/audit-log", headers=_auth(PRINCIPAL)).status_code == 403
 
 
 def test_audit_log_filters(client: TestClient, db_session: Session) -> None:

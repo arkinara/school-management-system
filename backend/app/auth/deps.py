@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import sys
 from collections.abc import Callable
 
 from fastapi import Depends, HTTPException, Request, status
@@ -26,6 +25,44 @@ logger = logging.getLogger("app.auth.deps")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
 
+# Rate-limit the auditing of malformed JWTs so a bad-token flood cannot itself
+# become an audit-log DoS: only every Nth rejected token is persisted.
+_JWT_AUDIT_EVERY = 10
+_jwt_audit_counter = 0
+
+
+def _audit_denied(db: Session, user: User, *, action: str, reason_code: str) -> None:
+    """Best-effort audit of a role/scope denial; never masks the 403."""
+    try:
+        log_audit_event(
+            db,
+            actor=user,
+            action=action,
+            outcome="denied",
+            reason_code=reason_code,
+        )
+    except Exception:  # noqa: BLE001 - audit is best-effort
+        logger.exception("failed to audit denial action=%s user=%s", action, user.id)
+
+
+def _audit_invalid_jwt(db: Session, request: Request, exc: Exception) -> None:
+    """Audit rejected JWTs at a 1:_JWT_AUDIT_EVERY rate to bound log volume."""
+    global _jwt_audit_counter
+    _jwt_audit_counter += 1
+    if _jwt_audit_counter % _JWT_AUDIT_EVERY != 0:
+        return
+    try:
+        log_audit_event(
+            db,
+            actor=None,
+            action="auth_jwt_invalid",
+            outcome="denied",
+            reason_code=type(exc).__name__,
+            request=request,
+        )
+    except Exception:  # noqa: BLE001 - audit is best-effort
+        logger.exception("failed to audit invalid jwt")
+
 
 def get_current_user(
     request: Request,
@@ -41,11 +78,13 @@ def get_current_user(
     try:
         payload = decode_access_token_strict(token)
     except TokenExpiredError as exc:
+        _audit_invalid_jwt(db, request, exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="token expired",
         ) from exc
     except TokenError as exc:
+        _audit_invalid_jwt(db, request, exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid token",
@@ -93,18 +132,12 @@ def require_role(*allowed_roles: str | UserRole) -> Callable[..., User]:
                 str(user.role),
                 sorted(allowed),
             )
-            try:
-                log_audit_event(
-                    db,
-                    actor=user,
-                    action="role_escalation_attempt",
-                    entity_type="user",
-                    entity_id=user.id,
-                    before={"required": sorted(allowed), "actual": str(user.role)},
-                    request=request,
-                )
-            except Exception as exc:  # noqa: BLE001 - audit is best-effort
-                print(f"[audit] failed to write role_escalation_attempt: {exc}", file=sys.stderr)
+            _audit_denied(
+                db,
+                user,
+                action="role_check_failed",
+                reason_code=f"required_{'_'.join(sorted(allowed))}_got_{user.role}",
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="forbidden",

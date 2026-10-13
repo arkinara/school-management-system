@@ -16,6 +16,14 @@ class AuditLogOut(BaseModel):
     action: str
     tenant_id: int | None = None
     school_id: int | None = None
+    resource_type: str | None = None
+    resource_id: int | None = None
+    outcome: str = "success"
+    reason_code: str | None = None
+    ip_address: str | None = None
+    user_agent: str | None = None
+    before: dict | None = None
+    after: dict | None = None
     reason: str | None = None
     bypassed: bool = False
     created_at: datetime

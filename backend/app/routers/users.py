@@ -253,6 +253,7 @@ def update_user(
 
     old_role = target.role
     old_school_id = target.school_id
+    old_is_active = target.is_active
     new_role = data.get("role")
 
     if new_role is not None and new_role != old_role:
@@ -325,6 +326,28 @@ def update_user(
     db.commit()
     db.refresh(target)
 
+    before_snapshot = {
+        "role": old_role.value if old_role else None,
+        "school_id": old_school_id,
+        "is_active": old_is_active,
+    }
+    after_snapshot = {
+        "role": target.role.value if target.role else None,
+        "school_id": target.school_id,
+        "is_active": target.is_active,
+    }
+    if before_snapshot != after_snapshot:
+        log_audit_event(
+            db,
+            actor=user,
+            action="update_user",
+            resource_type="user",
+            resource_id=target.id,
+            before=before_snapshot,
+            after=after_snapshot,
+            request=request,
+        )
+
     if new_role is not None and new_role != old_role:
         log_audit_event(
             db,
@@ -379,6 +402,8 @@ def delete_user(
         action="deactivate_user",
         entity_type="user",
         entity_id=target.id,
+        resource_type="user",
+        resource_id=target.id,
         before={"is_active": True},
         after={"is_active": False},
     )
