@@ -38,6 +38,7 @@ from app.routers import (
     teacher_assignments,
     tenants,
     users,
+    yayasan,
 )
 
 logger = logging.getLogger("app.main")
@@ -107,6 +108,7 @@ app.add_middleware(TenantScopeMiddleware)
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(academic.router, prefix="/api/academic", tags=["academic"])
 app.include_router(tenants.router, prefix="/api/tenants", tags=["tenants"])
+app.include_router(yayasan.router, prefix="/api/yayasan", tags=["yayasan"])
 app.include_router(schools.router, prefix="/api/schools", tags=["schools"])
 # Public, unauthenticated picker data for sign-in/sign-up/onboarding (#45).
 app.include_router(tenants.public_router, tags=["public"])
