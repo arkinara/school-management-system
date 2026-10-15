@@ -66,7 +66,13 @@ export function Table<Row>({
                     key={col.key}
                     scope="col"
                     aria-sort={
-                      active ? (sort!.direction === "asc" ? "ascending" : "descending") : undefined
+                      col.sortable
+                        ? active && sort
+                          ? sort.direction === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                        : undefined
                     }
                     className={cn(
                       "border-b border-outline-variant font-semibold text-muted-foreground",
@@ -111,14 +117,18 @@ export function Table<Row>({
                 key={rowKey(row)}
                 className="border-b border-outline-variant last:border-0 transition-colors duration-short hover:bg-surface-container-low"
               >
-                {columns.map((col) => (
-                  <td
-                    key={col.key}
-                    className={cn(pad, alignClass[col.align ?? "left"], col.className)}
-                  >
-                    {col.cell ? col.cell(row) : (row as Record<string, React.ReactNode>)[col.key]}
-                  </td>
-                ))}
+                {columns.map((col) => {
+                  const value = (row as Record<string, unknown>)[col.key];
+                  return (
+                    <td
+                      key={col.key}
+                      data-value={value === undefined || value === null ? "" : String(value)}
+                      className={cn(pad, alignClass[col.align ?? "left"], col.className)}
+                    >
+                      {col.cell ? col.cell(row) : (value as React.ReactNode)}
+                    </td>
+                  );
+                })}
                 {rowActions && (
                   <td className={cn(pad, "text-right")}>
                     <div className="flex justify-end gap-1">{rowActions(row)}</div>

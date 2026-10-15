@@ -1182,3 +1182,84 @@ export function markNotificationRead(id: number): Promise<void> {
 export function markAllNotificationsRead(): Promise<void> {
   return apiFetch<void>("/api/notifications/mark-all-read", { method: "POST" });
 }
+
+/* ==========================================================================
+   Yayasan (#64) — super_admin multi-tenant roll-ups
+   ========================================================================== */
+
+/** One school inside a tenant roll-up (no class breakdown). */
+export interface YayasanSchoolSummary {
+  id: number;
+  name: string;
+  jenjang: string | null;
+  enrollment: number;
+}
+
+/** Per-tenant aggregate returned by `GET /api/yayasan/overview`. */
+export interface YayasanTenantSummary {
+  id: number;
+  name: string;
+  jenjang_type: string;
+  school_count: number;
+  enrollment: number;
+  users_by_role: Record<string, number>;
+  attendance_rate: number;
+  spp_collection_rate: number;
+  schools: YayasanSchoolSummary[];
+}
+
+/** Payload of `GET /api/yayasan/overview`. */
+export interface YayasanOverview {
+  tenants: YayasanTenantSummary[];
+  total_tenants: number;
+  total_schools: number;
+  total_enrollment: number;
+  total_users_by_role: Record<string, number>;
+}
+
+/** One class inside a compared school. */
+export interface YayasanCompareClass {
+  id: number;
+  name: string;
+  enrollment: number;
+}
+
+/** One school inside a comparison payload. */
+export interface YayasanCompareSchool {
+  id: number;
+  name: string;
+  jenjang: string | null;
+  enrollment: number;
+  classes: YayasanCompareClass[];
+}
+
+/** Payload of `GET /api/yayasan/compare`. */
+export interface YayasanCompare {
+  schools: YayasanCompareSchool[];
+}
+
+/** Canonical role order used by the yayasan users-by-role table. */
+export const YAYASAN_ROLE_KEYS = [
+  "super_admin",
+  "principal",
+  "teacher",
+  "student",
+  "parent",
+  "admin",
+] as const;
+
+/** GET /api/yayasan/overview — per-tenant stats for the yayasan dashboard. */
+export function fetchYayasanOverview(): Promise<YayasanOverview> {
+  return apiFetch<YayasanOverview>("/api/yayasan/overview");
+}
+
+/**
+ * GET /api/yayasan/compare?school_ids=… — side-by-side 2–3 schools.
+ *
+ * FastAPI parses `list[int]` query params from repeated keys, so each id is
+ * emitted as its own `school_ids=` pair (a comma-joined value would 422).
+ */
+export function fetchYayasanCompare(schoolIds: number[]): Promise<YayasanCompare> {
+  const search = schoolIds.map((id) => `school_ids=${encodeURIComponent(id)}`).join("&");
+  return apiFetch<YayasanCompare>(`/api/yayasan/compare?${search}`);
+}
