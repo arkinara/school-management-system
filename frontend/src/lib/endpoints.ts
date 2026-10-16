@@ -682,6 +682,22 @@ export function voidPayment(paymentId: number, reason?: string): Promise<void> {
   });
 }
 
+/**
+ * POST /api/spp/bills/{id}/remind — send a payment reminder to every linked
+ * guardian (#51 notifications) and stamp the bill's `last_reminded_at`.
+ */
+export function remindBill(billId: number): Promise<{ notified: number }> {
+  return apiFetch<{ notified: number }>(`/api/spp/bills/${billId}/remind`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+/** DELETE /api/spp/bills/{id}/remind — undo an earlier reminder. */
+export function unremindBill(billId: number): Promise<void> {
+  return apiFetch<void>(`/api/spp/bills/${billId}/remind`, { method: "DELETE" });
+}
+
 /** @deprecated Legacy POST /api/spp/payments alias; prefer `recordBillPayment`. */
 export function recordPayment(input: {
   bill_id: number;

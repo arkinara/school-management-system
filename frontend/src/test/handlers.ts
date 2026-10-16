@@ -495,6 +495,8 @@ export const handlers = [
 
   http.get(`${API}/api/spp/bills`, () => HttpResponse.json(page(bills, bills.length))),
 
+  http.get(`${API}/api/spp/bills/overdue`, () => HttpResponse.json(page(bills, bills.length))),
+
   http.post(`${API}/api/spp/bills`, async ({ request }) => {
     const body = (await request.json()) as {
       student_id: number;
@@ -556,6 +558,10 @@ export const handlers = [
   }),
 
   http.delete(`${API}/api/spp/payments/:paymentId`, () => new HttpResponse(null, { status: 204 })),
+
+  http.post(`${API}/api/spp/bills/:billId/remind`, () => HttpResponse.json({ notified: 1 })),
+
+  http.delete(`${API}/api/spp/bills/:billId/remind`, () => new HttpResponse(null, { status: 204 })),
 
   http.get(`${API}/api/spp/payments`, () => HttpResponse.json(page(payments, payments.length))),
 

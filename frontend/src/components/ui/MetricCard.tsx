@@ -1,5 +1,6 @@
 import * as React from "react";
 import { type LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
+import { Sparkline } from "@/components/dashboard/Sparkline";
 import { cn } from "./cn";
 
 export interface MetricCardProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -9,6 +10,10 @@ export interface MetricCardProps extends React.HTMLAttributes<HTMLDivElement> {
   delta?: { value: string; direction: "up" | "down" };
   icon?: LucideIcon;
   hint?: string;
+  /** Optional real series rendered as an area sparkline beneath the value. */
+  sparkline?: number[];
+  /** Accessible label for the sparkline image. */
+  sparklineLabel?: string;
 }
 
 /** KPI tile: label + big number + optional delta + icon. */
@@ -18,6 +23,8 @@ export function MetricCard({
   delta,
   icon: Icon,
   hint,
+  sparkline,
+  sparklineLabel,
   className,
   ...props
 }: MetricCardProps) {
@@ -58,6 +65,15 @@ export function MetricCard({
         )}
       </div>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+      {sparkline && sparkline.length > 0 && (
+        <Sparkline
+          points={sparkline}
+          ariaLabel={sparklineLabel ?? `${label} sparkline`}
+          width={220}
+          height={40}
+          className="mt-3"
+        />
+      )}
     </div>
   );
 }
