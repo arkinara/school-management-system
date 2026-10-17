@@ -15,6 +15,7 @@ from app.db.models import (
     School,
     Student,
     Subject,
+    TeacherAssignment,
     Tenant,
     User,
     UserRole,
@@ -219,7 +220,19 @@ def test_student_can_read_own_grades(client: TestClient, db_session: Session) ->
     assert other.status_code == 403
 
 
-def test_teacher_can_only_modify_own_grades(
+def _assign(db_session: Session, teacher_id: int, subject_id: int, class_id: int) -> None:
+    db_session.add(
+        TeacherAssignment(
+            teacher_id=teacher_id,
+            subject_id=subject_id,
+            class_id=class_id,
+            academic_year="2026/2027",
+        )
+    )
+    db_session.commit()
+
+
+def test_teacher_can_only_modify_assigned_grades(
     client: TestClient, db_session: Session
 ) -> None:
     forbidden = client.patch(
@@ -227,6 +240,7 @@ def test_teacher_can_only_modify_own_grades(
     )
     assert forbidden.status_code == 403
 
+    _assign(db_session, 4, 1, 1)
     allowed = client.patch(
         "/api/grades/1", headers=_auth(TEACHER4), json={"score": 91}
     )
@@ -234,11 +248,16 @@ def test_teacher_can_only_modify_own_grades(
     assert allowed.json()["score"] == 91
 
 
-def test_delete_requires_admin(client: TestClient, db_session: Session) -> None:
+def test_delete_requires_assignment_or_admin(
+    client: TestClient, db_session: Session
+) -> None:
     assert client.delete("/api/grades/1", headers=_auth(TEACHER4)).status_code == 403
-    assert client.delete("/api/grades/1", headers=_auth(ADMIN)).status_code == 204
+    _assign(db_session, 4, 1, 1)
+    assert client.delete("/api/grades/1", headers=_auth(TEACHER4)).status_code == 204
+    assert client.delete("/api/grades/2", headers=_auth(ADMIN)).status_code == 204
     db_session.expire_all()
     assert db_session.get(Grade, 1) is None
+    assert db_session.get(Grade, 2) is None
 
 
 def test_cross_tenant_blocked(client: TestClient, db_session: Session) -> None:
@@ -412,3 +431,61 @@ def test_post_same_grade_twice_leaves_one_row(
     assert len(rows) == 1
     audits = db_session.query(AuditLog).filter(AuditLog.action == "update_grade").all()
     assert len(audits) >= 1
+
+
+def test_patch_category_collision_409(client: TestClient, db_session: Session) -> None:
+    _assign(db_session, 4, 1, 1)
+    response = client.patch(
+        "/api/grades/1", headers=_auth(TEACHER4), json={"category": "sumatif"}
+    )
+    assert response.status_code == 409, response.text
+
+
+def test_patch_null_score_422(client: TestClient, db_session: Session) -> None:
+    _assign(db_session, 4, 1, 1)
+    response = client.patch(
+        "/api/grades/1", headers=_auth(TEACHER4), json={"score": None}
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_patch_teacher_removed_from_assignment_403(
+    client: TestClient, db_session: Session
+) -> None:
+    _assign(db_session, 5, 1, 1)
+    assignment = db_session.query(TeacherAssignment).filter(
+        TeacherAssignment.teacher_id == 5
+    ).one()
+    db_session.delete(assignment)
+    db_session.commit()
+    response = client.patch(
+        "/api/grades/1", headers=_auth(TEACHER5), json={"score": 60}
+    )
+    assert response.status_code == 403, response.text
+    denied = db_session.query(AuditLog).filter(
+        AuditLog.action == "grade_edit_denied"
+    ).first()
+    assert denied is not None
+
+
+def test_delete_grade_audit_logged(client: TestClient, db_session: Session) -> None:
+    _assign(db_session, 4, 1, 1)
+    response = client.delete("/api/grades/1", headers=_auth(TEACHER4))
+    assert response.status_code == 204, response.text
+    row = db_session.query(AuditLog).filter(
+        AuditLog.action == "delete_grade", AuditLog.resource_id == 1
+    ).first()
+    assert row is not None
+
+
+def test_delete_grade_unassigned_403(client: TestClient, db_session: Session) -> None:
+    response = client.delete("/api/grades/1", headers=_auth(TEACHER5))
+    assert response.status_code == 403, response.text
+
+
+def test_grade_score_validation_0_100(client: TestClient, db_session: Session) -> None:
+    _assign(db_session, 4, 1, 1)
+    response = client.patch(
+        "/api/grades/1", headers=_auth(TEACHER4), json={"score": 101}
+    )
+    assert response.status_code == 422, response.text

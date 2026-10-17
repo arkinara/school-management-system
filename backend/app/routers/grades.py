@@ -11,8 +11,10 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.academic import ACTIVE_SEMESTER
 from app.auth.audit import log_audit_event
 from app.auth.deps import get_current_user
 from app.db.models import (
@@ -22,6 +24,7 @@ from app.db.models import (
     School,
     Student,
     Subject,
+    TeacherAssignment,
     Tenant,
     User,
     UserRole,
@@ -30,7 +33,7 @@ from app.db.models import (
 from app.db.session import get_db
 from app.pagination import PageParams
 from app.schemas.grade import (
-    GradeAggregate,
+    BulkGradeRowResult,
     GradeBulkCreate,
     GradeBulkResult,
     GradeCreate,
@@ -174,6 +177,86 @@ def _audit_grade(db: Session, user: User, grade: Grade, before: dict | None) -> 
         )
 
 
+def _teacher_has_assignment(
+    db: Session, teacher_id: int, class_id: int | None, subject_id: int
+) -> bool:
+    """True when the teacher holds a current assignment for class+subject."""
+    if class_id is None:
+        return False
+    return (
+        db.scalar(
+            select(TeacherAssignment.id).where(
+                TeacherAssignment.teacher_id == teacher_id,
+                TeacherAssignment.class_id == class_id,
+                TeacherAssignment.subject_id == subject_id,
+            )
+        )
+        is not None
+    )
+
+
+def _can_edit_grade(db: Session, user: User, grade: Grade) -> bool:
+    """Mutation gate for PATCH/DELETE.
+
+    Teachers must hold a TeacherAssignment for the grade's class+subject;
+    admin/principal may edit inside their tenant; super_admin bypasses.
+    """
+    if is_super_admin(user):
+        return True
+    student = db.get(Student, grade.student_id)
+    if student is None:
+        return False
+    school = db.get(School, student.school_id)
+    if user.role in _STAFF_ADMIN_ROLES:
+        return school is not None and school.tenant_id == user.tenant_id
+    if user.role == UserRole.TEACHER:
+        return _teacher_has_assignment(db, user.id, student.class_id, grade.subject_id)
+    return False
+
+
+def _audit_denied_grade_edit(db: Session, user: User, grade: Grade) -> None:
+    log_audit_event(
+        db,
+        actor=user,
+        action="grade_edit_denied",
+        entity_type="grade",
+        entity_id=grade.id,
+        outcome="denied",
+        reason_code="no_teacher_assignment",
+    )
+
+
+def _grade_category_block(
+    rows: list[Grade], *, include_ids: bool = False
+) -> dict:
+    """Per-category scores/descriptions/average + completeness flags."""
+    block: dict = {
+        "scores": [float(g.score) for g in rows],
+        "descriptions": [g.description for g in rows if g.description],
+        "avg": (sum(float(g.score) for g in rows) / len(rows)) if rows else None,
+        "complete": bool(rows),
+        "missing": [] if rows else ["assessment_1"],
+    }
+    if include_ids:
+        block["ids"] = [g.id for g in rows]
+    return block
+
+
+def _total_avg(categories: dict) -> float | None:
+    avgs = [v["avg"] for v in categories.values() if v["avg"] is not None]
+    return sum(avgs) / len(avgs) if avgs else None
+
+
+def _subjects_for_student(db: Session, student: Student) -> list[Subject]:
+    """All subjects in the student's tenant (so empty ones list as missing)."""
+    school = db.get(School, student.school_id)
+    tenant_id = school.tenant_id if school is not None else None
+    if tenant_id is None:
+        return []
+    stmt = select(Subject).where(Subject.tenant_id == tenant_id).order_by(Subject.name)
+    return list(db.scalars(stmt).all())
+
+
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=GradeOut)
 def create_grade(
     payload: GradeCreate,
@@ -207,13 +290,287 @@ def create_grade(
     return GradeOut.model_validate(grade)
 
 
+def _bulk_error(
+    index: int,
+    detail: str,
+    *,
+    status_code: int = status.HTTP_422_UNPROCESSABLE_ENTITY,
+    student_id: int | None = None,
+    subject_id: int | None = None,
+    category: str | None = None,
+    assessment_no: int | None = None,
+) -> BulkGradeRowResult:
+    return BulkGradeRowResult(
+        index=index,
+        student_id=student_id,
+        subject_id=subject_id,
+        category=category,
+        assessment_no=assessment_no,
+        status="error",
+        status_code=status_code,
+        detail=detail,
+    )
+
+
+def _bulk_by_items(
+    db: Session, user: User, payload: GradeBulkCreate
+) -> GradeBulkResult:
+    """Process heterogeneous per-row items, collecting errors instead of aborting."""
+    saved_grades: list[Grade] = []
+    created = 0
+    updated = 0
+    errors: list[BulkGradeRowResult] = []
+    seen: set[tuple] = set()
+
+    for index, item in enumerate(payload.items):
+        semester = item.semester or payload.semester
+        category = item.category or payload.category
+        if semester is None:
+            errors.append(
+                _bulk_error(
+                    index,
+                    "semester is required",
+                    student_id=item.student_id,
+                    subject_id=item.subject_id,
+                )
+            )
+            continue
+        if category is None:
+            errors.append(
+                _bulk_error(
+                    index,
+                    "category is required",
+                    student_id=item.student_id,
+                    subject_id=item.subject_id,
+                )
+            )
+            continue
+        if item.score is None:
+            errors.append(
+                _bulk_error(
+                    index,
+                    "score is required",
+                    student_id=item.student_id,
+                    subject_id=item.subject_id,
+                    category=str(category),
+                    assessment_no=item.assessment_no,
+                )
+            )
+            continue
+        if item.score < 0 or item.score > 100:
+            errors.append(
+                _bulk_error(
+                    index,
+                    f"score must be 0-100, got {item.score}",
+                    student_id=item.student_id,
+                    subject_id=item.subject_id,
+                    category=str(category),
+                    assessment_no=item.assessment_no,
+                )
+            )
+            continue
+
+        key = (
+            item.student_id,
+            item.subject_id,
+            str(category),
+            semester,
+            item.assessment_no,
+        )
+        if key in seen:
+            errors.append(
+                _bulk_error(
+                    index,
+                    "duplicate grade in bulk payload "
+                    "(student, subject, category, semester, assessment)",
+                    status_code=status.HTTP_409_CONFLICT,
+                    student_id=item.student_id,
+                    subject_id=item.subject_id,
+                    category=str(category),
+                    assessment_no=item.assessment_no,
+                )
+            )
+            continue
+
+        student = db.get(Student, item.student_id)
+        if student is None:
+            errors.append(
+                _bulk_error(
+                    index,
+                    "student not found",
+                    student_id=item.student_id,
+                    subject_id=item.subject_id,
+                )
+            )
+            continue
+        if not can_write_student(db, user, student):
+            errors.append(
+                _bulk_error(
+                    index,
+                    "forbidden",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    student_id=item.student_id,
+                    subject_id=item.subject_id,
+                )
+            )
+            continue
+        subject = db.get(Subject, item.subject_id)
+        if subject is None or (
+            not is_super_admin(user) and subject.tenant_id != user.tenant_id
+        ):
+            errors.append(
+                _bulk_error(
+                    index,
+                    "subject invalid",
+                    student_id=item.student_id,
+                    subject_id=item.subject_id,
+                )
+            )
+            continue
+        if user.role == UserRole.TEACHER and not _teacher_has_assignment(
+            db, user.id, student.class_id, subject.id
+        ):
+            errors.append(
+                _bulk_error(
+                    index,
+                    "no current teacher assignment",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    student_id=item.student_id,
+                    subject_id=item.subject_id,
+                )
+            )
+            continue
+        try:
+            _enforce_note_rule(_student_jenjang(db, student), item.description)
+        except HTTPException as exc:
+            errors.append(
+                _bulk_error(
+                    index,
+                    str(exc.detail),
+                    student_id=item.student_id,
+                    subject_id=item.subject_id,
+                    category=str(category),
+                    assessment_no=item.assessment_no,
+                )
+            )
+            continue
+
+        existing = db.scalar(
+            select(Grade).where(
+                Grade.student_id == item.student_id,
+                Grade.subject_id == item.subject_id,
+                Grade.category == category,
+                Grade.semester == semester,
+                Grade.assessment_no == item.assessment_no,
+            )
+        )
+        if existing is not None:
+            log_audit_event(
+                db,
+                actor=user,
+                action="update_grade",
+                entity_type="grade",
+                entity_id=existing.id,
+                before={"score": existing.score, "description": existing.description},
+                after={"score": item.score, "description": item.description},
+            )
+            existing.score = item.score
+            existing.description = item.description
+            existing.recorded_by = user.id
+            existing.updated_at = utcnow()
+            db.flush()
+            saved_grades.append(existing)
+            updated += 1
+        else:
+            school = db.get(School, student.school_id)
+            grade = Grade(
+                student_id=student.id,
+                subject_id=subject.id,
+                semester=semester,
+                category=category,
+                assessment_no=item.assessment_no,
+                score=item.score,
+                description=item.description,
+                kurikulum_version=school.kurikulum_version if school is not None else None,
+                recorded_by=user.id,
+            )
+            try:
+                with db.begin_nested():
+                    db.add(grade)
+                    db.flush()
+            except IntegrityError as exc:
+                errors.append(
+                    _bulk_error(
+                        index,
+                        f"integrity conflict: {exc.orig}",
+                        status_code=status.HTTP_409_CONFLICT,
+                        student_id=item.student_id,
+                        subject_id=item.subject_id,
+                        category=str(category),
+                        assessment_no=item.assessment_no,
+                    )
+                )
+                continue
+            log_audit_event(
+                db,
+                actor=user,
+                action="create_grade",
+                entity_type="grade",
+                entity_id=grade.id,
+                after={"score": grade.score, "description": grade.description},
+            )
+            saved_grades.append(grade)
+            created += 1
+        seen.add(key)
+
+    db.commit()
+    for grade in saved_grades:
+        db.refresh(grade)
+    return GradeBulkResult(
+        class_id=payload.class_id,
+        subject_id=payload.subject_id,
+        semester=payload.semester,
+        category=payload.category,
+        created=created,
+        updated=updated,
+        saved=[GradeOut.model_validate(g) for g in saved_grades],
+        errors=errors,
+    )
+
+
 @router.post("/bulk", status_code=status.HTTP_201_CREATED, response_model=GradeBulkResult)
 def create_grade_bulk(
     payload: GradeBulkCreate,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> GradeBulkResult:
-    """Upsert every entry for a class/subject/category in one transaction."""
+    """Upsert grades, returning per-row results.
+
+    Invalid rows are collected into ``errors`` instead of aborting the batch.
+    Supports both the class-scoped ``entries`` shape and per-row ``items``.
+    """
+    if user.role not in (
+        UserRole.SUPER_ADMIN,
+        UserRole.PRINCIPAL,
+        UserRole.ADMIN,
+        UserRole.TEACHER,
+    ):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
+    if payload.items:
+        return _bulk_by_items(db, user, payload)
+
+    if (
+        payload.class_id is None
+        or payload.subject_id is None
+        or payload.category is None
+        or payload.semester is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="class_id, subject_id, semester and category are required",
+        )
+
     klass = _class_or_404(db, payload.class_id)
     if not can_manage_class(db, user, klass):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
@@ -222,19 +579,71 @@ def create_grade_bulk(
 
     entries = list({entry.student_id: entry for entry in payload.entries}.values())
     written: list[tuple[Grade, dict | None]] = []
-    for entry in entries:
+    errors: list[BulkGradeRowResult] = []
+    for index, entry in enumerate(entries):
+        if entry.score is None:
+            errors.append(
+                _bulk_error(
+                    index,
+                    "score is required",
+                    student_id=entry.student_id,
+                    subject_id=subject.id,
+                    category=str(payload.category),
+                    assessment_no=payload.assessment_no,
+                )
+            )
+            continue
+        if entry.score < 0 or entry.score > 100:
+            errors.append(
+                _bulk_error(
+                    index,
+                    f"score must be 0-100, got {entry.score}",
+                    student_id=entry.student_id,
+                    subject_id=subject.id,
+                    category=str(payload.category),
+                    assessment_no=payload.assessment_no,
+                )
+            )
+            continue
         student = db.get(Student, entry.student_id)
         if student is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"student {entry.student_id} not found",
+            errors.append(
+                _bulk_error(
+                    index,
+                    f"student {entry.student_id} not found",
+                    student_id=entry.student_id,
+                    subject_id=subject.id,
+                    category=str(payload.category),
+                    assessment_no=payload.assessment_no,
+                )
             )
+            continue
         if student.class_id != klass.id:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"student {entry.student_id} does not belong to this class",
+            errors.append(
+                _bulk_error(
+                    index,
+                    f"student {entry.student_id} does not belong to this class",
+                    student_id=entry.student_id,
+                    subject_id=subject.id,
+                    category=str(payload.category),
+                    assessment_no=payload.assessment_no,
+                )
             )
-        _enforce_note_rule(_student_jenjang(db, student), entry.description)
+            continue
+        try:
+            _enforce_note_rule(_student_jenjang(db, student), entry.description)
+        except HTTPException as exc:
+            errors.append(
+                _bulk_error(
+                    index,
+                    str(exc.detail),
+                    student_id=entry.student_id,
+                    subject_id=subject.id,
+                    category=str(payload.category),
+                    assessment_no=payload.assessment_no,
+                )
+            )
+            continue
         written.append(
             _apply_upsert(
                 db,
@@ -247,6 +656,12 @@ def create_grade_bulk(
                 entry.score,
                 entry.description,
             )
+        )
+
+    if not written and errors:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[error.model_dump() for error in errors],
         )
 
     db.commit()
@@ -262,6 +677,8 @@ def create_grade_bulk(
         category=payload.category,
         created=created,
         updated=len(written) - created,
+        saved=[GradeOut.model_validate(grade) for grade, _ in written],
+        errors=errors,
     )
 
 
@@ -311,49 +728,78 @@ def list_grades(
 
 def _student_aggregate(
     db: Session, user: User, student_id: int, semester: str
-) -> GradeAggregate:
-    """Per-subject and overall averages for one student/semester."""
+) -> dict:
+    """Subject × category view for one student plus legacy aggregate keys.
+
+    Categories with no rows are still present so callers can surface
+    ``complete=False`` and ``missing=['assessment_1']`` for an empty semester.
+    """
     student = db.get(Student, student_id)
     if student is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="student not found")
     if not student_visible(db, user, student):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="student not found")
 
-    rows = db.execute(
-        select(
-            Grade.subject_id,
-            Subject.name,
-            func.avg(Grade.score),
-            func.count(Grade.id),
-        )
-        .join(Subject, Subject.id == Grade.subject_id)
-        .where(Grade.student_id == student.id, Grade.semester == semester)
-        .group_by(Grade.subject_id, Subject.name)
-        .order_by(Grade.subject_id)
-    ).all()
+    subjects = _subjects_for_student(db, student)
+    grades = list(
+        db.scalars(
+            select(Grade).where(
+                Grade.student_id == student.id,
+                Grade.semester == semester,
+                Grade.subject_id.in_([s.id for s in subjects]) if subjects else False,
+            )
+        ).all()
+    )
+    by_key: dict[tuple[int, str], list[Grade]] = defaultdict(list)
+    for grade in grades:
+        by_key[(grade.subject_id, str(grade.category))].append(grade)
 
-    per_subject = [
-        SubjectAggregate(
-            subject_id=row[0],
-            subject_name=row[1],
-            average=round(float(row[2]), 2),
-            count=int(row[3]),
+    out_subjects = []
+    per_subject: list[SubjectAggregate] = []
+    for subject in subjects:
+        categories = {}
+        subject_count = 0
+        for cat in _CATEGORIES:
+            rows = by_key.get((subject.id, cat), [])
+            subject_count += len(rows)
+            categories[cat] = _grade_category_block(rows, include_ids=True)
+        if subject_count:
+            subject_total = sum(
+                float(g.score) for g in grades if g.subject_id == subject.id
+            )
+            subject_avg = subject_total / subject_count
+            per_subject.append(
+                SubjectAggregate(
+                    subject_id=subject.id,
+                    subject_name=subject.name,
+                    average=round(subject_avg, 2),
+                    count=subject_count,
+                )
+            )
+        out_subjects.append(
+            {
+                "subject_id": subject.id,
+                "subject_name": subject.name,
+                "categories": categories,
+                "total_avg": _total_avg(categories),
+            }
         )
-        for row in rows
-    ]
+
     total = sum(item.count for item in per_subject)
     overall = (
         round(sum(item.average * item.count for item in per_subject) / total, 2)
         if total
         else None
     )
-    return GradeAggregate(
-        student_id=student.id,
-        semester=semester,
-        total=total,
-        per_subject=per_subject,
-        overall_average=overall,
-    )
+    return {
+        "student_id": student.id,
+        "class_id": student.class_id,
+        "semester": semester,
+        "subjects": out_subjects,
+        "total": total,
+        "per_subject": [item.model_dump() for item in per_subject],
+        "overall_average": overall,
+    }
 
 
 def _class_aggregate(db: Session, user: User, class_id: int, semester: str) -> dict:
@@ -395,34 +841,34 @@ def _class_aggregate(db: Session, user: User, class_id: int, semester: str) -> d
             ).all()
         )
 
-    grouped: dict[tuple[int, int, str], list[float]] = defaultdict(list)
+    grouped: dict[tuple[int, int, str], list[Grade]] = defaultdict(list)
     for grade in grades:
-        grouped[(grade.student_id, grade.subject_id, str(grade.category))].append(
-            grade.score
-        )
+        grouped[(grade.student_id, grade.subject_id, str(grade.category))].append(grade)
+
+    def _subject_rows(student: Student, subject: Subject) -> dict:
+        categories = {}
+        for cat in _CATEGORIES:
+            rows = grouped.get((student.id, subject.id, cat), [])
+            categories[cat] = _grade_category_block(rows)
+        return {
+            "subject_id": subject.id,
+            "subject_name": subject.name,
+            "categories": categories,
+            "total_avg": _total_avg(categories),
+        }
 
     out_subjects = []
     for subject in subjects:
         out_students = []
         for student in students:
-            categories = {}
-            for cat in _CATEGORIES:
-                scores = grouped.get((student.id, subject.id, cat), [])
-                categories[cat] = {
-                    "scores": scores,
-                    "avg": sum(scores) / len(scores) if scores else None,
-                    "complete": bool(scores),
-                    "missing": [] if scores else ["assessment_1"],
-                }
-            avgs = [v["avg"] for v in categories.values() if v["avg"] is not None]
-            total_avg = sum(avgs) / len(avgs) if avgs else None
+            data = _subject_rows(student, subject)
             name = student.user.full_name if student.user is not None else f"Student {student.id}"
             out_students.append(
                 {
                     "student_id": student.id,
                     "student_name": name,
-                    "categories": categories,
-                    "total_avg": total_avg,
+                    "categories": data["categories"],
+                    "total_avg": data["total_avg"],
                 }
             )
         out_subjects.append(
@@ -433,30 +879,50 @@ def _class_aggregate(db: Session, user: User, class_id: int, semester: str) -> d
             }
         )
 
-    return {"class_id": class_id, "semester": semester, "subjects": out_subjects}
+    by_student = []
+    for student in students:
+        name = student.user.full_name if student.user is not None else f"Student {student.id}"
+        by_student.append(
+            {
+                "student_id": student.id,
+                "student_name": name,
+                "subjects": [_subject_rows(student, subject) for subject in subjects],
+            }
+        )
+
+    return {
+        "class_id": class_id,
+        "semester": semester,
+        "subjects": out_subjects,
+        "students": by_student,
+    }
 
 
 @router.get("/aggregate", response_model=None)
 def aggregate_grades(
     student_id: int | None = Query(None),
     class_id: int | None = Query(None),
-    semester: str = Query(...),
+    semester: str | None = Query(None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Aggregate grades.
 
-    With ``student_id`` → per-subject averages (legacy shape). With ``class_id``
-    → per-student, per-subject, per-category completeness view (ticket #53).
+    With ``student_id`` → per-subject × category with completeness flags, plus
+    the legacy flat per-subject keys. With ``class_id`` → per-student,
+    per-subject, per-category completeness view (ticket #53/#76).
     """
     # scope: school
-    if class_id is not None:
-        return _class_aggregate(db, user, class_id, semester)
-    if student_id is None:
+    if class_id is None and student_id is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="student_id or class_id is required",
         )
+    if semester is None:
+        semester = ACTIVE_SEMESTER
+    if class_id is not None:
+        return _class_aggregate(db, user, class_id, semester)
+    assert student_id is not None
     return _student_aggregate(db, user, student_id, semester)
 
 
@@ -536,29 +1002,42 @@ def update_grade(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> GradeOut:
-    """Update a grade; teachers may only edit records they created."""
+    """Update a grade inside the caller's current assignment scope."""
     grade = db.get(Grade, grade_id)
     if grade is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="grade not found")
 
-    permitted = is_super_admin(user) or (
-        user.role == UserRole.TEACHER and grade.recorded_by == user.id
-    )
-    if not permitted and user.role in _STAFF_ADMIN_ROLES:
-        student = db.get(Student, grade.student_id)
-        school = db.get(School, student.school_id) if student is not None else None
-        permitted = school is not None and school.tenant_id == user.tenant_id
-    if not permitted:
+    if not _can_edit_grade(db, user, grade):
+        if user.role == UserRole.TEACHER:
+            _audit_denied_grade_edit(db, user, grade)
+            db.commit()
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
-    data = payload.model_dump(exclude_unset=True)
+    if "score" in payload.model_fields_set and payload.score is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="score cannot be null; use DELETE to remove the grade",
+        )
+    if payload.category is not None and payload.category != grade.category:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="category cannot be changed; delete and recreate the grade",
+        )
+
     before = {
         "score": grade.score,
         "description": grade.description,
         "category": str(grade.category),
     }
-    for field, value in data.items():
-        setattr(grade, field, value)
+    if payload.score is not None:
+        if payload.score < 0 or payload.score > 100:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"score must be 0-100, got {payload.score}",
+            )
+        grade.score = payload.score
+    if "description" in payload.model_fields_set:
+        grade.description = payload.description
 
     student = db.get(Student, grade.student_id)
     if student is not None:
@@ -577,17 +1056,30 @@ def delete_grade(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Response:
-    """Delete a grade (admin/super_admin only)."""
+    """Delete a grade: assigned teacher, admin/principal, or super_admin."""
     grade = db.get(Grade, grade_id)
     if grade is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="grade not found")
-    if user.role != UserRole.SUPER_ADMIN:
-        if user.role != UserRole.ADMIN:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
-        student = db.get(Student, grade.student_id)
-        school = db.get(School, student.school_id) if student is not None else None
-        if school is None or school.tenant_id != user.tenant_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    if not _can_edit_grade(db, user, grade):
+        if user.role == UserRole.TEACHER:
+            _audit_denied_grade_edit(db, user, grade)
+            db.commit()
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
+    log_audit_event(
+        db,
+        actor=user,
+        action="delete_grade",
+        entity_type="grade",
+        entity_id=grade.id,
+        before={
+            "score": grade.score,
+            "category": str(grade.category),
+            "subject_id": grade.subject_id,
+            "student_id": grade.student_id,
+            "semester": grade.semester,
+        },
+    )
     db.delete(grade)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

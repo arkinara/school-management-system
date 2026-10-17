@@ -117,3 +117,63 @@ def test_class_rollup_ranking(client: TestClient, db_session: Session) -> None:
     assert [row["rank"] for row in students] == [1, 2, 3, 4, 5]
     averages = [row["overall_avg"] for row in students]
     assert averages == sorted(averages, reverse=True)
+
+
+def test_aggregate_student_subject_category_with_complete(
+    client: TestClient, db_session: Session
+) -> None:
+    _post(client, 1, 1, "sumatif", 88)
+    body = client.get(
+        f"/api/grades/aggregate?student_id=1&semester={SEMESTER}", headers=_auth(TEACHER4)
+    ).json()
+    assert body["student_id"] == 1
+    assert body["semester"] == SEMESTER
+    subject = next(s for s in body["subjects"] if s["subject_id"] == 1)
+    assert {"subject_id", "subject_name", "categories", "total_avg"} <= set(subject)
+    assert subject["categories"]["sumatif"]["complete"] is True
+    assert subject["categories"]["sumatif"]["missing"] == []
+    assert subject["categories"]["sumatif"]["avg"] is not None
+    assert subject["categories"]["sumatif"]["ids"]
+
+
+def test_aggregate_student_descriptions_included(
+    client: TestClient, db_session: Session
+) -> None:
+    _post(client, 1, 1, "formatif", 77)
+    body = client.get(
+        f"/api/grades/aggregate?student_id=1&semester={SEMESTER}", headers=_auth(TEACHER4)
+    ).json()
+    subject = next(s for s in body["subjects"] if s["subject_id"] == 1)
+    assert "catatan" in subject["categories"]["formatif"]["descriptions"]
+
+
+def test_aggregate_empty_semester_lists_missing(
+    client: TestClient, db_session: Session
+) -> None:
+    body = client.get(
+        "/api/grades/aggregate?student_id=1&semester=2026/2027-genap",
+        headers=_auth(TEACHER4),
+    ).json()
+    assert body["subjects"], "expected subject list even with no grades"
+    for subject in body["subjects"]:
+        for cat in ("formatif", "sumatif", "PR", "tugas"):
+            assert subject["categories"][cat]["complete"] is False
+            assert subject["categories"][cat]["missing"] == ["assessment_1"]
+        assert subject["total_avg"] is None
+    assert body["total"] == 0
+    assert body["per_subject"] == []
+
+
+def test_aggregate_per_class_includes_descriptions(
+    client: TestClient, db_session: Session
+) -> None:
+    body = client.get(
+        f"/api/grades/aggregate?class_id=1&semester={SEMESTER}", headers=_auth(TEACHER4)
+    ).json()
+    subject = next(s for s in body["subjects"] if s["subject_id"] == 1)
+    student = next(s for s in subject["students"] if s["student_id"] == 1)
+    descriptions = student["categories"]["formatif"]["descriptions"]
+    assert "Capaian baik" in descriptions
+    assert body["students"], "expected per-student view"
+    per_student = next(s for s in body["students"] if s["student_id"] == 1)
+    assert any(item["subject_id"] == 1 for item in per_student["subjects"])
