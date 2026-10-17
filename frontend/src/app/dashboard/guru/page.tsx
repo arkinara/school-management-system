@@ -152,15 +152,30 @@ function GuruContent({ me }: { me: UserMe }) {
   React.useEffect(() => {
     let active = true;
     setSchedule((current) => ({ ...current, status: "loading" }));
-    Promise.all([
+    Promise.allSettled([
       getTeacherSchedule(teacherId),
       fetchClasses({ size: 100 }),
       fetchSubjects({ size: 100 }),
       fetchStudents({ size: 100 }),
       fetchAttendanceToday(),
     ])
-      .then(([scheduleRows, classPage, subjectPage, studentPage, attendance]) => {
+      .then(([scheduleResult, classResult, subjectResult, studentResult, attendanceResult]) => {
         if (!active) return;
+        if (scheduleResult.status === "rejected") {
+          setSchedule((current) => ({ ...current, status: "error" }));
+          return;
+        }
+        const scheduleRows = scheduleResult.value;
+        const classPage =
+          classResult.status === "fulfilled" ? classResult.value : { items: [], total: 0 };
+        const subjectPage =
+          subjectResult.status === "fulfilled" ? subjectResult.value : { items: [], total: 0 };
+        const studentPage =
+          studentResult.status === "fulfilled" ? studentResult.value : { items: [], total: 0 };
+        const attendance =
+          attendanceResult.status === "fulfilled"
+            ? attendanceResult.value
+            : { date: "", total: 0, counts: {}, items: [] };
         const classMap = new Map(classPage.items.map((k) => [k.id, k]));
         const subjectMap = new Map(subjectPage.items.map((s) => [s.id, s]));
         const studentsByClass = new Map<number, StudentRecord[]>();
@@ -229,19 +244,42 @@ function GuruContent({ me }: { me: UserMe }) {
   }, [teacherId, scheduleKey]);
 
   React.useEffect(() => {
-    if (schedule.status !== "ready") return;
     let active = true;
     setGradeQueue({ status: "loading", items: [] });
-    Promise.all([
+    Promise.allSettled([
       getTeacherSchedule(teacherId),
-      fetchActiveSemester()
-        .then((semester) => fetchAll((p) => fetchGrades({ semester, ...p })))
-        .catch(() => [] as GradeRecord[]),
+      fetchClasses({ size: 100 }),
+      fetchStudents({ size: 100 }),
+      fetchSubjects({ size: 100 }),
+      fetchActiveSemester().then((semester) => fetchAll((p) => fetchGrades({ semester, ...p }))),
     ])
-      .then(([scheduleRows, grades]) => {
+      .then(([scheduleResult, classResult, studentResult, subjectResult, gradesResult]) => {
         if (!active) return;
+        if (
+          scheduleResult.status === "rejected" ||
+          classResult.status === "rejected" ||
+          studentResult.status === "rejected" ||
+          subjectResult.status === "rejected" ||
+          gradesResult.status === "rejected"
+        ) {
+          setGradeQueue({ status: "error", items: [] });
+          return;
+        }
+        const scheduleRows = scheduleResult.value;
+        const classes = new Map(classResult.value.items.map((klass) => [klass.id, klass]));
+        const subjectsById = new Map(
+          subjectResult.value.items.map((subject) => [subject.id, subject.name])
+        );
+        const studentsByClass = new Map<number, StudentRecord[]>();
+        for (const student of studentResult.value.items) {
+          if (student.class_id === null) continue;
+          const list = studentsByClass.get(student.class_id) ?? [];
+          list.push(student);
+          studentsByClass.set(student.class_id, list);
+        }
+        const grades: GradeRecord[] = gradesResult.value;
         const gradedKeys = new Set(
-          grades.map((grade: GradeRecord) => `${grade.student_id}:${grade.subject_id}`)
+          grades.map((grade) => `${grade.student_id}:${grade.subject_id}`)
         );
         const seen = new Set<string>();
         const items: GradeQueueItem[] = [];
@@ -249,7 +287,7 @@ function GuruContent({ me }: { me: UserMe }) {
           const key = `${row.class_id}:${row.subject_id}`;
           if (seen.has(key)) continue;
           seen.add(key);
-          const roster = schedule.studentsByClass.get(row.class_id) ?? [];
+          const roster = studentsByClass.get(row.class_id) ?? [];
           if (roster.length === 0) continue;
           const pendingCount = roster.filter(
             (student) => !gradedKeys.has(`${student.id}:${row.subject_id}`)
@@ -257,8 +295,8 @@ function GuruContent({ me }: { me: UserMe }) {
           if (pendingCount === 0) continue;
           items.push({
             id: key,
-            className: schedule.classes.get(row.class_id)?.name ?? `Kelas ${row.class_id}`,
-            subject: schedule.subjects.get(row.subject_id)?.name ?? `Mapel ${row.subject_id}`,
+            className: classes.get(row.class_id)?.name ?? `Kelas ${row.class_id}`,
+            subject: subjectsById.get(row.subject_id) ?? `Mapel ${row.subject_id}`,
             classId: row.class_id,
             subjectId: row.subject_id,
             pendingCount,
@@ -272,7 +310,7 @@ function GuruContent({ me }: { me: UserMe }) {
     return () => {
       active = false;
     };
-  }, [schedule, teacherId, gradeKey]);
+  }, [teacherId, gradeKey]);
 
   React.useEffect(() => {
     let active = true;
@@ -325,45 +363,50 @@ function GuruContent({ me }: { me: UserMe }) {
         className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
       >
         {schedule.status === "loading" ? (
-          <>
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </>
+          <SkeletonCard />
         ) : (
-          <>
-            <MetricCard
-              label="Kelas Diampu"
-              value={schedule.classCount}
-              icon={BookOpen}
-              hint={schedule.status === "error" ? "Gagal memuat data" : "Dari jadwal Anda"}
-            />
-            <MetricCard
-              label="Siswa Aktif"
-              value={schedule.studentCount}
-              icon={Users}
-              hint={schedule.status === "error" ? "Gagal memuat data" : "Di kelas yang diampu"}
-            />
-            <MetricCard
-              label="Nilai Belum Diinput"
-              value={pendingCount}
-              icon={ClipboardList}
-              hint={
-                gradeQueue.status === "error"
-                  ? "Gagal memuat data"
-                  : pendingCount === 0
-                    ? "Semua sudah terisi"
-                    : "Siswa tanpa nilai semester ini"
-              }
-            />
-            <MetricCard
-              label="Kehadiran Hari Ini"
-              value={`${schedule.attendanceRate}%`}
-              icon={CalendarCheck}
-              hint="Untuk kelas yang diampu"
-            />
-          </>
+          <MetricCard
+            label="Kelas Diampu"
+            value={schedule.status === "error" ? "—" : schedule.classCount}
+            icon={BookOpen}
+            hint={schedule.status === "error" ? "Gagal memuat data" : "Dari jadwal Anda"}
+          />
+        )}
+        {schedule.status === "loading" ? (
+          <SkeletonCard />
+        ) : (
+          <MetricCard
+            label="Siswa Aktif"
+            value={schedule.status === "error" ? "—" : schedule.studentCount}
+            icon={Users}
+            hint={schedule.status === "error" ? "Gagal memuat data" : "Di kelas yang diampu"}
+          />
+        )}
+        {gradeQueue.status === "loading" ? (
+          <SkeletonCard />
+        ) : (
+          <MetricCard
+            label="Nilai Belum Diinput"
+            value={gradeQueue.status === "error" ? "—" : pendingCount}
+            icon={ClipboardList}
+            hint={
+              gradeQueue.status === "error"
+                ? "Gagal memuat data"
+                : pendingCount === 0
+                  ? "Semua sudah terisi"
+                  : "Siswa tanpa nilai semester ini"
+            }
+          />
+        )}
+        {schedule.status === "loading" ? (
+          <SkeletonCard />
+        ) : (
+          <MetricCard
+            label="Kehadiran Hari Ini"
+            value={schedule.status === "error" ? "—" : `${schedule.attendanceRate}%`}
+            icon={CalendarCheck}
+            hint={schedule.status === "error" ? "Gagal memuat data" : "Untuk kelas yang diampu"}
+          />
         )}
       </section>
 

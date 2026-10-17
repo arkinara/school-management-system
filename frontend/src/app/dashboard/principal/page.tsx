@@ -42,10 +42,32 @@ import {
   type StudentRecord,
 } from "@/lib/endpoints";
 import { fetchActiveSemester, semesterLabel, type Semester } from "@/lib/academic";
+import { currentPeriod } from "@/lib/dates";
 import type { UserMe } from "@/lib/auth";
-import { attendanceSegments, formatRupiahCompact } from "@/components/dashboard/mock-data";
 
 type WidgetStatus = "loading" | "ready" | "error";
+type TrendStatus = WidgetStatus | "empty";
+
+function attendanceSegments(attendance: {
+  hadir: number;
+  izin: number;
+  sakit: number;
+  alpa: number;
+}) {
+  return [
+    { label: "Hadir", value: attendance.hadir, tone: "success" as const },
+    { label: "Izin", value: attendance.izin, tone: "info" as const },
+    { label: "Sakit", value: attendance.sakit, tone: "warning" as const },
+    { label: "Alpa", value: attendance.alpa, tone: "danger" as const },
+  ];
+}
+
+function formatRupiahCompact(amount: number): string {
+  if (amount >= 1_000_000_000) return `Rp ${(amount / 1_000_000_000).toFixed(1)}M`;
+  if (amount >= 1_000_000) return `Rp ${Math.round(amount / 1_000_000)}jt`;
+  if (amount >= 1_000) return `Rp ${Math.round(amount / 1_000)}rb`;
+  return `Rp ${amount}`;
+}
 
 function last7Days(): string[] {
   const days: string[] = [];
@@ -93,6 +115,7 @@ function PrincipalContent({ me }: { me: UserMe }) {
   const isSuperAdmin = me.role === "super_admin";
   const [schools, setSchools] = React.useState<SchoolRecord[]>([]);
   const [schoolId, setSchoolId] = React.useState<number | null>(me.school_id);
+  const [period, setPeriod] = React.useState(() => currentPeriod());
   const [today, setToday] = React.useState("");
 
   const [counts, setCounts] = React.useState<CountWidget>({
@@ -121,7 +144,7 @@ function PrincipalContent({ me }: { me: UserMe }) {
   const [gradeKey, setGradeKey] = React.useState(0);
 
   const [trend, setTrend] = React.useState<{
-    status: WidgetStatus;
+    status: TrendStatus;
     points: number[];
   }>({ status: "loading", points: [] });
   const [trendKey, setTrendKey] = React.useState(0);
@@ -147,6 +170,7 @@ function PrincipalContent({ me }: { me: UserMe }) {
   }, []);
 
   React.useEffect(() => {
+    setPeriod(currentPeriod());
     setToday(
       new Intl.DateTimeFormat("id-ID", {
         weekday: "long",
@@ -181,16 +205,20 @@ function PrincipalContent({ me }: { me: UserMe }) {
   React.useEffect(() => {
     let active = true;
     setCounts((current) => ({ ...current, status: "loading" }));
-    Promise.all([
+    Promise.allSettled([
       fetchStudents({ ...scope, size: 1 }),
       fetchUsers({ ...scope, role: "teacher", size: 1 }),
     ])
-      .then(([students, teachers]) => {
+      .then(([studentsResult, teachersResult]) => {
         if (!active) return;
+        if (studentsResult.status === "rejected" || teachersResult.status === "rejected") {
+          setCounts({ status: "error", students: null, teachers: null });
+          return;
+        }
         setCounts({
           status: "ready",
-          students: students.total,
-          teachers: teachers.total,
+          students: studentsResult.value.total,
+          teachers: teachersResult.value.total,
         });
       })
       .catch(() => {
@@ -205,7 +233,7 @@ function PrincipalContent({ me }: { me: UserMe }) {
   React.useEffect(() => {
     let active = true;
     setAttendance({ status: "loading", summary: null });
-    fetchAttendanceToday()
+    fetchAttendanceToday(scope)
       .then((summary) => {
         if (active) setAttendance({ status: "ready", summary });
       })
@@ -215,12 +243,12 @@ function PrincipalContent({ me }: { me: UserMe }) {
     return () => {
       active = false;
     };
-  }, [schoolId, attendanceKey]);
+  }, [scope, attendanceKey]);
 
   React.useEffect(() => {
     let active = true;
     setSpp({ status: "loading", summary: null });
-    fetchSppSummary()
+    fetchSppSummary({ ...scope, period })
       .then((summary) => {
         if (active) setSpp({ status: "ready", summary });
       })
@@ -230,19 +258,30 @@ function PrincipalContent({ me }: { me: UserMe }) {
     return () => {
       active = false;
     };
-  }, [schoolId, sppKey]);
+  }, [scope, period, sppKey]);
 
   React.useEffect(() => {
     let active = true;
     setGradeEntry({ status: "loading", items: [] });
     const semester = activeSemester;
-    Promise.all([
+    Promise.allSettled([
       fetchClasses({ ...scope, size: 100 }),
       fetchStudents({ ...scope, size: 100 }),
       fetchGrades({ semester, size: 100 }),
     ])
-      .then(([classes, students, grades]) => {
+      .then(([classesResult, studentsResult, gradesResult]) => {
         if (!active) return;
+        if (
+          classesResult.status === "rejected" ||
+          studentsResult.status === "rejected" ||
+          gradesResult.status === "rejected"
+        ) {
+          setGradeEntry({ status: "error", items: [] });
+          return;
+        }
+        const classes = classesResult.value;
+        const students = studentsResult.value;
+        const grades = gradesResult.value;
         const byClass = new Map<number, StudentRecord[]>();
         for (const student of students.items) {
           if (student.class_id === null) continue;
@@ -278,12 +317,19 @@ function PrincipalContent({ me }: { me: UserMe }) {
     let active = true;
     setTrend({ status: "loading", points: [] });
     const days = last7Days();
-    Promise.all(days.map((date) => fetchAttendancesForRate(date).catch(() => null)))
-      .then((rates) => {
+    Promise.allSettled(days.map((date) => fetchAttendancesForRate(date, schoolId)))
+      .then((results) => {
         if (!active) return;
-        const points = rates.filter((v): v is number => v !== null);
+        const points = results
+          .filter(
+            (result): result is PromiseFulfilledResult<number | null> =>
+              result.status === "fulfilled"
+          )
+          .map((result) => result.value)
+          .filter((value): value is number => value !== null);
         if (points.length === 0) {
-          setTrend({ status: "error", points: [] });
+          const anySuccess = results.some((result) => result.status === "fulfilled");
+          setTrend({ status: anySuccess ? "empty" : "error", points: [] });
           return;
         }
         setTrend({ status: "ready", points });
@@ -349,60 +395,59 @@ function PrincipalContent({ me }: { me: UserMe }) {
         aria-label="Indikator utama"
         className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
       >
-        {counts.status === "loading" || attendance.status === "loading" ? (
-          <>
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </>
+        {counts.status === "loading" ? (
+          <SkeletonCard />
         ) : (
-          <>
-            <MetricCard
-              label="Total Siswa"
-              value={counts.students ?? 0}
-              icon={Users}
-              hint={counts.status === "error" ? "Gagal memuat data" : "Terdaftar di sekolah Anda"}
-            />
-            <MetricCard
-              label="Kehadiran Hari Ini"
-              value={`${attendanceRate}%`}
-              icon={CalendarCheck}
-              hint={
-                attendance.status === "error"
+          <MetricCard
+            label="Total Siswa"
+            value={counts.students ?? "—"}
+            icon={Users}
+            hint={counts.status === "error" ? "Gagal memuat data" : "Terdaftar di sekolah Anda"}
+          />
+        )}
+        {attendance.status === "loading" ? (
+          <SkeletonCard />
+        ) : (
+          <MetricCard
+            label="Kehadiran Hari Ini"
+            value={attendance.status === "error" ? "—" : `${attendanceRate}%`}
+            icon={CalendarCheck}
+            hint={
+              attendance.status === "error"
+                ? "Gagal memuat data"
+                : attendanceTotal > 0
+                  ? `${hadir}/${attendanceTotal} siswa hadir`
+                  : "Belum ada absensi hari ini"
+            }
+          />
+        )}
+        {counts.status === "loading" ? (
+          <SkeletonCard />
+        ) : (
+          <MetricCard
+            label="Guru Aktif"
+            value={counts.teachers ?? "—"}
+            icon={UserCog}
+            hint={counts.status === "error" ? "Gagal memuat data" : "Guru aktif"}
+          />
+        )}
+        {spp.status === "loading" ? (
+          <SkeletonCard />
+        ) : (
+          <MetricCard
+            label="SPP Terkumpul"
+            value={spp.summary ? formatRupiahCompact(spp.summary.total_collected) : "—"}
+            icon={Wallet}
+            hint={
+              spp.summary
+                ? `${Math.round(spp.summary.collection_rate)}% dari ${formatRupiahCompact(
+                    spp.summary.total_billed
+                  )} · ${period}`
+                : spp.status === "error"
                   ? "Gagal memuat data"
-                  : attendanceTotal > 0
-                    ? `${hadir}/${attendanceTotal} siswa hadir`
-                    : "Belum ada absensi hari ini"
-              }
-            />
-            <MetricCard
-              label="Guru Aktif"
-              value={counts.teachers ?? 0}
-              icon={UserCog}
-              hint={counts.status === "error" ? "Gagal memuat data" : "Guru aktif"}
-            />
-            <MetricCard
-              label="SPP Terkumpul"
-              value={
-                spp.summary
-                  ? formatRupiahCompact(spp.summary.total_collected)
-                  : spp.status === "loading"
-                    ? "…"
-                    : "—"
-              }
-              icon={Wallet}
-              hint={
-                spp.summary
-                  ? `${Math.round(spp.summary.collection_rate)}% dari ${formatRupiahCompact(
-                      spp.summary.total_billed
-                    )}`
-                  : spp.status === "error"
-                    ? "Gagal memuat data"
-                    : "Memuat…"
-              }
-            />
-          </>
+                  : `Periode ${period}`
+            }
+          />
         )}
       </section>
 
@@ -472,7 +517,11 @@ function PrincipalContent({ me }: { me: UserMe }) {
           <CardHeader>
             <CardTitle>Tren Kehadiran 7 Hari</CardTitle>
             <StatusChip tone={trend.status === "error" ? "danger" : "success"}>
-              {trend.status === "error" ? "tak tersedia" : "stabil"}
+              {trend.status === "error"
+                ? "tak tersedia"
+                : trend.status === "empty"
+                  ? "kosong"
+                  : "stabil"}
             </StatusChip>
           </CardHeader>
           <CardBody>
@@ -480,6 +529,12 @@ function PrincipalContent({ me }: { me: UserMe }) {
               <SkeletonList rows={2} />
             ) : trend.status === "error" ? (
               <WidgetError title="Gagal memuat tren" onRetry={() => setTrendKey((k) => k + 1)} />
+            ) : trend.status === "empty" ? (
+              <EmptyState
+                icon={CalendarCheck}
+                title="Belum ada data tren"
+                description="Tren kehadiran muncul setelah absensi tercatat."
+              />
             ) : (
               <>
                 <Sparkline
@@ -570,8 +625,13 @@ function PrincipalContent({ me }: { me: UserMe }) {
 }
 
 /** Attendance rate (0-100) for a single date, or null when no data exists. */
-async function fetchAttendancesForRate(date: string): Promise<number | null> {
-  const rows = await fetchAll((p) => fetchAttendances({ date, ...p }));
+async function fetchAttendancesForRate(
+  date: string,
+  schoolId: number | null
+): Promise<number | null> {
+  const rows = await fetchAll((p) =>
+    fetchAttendances({ date, school_id: schoolId ?? undefined, ...p })
+  );
   if (rows.length === 0) return null;
   const hadir = rows.filter((row) => row.status === "hadir").length;
   return Math.round((hadir / rows.length) * 100);

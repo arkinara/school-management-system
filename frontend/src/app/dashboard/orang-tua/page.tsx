@@ -60,6 +60,9 @@ interface BillItem {
 
 interface ChildData {
   status: LoadStatus;
+  gradesStatus: LoadStatus;
+  attendanceStatus: LoadStatus;
+  billsStatus: LoadStatus;
   average: number | null;
   attendanceRate: number;
   rank: null;
@@ -70,6 +73,9 @@ interface ChildData {
 
 const EMPTY_CHILD: ChildData = {
   status: "loading",
+  gradesStatus: "loading",
+  attendanceStatus: "loading",
+  billsStatus: "loading",
   average: null,
   attendanceRate: 0,
   rank: null,
@@ -172,11 +178,23 @@ function OrangTuaContent({ me }: { me: UserMe }) {
   React.useEffect(() => {
     let active = true;
     setChildrenStatus("loading");
-    Promise.all([fetchParentChildren(me.user.id), fetchClasses({ size: 100 })])
-      .then(([kids, classPage]) => {
+    Promise.allSettled([fetchParentChildren(me.user.id), fetchClasses({ size: 100 })])
+      .then(([kidsResult, classResult]) => {
         if (!active) return;
+        if (kidsResult.status === "rejected") {
+          setChildrenStatus("error");
+          return;
+        }
+        const kids = kidsResult.value;
         setChildren(kids);
-        setClassMap(new Map(classPage.items.map((k) => [k.id, k])));
+        setClassMap(
+          new Map(
+            (classResult.status === "fulfilled" ? classResult.value.items : []).map((k) => [
+              k.id,
+              k,
+            ])
+          )
+        );
         setSelectedId((prev) => prev ?? kids[0]?.id ?? null);
         setChildrenStatus("ready");
       })
@@ -193,21 +211,21 @@ function OrangTuaContent({ me }: { me: UserMe }) {
     let active = true;
     setChildData(EMPTY_CHILD);
     const semester = activeSemester;
-    Promise.all([
-      fetchGradeAggregate({ student_id: selectedId, semester }).catch(() => null),
+    Promise.allSettled([
+      fetchGradeAggregate({ student_id: selectedId, semester }),
       fetchAll((p) => fetchAttendances({ student_id: selectedId, ...p })),
       fetchReportCards({ student_id: selectedId, semester, size: 1 }),
       getBills({ student_id: selectedId, size: 100 }),
     ])
-      .then(([aggregate, attendance, rapors, bills]) => {
+      .then(([aggregateResult, attendanceResult, raporResult, billsResult]) => {
         if (!active) return;
-        const breakdown: AttendanceBreakdown = {
-          hadir: 0,
-          izin: 0,
-          sakit: 0,
-          alpa: 0,
-        };
-        for (const row of attendance as AttendanceRecord[]) {
+
+        const attendance =
+          attendanceResult.status === "fulfilled"
+            ? (attendanceResult.value as AttendanceRecord[])
+            : [];
+        const breakdown: AttendanceBreakdown = { hadir: 0, izin: 0, sakit: 0, alpa: 0 };
+        for (const row of attendance) {
           breakdown[row.status] += 1;
         }
         const totalAttendance = attendance.length;
@@ -216,14 +234,15 @@ function OrangTuaContent({ me }: { me: UserMe }) {
 
         let grades: GradeBarItem[] = [];
         let average: number | null = null;
+        const aggregate = aggregateResult.status === "fulfilled" ? aggregateResult.value : null;
         if (aggregate && aggregate.per_subject.length > 0) {
           grades = aggregate.per_subject.map((item) => ({
             subject: item.subject_name ?? `Mapel ${item.subject_id}`,
             score: Math.round(item.average),
           }));
           average = aggregate.overall_average;
-        } else {
-          const nilai = rapors.items[0]?.compiled_data?.nilai ?? [];
+        } else if (raporResult.status === "fulfilled") {
+          const nilai = raporResult.value.items[0]?.compiled_data?.nilai ?? [];
           grades = nilai.map((entry) => ({
             subject: entry.subject,
             score: Math.round(entry.score),
@@ -234,15 +253,31 @@ function OrangTuaContent({ me }: { me: UserMe }) {
               : null;
         }
 
-        const billItems: BillItem[] = (bills.items as SppBill[]).map((bill) => ({
-          id: bill.id,
-          label: `SPP ${bill.period}`,
-          amount: bill.status === "paid" ? bill.amount : bill.balance,
-          status: bill.status,
-        }));
+        const billItems: BillItem[] =
+          billsResult.status === "fulfilled"
+            ? (billsResult.value.items as SppBill[]).map((bill) => ({
+                id: bill.id,
+                label: `SPP ${bill.period}`,
+                amount: bill.status === "paid" ? bill.amount : bill.balance,
+                status: bill.status,
+              }))
+            : [];
+
+        const gradesStatus: LoadStatus =
+          aggregateResult.status === "fulfilled" || raporResult.status === "fulfilled"
+            ? "ready"
+            : "error";
+        const attendanceStatus: LoadStatus =
+          attendanceResult.status === "fulfilled" ? "ready" : "error";
+        const billsStatus: LoadStatus = billsResult.status === "fulfilled" ? "ready" : "error";
+        const allFailed =
+          gradesStatus === "error" && attendanceStatus === "error" && billsStatus === "error";
 
         setChildData({
-          status: "ready",
+          status: allFailed ? "error" : "ready",
+          gradesStatus,
+          attendanceStatus,
+          billsStatus,
           average,
           attendanceRate: rate,
           rank: null,
@@ -424,54 +459,65 @@ function OrangTuaContent({ me }: { me: UserMe }) {
       )}
 
       <section aria-label="Ringkasan anak" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {childData.status === "loading" ? (
-          <>
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </>
-        ) : childData.status === "error" ? (
-          <div className="sm:col-span-3">
-            <WidgetError
-              title="Gagal memuat ringkasan anak"
-              onRetry={() => setChildKey((k) => k + 1)}
-            />
-          </div>
+        {childData.gradesStatus === "loading" ? (
+          <SkeletonCard />
         ) : (
-          <>
-            <MetricCard
-              label="Rata-rata"
-              value={
-                childData.average !== null ? childData.average.toFixed(1).replace(".", ",") : "—"
-              }
-              icon={TrendingUp}
-              hint={`Semester ini · ${child.full_name}`}
-            />
-            <MetricCard
-              label="Kehadiran"
-              value={`${childData.attendanceRate}%`}
-              icon={CalendarCheck}
-              hint="Dari pencatatan absensi"
-            />
-            <MetricCard
-              label="Tagihan Aktif"
-              value={
-                overdue
+          <MetricCard
+            label="Rata-rata"
+            value={
+              childData.gradesStatus === "error"
+                ? "—"
+                : childData.average !== null
+                  ? childData.average.toFixed(1).replace(".", ",")
+                  : "—"
+            }
+            icon={TrendingUp}
+            hint={
+              childData.gradesStatus === "error"
+                ? "Gagal memuat data"
+                : `Semester ini · ${child.full_name}`
+            }
+          />
+        )}
+        {childData.attendanceStatus === "loading" ? (
+          <SkeletonCard />
+        ) : (
+          <MetricCard
+            label="Kehadiran"
+            value={childData.attendanceStatus === "error" ? "—" : `${childData.attendanceRate}%`}
+            icon={CalendarCheck}
+            hint={
+              childData.attendanceStatus === "error"
+                ? "Gagal memuat data"
+                : "Dari pencatatan absensi"
+            }
+          />
+        )}
+        {childData.billsStatus === "loading" ? (
+          <SkeletonCard />
+        ) : (
+          <MetricCard
+            label="Tagihan Aktif"
+            value={
+              childData.billsStatus === "error"
+                ? "—"
+                : overdue
                   ? formatRupiah(overdue.amount)
                   : childData.bills.length > 0
                     ? `${childData.bills.length - paidCount} tagihan`
                     : "—"
-              }
-              icon={Wallet}
-              hint={
-                overdue
+            }
+            icon={Wallet}
+            hint={
+              childData.billsStatus === "error"
+                ? "Gagal memuat data"
+                : overdue
                   ? "Ada tunggakan"
                   : childData.bills.length > 0
                     ? "Belum lunas"
                     : "Tidak ada tagihan"
-              }
-            />
-          </>
+            }
+          />
         )}
       </section>
 
@@ -488,8 +534,10 @@ function OrangTuaContent({ me }: { me: UserMe }) {
             </Link>
           </CardHeader>
           <CardBody>
-            {childData.status === "loading" ? (
+            {childData.gradesStatus === "loading" ? (
               <SkeletonList rows={4} />
+            ) : childData.gradesStatus === "error" ? (
+              <WidgetError title="Gagal memuat nilai" onRetry={() => setChildKey((k) => k + 1)} />
             ) : childData.grades.length === 0 ? (
               <EmptyState
                 icon={ClipboardList}
@@ -497,29 +545,46 @@ function OrangTuaContent({ me }: { me: UserMe }) {
                 description={`Nilai ${child.full_name} akan tampil setelah guru menerbitkannya.`}
               />
             ) : (
-              <>
-                <GradeBars
-                  items={childData.grades}
-                  ariaLabel={`Nilai mata pelajaran ${child.full_name}`}
-                />
-                <AttendanceBreakdownList attendance={childData.attendance} />
-              </>
+              <GradeBars
+                items={childData.grades}
+                ariaLabel={`Nilai mata pelajaran ${child.full_name}`}
+              />
             )}
+
+            <div className="mt-4 border-t border-outline-variant pt-3">
+              <p className="text-sm font-medium text-foreground">Rincian Kehadiran</p>
+              {childData.attendanceStatus === "loading" ? (
+                <SkeletonList rows={2} />
+              ) : childData.attendanceStatus === "error" ? (
+                <WidgetError
+                  title="Gagal memuat kehadiran"
+                  onRetry={() => setChildKey((k) => k + 1)}
+                />
+              ) : (
+                <AttendanceBreakdownList attendance={childData.attendance} />
+              )}
+            </div>
           </CardBody>
         </Card>
 
         <Card>
           <CardHeader className="items-center border-b border-outline-variant pb-3">
             <CardTitle>Status Pembayaran</CardTitle>
-            {overdue ? (
+            {childData.billsStatus === "error" ? (
+              <StatusChip tone="danger">tak tersedia</StatusChip>
+            ) : overdue ? (
               <StatusChip tone="danger">1 menunggak</StatusChip>
             ) : (
               <StatusChip tone="success">lunas</StatusChip>
             )}
           </CardHeader>
-          {childData.status === "loading" ? (
+          {childData.billsStatus === "loading" ? (
             <CardBody>
               <SkeletonList rows={3} />
+            </CardBody>
+          ) : childData.billsStatus === "error" ? (
+            <CardBody>
+              <WidgetError title="Gagal memuat tagihan" onRetry={() => setChildKey((k) => k + 1)} />
             </CardBody>
           ) : childData.bills.length === 0 ? (
             <CardBody>

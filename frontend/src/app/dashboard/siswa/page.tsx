@@ -24,11 +24,13 @@ import {
   fetchAll,
   fetchAnnouncements,
   fetchAttendances,
+  fetchClassGradeAggregate,
   fetchClasses,
   fetchReportCards,
   fetchStudents,
   fetchSubjects,
   fetchUsers,
+  getStudent,
   getTodaySchedule,
   type AnnouncementRecord,
   type AttendanceRecord,
@@ -113,6 +115,13 @@ function SiswaContent({ me }: { me: UserMe }) {
   }>({ status: "loading", record: null });
   const [raporKey, setRaporKey] = React.useState(0);
 
+  const [grades, setGrades] = React.useState<{
+    status: LoadStatus;
+    items: ProgressItem[];
+    average: number | null;
+  }>({ status: "loading", items: [], average: null });
+  const [gradesKey, setGradesKey] = React.useState(0);
+
   const [announcements, setAnnouncements] = React.useState<{
     status: LoadStatus;
     items: AnnouncementRecord[];
@@ -146,21 +155,43 @@ function SiswaContent({ me }: { me: UserMe }) {
   React.useEffect(() => {
     let active = true;
     setProfile((current) => ({ ...current, status: "loading" }));
-    Promise.all([
-      fetchStudents({ size: 100 }),
+
+    const studentPromise: Promise<StudentRecord | null> = (async () => {
+      if (typeof me.student_id === "number") {
+        try {
+          return await getStudent(me.student_id);
+        } catch {
+          // Older backend deployments don't expose the profile link; resolve
+          // the id from the scoped roster instead of taking the first row.
+          const page = await fetchStudents({ size: 100 });
+          return page.items.find((item) => item.id === me.student_id) ?? null;
+        }
+      }
+      const page = await fetchStudents({ size: 100 });
+      return page.items.find((item) => item.user_id === me.user.id) ?? null;
+    })();
+
+    Promise.allSettled([
+      studentPromise,
       fetchClasses({ size: 100 }),
       fetchSubjects({ size: 100 }),
       fetchUsers({ role: "teacher", size: 100 }),
     ])
-      .then(([students, classes, subjects, teachers]) => {
+      .then(([studentResult, classesResult, subjectsResult, teachersResult]) => {
         if (!active) return;
-        const student = students.items.find((item) => item.user_id === me.user.id) ?? null;
+        if (studentResult.status === "rejected") {
+          setProfile((current) => ({ ...current, status: "error" }));
+          return;
+        }
+        const classes = classesResult.status === "fulfilled" ? classesResult.value : null;
+        const subjects = subjectsResult.status === "fulfilled" ? subjectsResult.value : null;
+        const teachers = teachersResult.status === "fulfilled" ? teachersResult.value : null;
         setProfile({
           status: "ready",
-          student,
-          classes: new Map(classes.items.map((k) => [k.id, k])),
-          subjects: new Map(subjects.items.map((s) => [s.id, s])),
-          teachers: new Map(teachers.items.map((t) => [t.id, t])),
+          student: studentResult.value,
+          classes: new Map((classes?.items ?? []).map((k) => [k.id, k])),
+          subjects: new Map((subjects?.items ?? []).map((s) => [s.id, s])),
+          teachers: new Map((teachers?.items ?? []).map((t) => [t.id, t])),
         });
       })
       .catch(() => {
@@ -169,11 +200,14 @@ function SiswaContent({ me }: { me: UserMe }) {
     return () => {
       active = false;
     };
-  }, [me.user.id, profileKey]);
+  }, [me.user.id, me.student_id, profileKey]);
 
   React.useEffect(() => {
+    if (profile.status !== "ready") return;
     const student = profile.student;
-    if (profile.status !== "ready" || student === null || student.class_id === null) {
+    if (student === null) return;
+    if (student.class_id === null) {
+      setSchedule({ status: "ready", sessions: [] });
       return;
     }
     let active = true;
@@ -243,7 +277,10 @@ function SiswaContent({ me }: { me: UserMe }) {
       size: 1,
     })
       .then((page) => {
-        if (active) setRapor({ status: "ready", record: page.items[0] ?? null });
+        if (active) {
+          const [record] = page.items;
+          setRapor({ status: "ready", record: record ?? null });
+        }
       })
       .catch(() => {
         if (active) setRapor({ status: "error", record: null });
@@ -252,6 +289,42 @@ function SiswaContent({ me }: { me: UserMe }) {
       active = false;
     };
   }, [profile, raporKey, activeSemester]);
+
+  React.useEffect(() => {
+    const student = profile.student;
+    if (profile.status !== "ready") return;
+    if (student === null) return;
+    if (student.class_id === null) {
+      setGrades({ status: "ready", items: [], average: null });
+      return;
+    }
+    let active = true;
+    setGrades({ status: "loading", items: [], average: null });
+    fetchClassGradeAggregate({ class_id: student.class_id, semester: activeSemester })
+      .then((aggregate) => {
+        if (!active) return;
+        const items: ProgressItem[] = [];
+        for (const subject of aggregate.subjects) {
+          const row = subject.students.find((entry) => entry.student_id === student.id);
+          if (!row || row.total_avg === null) continue;
+          const value = Math.round(row.total_avg);
+          items.push({
+            label: subject.subject_name,
+            value,
+            display: String(value),
+          });
+        }
+        const average =
+          items.length > 0 ? items.reduce((sum, item) => sum + item.value, 0) / items.length : null;
+        setGrades({ status: "ready", items, average });
+      })
+      .catch(() => {
+        if (active) setGrades({ status: "error", items: [], average: null });
+      });
+    return () => {
+      active = false;
+    };
+  }, [profile, activeSemester, gradesKey]);
 
   React.useEffect(() => {
     let active = true;
@@ -268,19 +341,14 @@ function SiswaContent({ me }: { me: UserMe }) {
     };
   }, [announcementKey]);
 
-  const raporGrades: ProgressItem[] =
-    rapor.record?.compiled_data?.nilai?.map((entry) => ({
-      label: entry.subject,
-      value: entry.score,
-      display: String(entry.score),
-    })) ?? [];
-  const average =
-    raporGrades.length > 0
-      ? (raporGrades.reduce((sum, item) => sum + item.value, 0) / raporGrades.length)
-          .toFixed(1)
-          .replace(".", ",")
-      : "—";
-  const raporStatus = rapor.status === "ready" && rapor.record !== null ? "published" : "draft";
+  const raporGrades: ProgressItem[] = grades.items;
+  const average = grades.average !== null ? grades.average.toFixed(1).replace(".", ",") : "—";
+  const raporStatus =
+    rapor.status === "ready" && rapor.record !== null
+      ? rapor.record.status === "published"
+        ? "published"
+        : "draft"
+      : "draft";
 
   if (profile.status === "error") {
     return (
@@ -324,33 +392,43 @@ function SiswaContent({ me }: { me: UserMe }) {
       </div>
 
       <section aria-label="Ringkasan saya" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {profile.status === "loading" ? (
-          <>
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </>
+        {profile.status === "loading" || grades.status === "loading" ? (
+          <SkeletonCard />
         ) : (
-          <>
-            <MetricCard
-              label="Rata-rata Nilai"
-              value={average}
-              icon={TrendingUp}
-              hint={raporStatus === "published" ? "Dari rapor terbit" : "Belum ada rapor"}
-            />
-            <MetricCard
-              label="Kehadiran"
-              value={`${attendance.rate}%`}
-              icon={CalendarDays}
-              hint={attendance.status === "error" ? "Gagal memuat data" : "Semester ini"}
-            />
-            <MetricCard
-              label="Status Rapor"
-              value={raporStatus === "published" ? "Terbit" : "Draft"}
-              icon={ClipboardList}
-              hint={semesterLabel(activeSemester)}
-            />
-          </>
+          <MetricCard
+            label="Rata-rata Nilai"
+            value={grades.status === "error" ? "—" : average}
+            icon={TrendingUp}
+            hint={grades.status === "error" ? "Gagal memuat data" : "Dari nilai semester ini"}
+          />
+        )}
+        {profile.status === "loading" || attendance.status === "loading" ? (
+          <SkeletonCard />
+        ) : (
+          <MetricCard
+            label="Kehadiran"
+            value={attendance.status === "error" ? "—" : `${attendance.rate}%`}
+            icon={CalendarDays}
+            hint={attendance.status === "error" ? "Gagal memuat data" : "Semester ini"}
+          />
+        )}
+        {profile.status === "loading" || rapor.status === "loading" ? (
+          <SkeletonCard />
+        ) : (
+          <MetricCard
+            label="Status Rapor"
+            value={
+              rapor.status === "error"
+                ? "—"
+                : raporStatus === "published"
+                  ? "Terbit"
+                  : rapor.record
+                    ? "Draft"
+                    : "Belum ada"
+            }
+            icon={ClipboardList}
+            hint={semesterLabel(activeSemester)}
+          />
         )}
       </section>
 
@@ -454,10 +532,10 @@ function SiswaContent({ me }: { me: UserMe }) {
             </div>
           </CardHeader>
           <CardBody>
-            {rapor.status === "loading" ? (
+            {grades.status === "loading" ? (
               <SkeletonList rows={4} />
-            ) : rapor.status === "error" ? (
-              <WidgetError title="Gagal memuat rapor" onRetry={() => setRaporKey((k) => k + 1)} />
+            ) : grades.status === "error" ? (
+              <WidgetError title="Gagal memuat nilai" onRetry={() => setGradesKey((k) => k + 1)} />
             ) : (
               <>
                 <p className="mb-3 text-2xs text-muted-foreground">
@@ -469,7 +547,7 @@ function SiswaContent({ me }: { me: UserMe }) {
                   <EmptyState
                     icon={FileText}
                     title="Belum ada nilai"
-                    description="Nilai rapor akan tampil setelah guru menerbitkannya."
+                    description="Nilai akan tampil setelah guru menerbitkannya."
                   />
                 ) : (
                   <>

@@ -48,6 +48,12 @@ export interface UserMe {
   tenant_id: number;
   school_id: number | null;
   role: UserRole;
+  /**
+   * Optional server-resolved profile links (#66). Older backends omit these;
+   * student/parent pages fall back to a scoped lookup when absent.
+   */
+  student_id?: number | null;
+  parent_id?: number | null;
 }
 
 export interface LoginInput {

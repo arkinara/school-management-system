@@ -131,6 +131,11 @@ export function fetchStudents(
   return apiFetch<Paginated<StudentRecord>>(`/api/students${toQuery(params)}`);
 }
 
+/** GET /api/students/{id} — one student profile (scope-checked server-side). */
+export function getStudent(studentId: number): Promise<StudentRecord> {
+  return apiFetch<StudentRecord>(`/api/students/${studentId}`);
+}
+
 /** GET /api/users — tenant-scoped user list, filterable by role/school. */
 export function fetchUsers(
   params: { role?: string; school_id?: number; page?: number; size?: number } = {}
@@ -229,6 +234,7 @@ export function fetchAttendances(
     class_id?: number;
     date?: string;
     student_id?: number;
+    school_id?: number;
     page?: number;
     size?: number;
   } = {}
@@ -731,9 +737,15 @@ export interface AttendanceTodaySummary {
   items: AttendanceRecord[];
 }
 
-/** GET /api/attendances/today — per-status counts scoped to the caller. */
-export function fetchAttendanceToday(): Promise<AttendanceTodaySummary> {
-  return apiFetch<AttendanceTodaySummary>("/api/attendances/today");
+/**
+ * GET /api/attendances/today — per-status counts scoped to the caller.
+ * `school_id` is sent for super-admin school-picker scopes; the backend may
+ * ignore it for roles that are already hard-scoped to one school.
+ */
+export function fetchAttendanceToday(
+  params: { school_id?: number } = {}
+): Promise<AttendanceTodaySummary> {
+  return apiFetch<AttendanceTodaySummary>(`/api/attendances/today${toQuery(params)}`);
 }
 
 /** Per-subject rollup returned inside a grade aggregate. */
@@ -828,7 +840,7 @@ export interface SppSummary {
 
 /** GET /api/spp/summary — collection rate/totals for the caller's scope. */
 export function fetchSppSummary(
-  params: { class_id?: number; period?: string } = {}
+  params: { class_id?: number; period?: string; school_id?: number } = {}
 ): Promise<SppSummary> {
   return apiFetch<SppSummary>(`/api/spp/summary${toQuery(params)}`);
 }
