@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import config as app_config
 from app.academic import parse_semester
-from app.audit import log_audit_event
 from app.auth.audit import log_audit_event as log_workflow_audit
 from app.auth.deps import get_current_user
 from app.db.models import (
@@ -35,6 +35,7 @@ from app.db.session import get_db
 from app.pagination import PageParams
 from app.schemas.report_card import (
     FinalizePayload,
+    RaporStatusOut,
     ReportCardCompile,
     ReportCardCorrect,
     ReportCardGap,
@@ -51,6 +52,20 @@ router = APIRouter()
 
 _READ_ONLY_VIEWERS = {UserRole.PARENT, UserRole.STUDENT}
 _ALL_STATUSES = [s.value for s in AttendanceStatus]
+
+
+def _deadline_passed() -> bool:
+    """True when the configured grade-entry deadline is in the past."""
+    deadline = app_config.GRADE_ENTRY_DEADLINE
+    return deadline is not None and date.today() > deadline
+
+
+def _deadline_message() -> str:
+    deadline = app_config.GRADE_ENTRY_DEADLINE
+    return (
+        f"grade-entry deadline ({deadline.isoformat() if deadline else 'none'}) passed; "
+        "principal override required"
+    )
 
 
 def _default_fase(grade_level: int | None) -> str:
@@ -235,9 +250,24 @@ def compile_report_card(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
     school = db.get(School, student.school_id)
-    tenant = db.get(Tenant, school.tenant_id) if school is not None else None
+    if school is None or not school.kurikulum_version:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="kurikulum_version not set on school; set it before creating rapor",
+        )
+    tenant = db.get(Tenant, school.tenant_id)
     if tenant is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant not found")
+
+    if _deadline_passed():
+        can_override = (
+            payload.override_reason
+            and user.role in (UserRole.SUPER_ADMIN, UserRole.PRINCIPAL)
+        )
+        if not can_override:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail=_deadline_message()
+            )
 
     existing = db.scalar(
         select(ReportCard)
@@ -259,6 +289,11 @@ def compile_report_card(
     report_card.status = ReportCardStatus.DRAFT
     report_card.kurikulum_version = compiled["kurikulum_version"]
     report_card.compiled_data = compiled
+    # Recompiling invalidates any previous sign-off/publish state (#75).
+    report_card.finalized_by = None
+    report_card.finalized_at = None
+    report_card.gap_override_reason = None
+    report_card.published_by = None
     report_card.published_at = None
     if existing is None:
         db.add(report_card)
@@ -315,6 +350,41 @@ def list_report_cards(
     )
 
 
+@router.get("/status", response_model=list[RaporStatusOut])
+def list_rapor_status(
+    student_id: int | None = Query(None),
+    semester: str | None = Query(None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[RaporStatusOut]:
+    """Status-only rapor metadata for parents/students (never compiled data)."""
+    allowed_students = visible_student_ids(db, user)
+    if student_id is not None:
+        if allowed_students is not None and student_id not in allowed_students:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+        if allowed_students is None:
+            student = db.get(Student, student_id)
+            if student is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="student not found"
+                )
+
+    conditions = [ReportCard.status != ReportCardStatus.SUPERSEDED]
+    if allowed_students is not None:
+        conditions.append(ReportCard.student_id.in_(allowed_students))
+    if student_id is not None:
+        conditions.append(ReportCard.student_id == student_id)
+    if semester is not None:
+        conditions.append(ReportCard.semester == semester)
+
+    rows = db.scalars(
+        select(ReportCard)
+        .where(*conditions)
+        .order_by(ReportCard.semester.desc(), ReportCard.version.desc(), ReportCard.id.desc())
+    ).all()
+    return [RaporStatusOut.model_validate(row) for row in rows]
+
+
 @router.get("/{report_card_id}", response_model=ReportCardOut)
 def get_report_card(
     report_card_id: int,
@@ -351,20 +421,36 @@ def finalize_report_card(
 
     student = db.get(Student, report_card.student_id)
     klass = db.get(Class, student.class_id) if student is not None else None
-    if user.role != UserRole.SUPER_ADMIN:
-        if klass is None or klass.wali_kelas_id != user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="only wali kelas can finalize"
-            )
+    is_wali = klass is not None and klass.wali_kelas_id == user.id
+    is_principal = user.role in (UserRole.SUPER_ADMIN, UserRole.PRINCIPAL)
+    if not is_wali and not is_principal:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="only wali kelas can finalize"
+        )
+
+    gap_override_reason = payload.gap_override_reason if payload is not None else None
+    deadline = payload.deadline if payload is not None else None
+
+    if _deadline_passed() and not (is_principal and gap_override_reason):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=_deadline_message()
+        )
+
+    # Non-wali staff may only act as the principal deadline override.
+    if (
+        not is_wali
+        and user.role != UserRole.SUPER_ADMIN
+        and not (is_principal and gap_override_reason and _deadline_passed())
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="only wali kelas can finalize"
+        )
 
     if report_card.status != ReportCardStatus.DRAFT:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"cannot finalize from status {report_card.status}",
         )
-
-    gap_override_reason = payload.gap_override_reason if payload is not None else None
-    deadline = payload.deadline if payload is not None else None
 
     gaps = _detect_gaps(db, student, report_card.semester)
     if gaps and not gap_override_reason:
@@ -451,8 +537,17 @@ def correct_report_card(
     """Create a corrected version; the previous version is retained as superseded."""
     old = db.get(ReportCard, report_card_id)
     student = db.get(Student, old.student_id) if old is not None else None
-    if old is None or student is None or not can_write_student(db, user, student):
+    if old is None or student is None or not can_user_read_student(db, user, old.student_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="report card not found")
+
+    klass = db.get(Class, student.class_id) if student.class_id is not None else None
+    is_wali = klass is not None and klass.wali_kelas_id == user.id
+    is_principal = user.role in (UserRole.SUPER_ADMIN, UserRole.PRINCIPAL)
+    if not (is_wali or is_principal):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="correction requires wali kelas or principal",
+        )
 
     if old.status != ReportCardStatus.PUBLISHED:
         raise HTTPException(
@@ -498,59 +593,29 @@ def correct_report_card(
     return ReportCardOut.model_validate(new)
 
 
-@router.patch("/{report_card_id}/publish", response_model=ReportCardOut)
-def publish_report_card(
-    report_card_id: int,
-    request: Request,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> ReportCardOut:
-    """Approve a draft and make it visible to parents/students."""
-    report_card = db.get(ReportCard, report_card_id)
-    if report_card is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="report card not found")
-    student = db.get(Student, report_card.student_id)
-    if student is None or not can_write_student(db, user, student):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
-
-    report_card.status = ReportCardStatus.PUBLISHED
-    report_card.published_at = utcnow()
-    db.commit()
-    db.refresh(report_card)
-    log_audit_event(
-        db,
-        user=user,
-        action="publish_rapor",
-        entity_type="report_card",
-        entity_id=report_card.id,
-        request=request,
+@router.patch(
+    "/{report_card_id}/publish",
+    status_code=status.HTTP_410_GONE,
+    deprecated=True,
+)
+def publish_legacy(report_card_id: int) -> None:
+    """Retired direct-publish route: publishing now requires principal approval."""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail=(
+            "publish must go through POST /api/report-cards/{id}/publish "
+            "(principal approval of a finalized rapor)"
+        ),
     )
-    return ReportCardOut.model_validate(report_card)
 
 
-@router.patch("/{report_card_id}/unpublish", response_model=ReportCardOut)
-def unpublish_report_card(
-    report_card_id: int,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> ReportCardOut:
-    """Return a published rapor to draft (admin/super_admin only)."""
-    report_card = db.get(ReportCard, report_card_id)
-    if report_card is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="report card not found")
-    student = db.get(Student, report_card.student_id)
-    if user.role != UserRole.SUPER_ADMIN:
-        if user.role != UserRole.ADMIN:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
-        school = db.get(School, student.school_id) if student is not None else None
-        if school is None or school.tenant_id != user.tenant_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
-
-    report_card.status = ReportCardStatus.DRAFT
-    report_card.published_at = None
-    db.commit()
-    db.refresh(report_card)
-    return ReportCardOut.model_validate(report_card)
+@router.patch("/{report_card_id}/unpublish", status_code=status.HTTP_410_GONE)
+def unpublish_legacy(report_card_id: int) -> None:
+    """Retired unpublish route: corrections create a new version instead."""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="corrections create a new version; unpublish is not supported",
+    )
 
 
 @router.delete("/{report_card_id}", status_code=status.HTTP_204_NO_CONTENT)

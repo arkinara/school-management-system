@@ -9,6 +9,7 @@ from passlib.hash import bcrypt
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import config as app_config
 from app.auth.jwt import create_access_token
 from app.db.models import (
     Attendance,
@@ -157,6 +158,23 @@ def _compile(client: TestClient, token: str, student_id: int, semester: str = "2
     )
 
 
+def _finalize(client: TestClient, token: str, card_id: int, **body):
+    return client.post(
+        f"/api/report-cards/{card_id}/finalize", headers=_auth(token), json=body
+    )
+
+
+def _publish(client: TestClient, token: str, card_id: int):
+    return client.post(f"/api/report-cards/{card_id}/publish", headers=_auth(token))
+
+
+def _publish_workflow(client: TestClient, card_id: int) -> None:
+    finalized = _finalize(client, TEACHER4, card_id, gap_override_reason="guru mapel belum input")
+    assert finalized.status_code == 200, finalized.text
+    published = _publish(client, PRINCIPAL, card_id)
+    assert published.status_code == 200, published.text
+
+
 def test_compile_creates_sd_narrative_draft(client: TestClient, db_session: Session) -> None:
     response = _compile(client, TEACHER4, 1)
     assert response.status_code == 201, response.text
@@ -211,43 +229,146 @@ def test_parent_cannot_see_draft(client: TestClient, db_session: Session) -> Non
     assert listing.json()["total"] == 0
 
 
-def test_publish_makes_visible_to_parent(client: TestClient, db_session: Session) -> None:
+def test_publish_workflow_makes_visible_to_parent(
+    client: TestClient, db_session: Session
+) -> None:
     _link_parent(client, 1, 10)
-    published = client.patch("/api/report-cards/1/publish", headers=_auth(TEACHER4))
-    assert published.status_code == 200, published.text
-    assert published.json()["status"] == "published"
-    assert published.json()["published_at"] is not None
+    _compile(client, TEACHER4, 1)
+    _publish_workflow(client, 1)
 
     detail = client.get("/api/report-cards/1", headers=_auth(PARENT10))
     assert detail.status_code == 200, detail.text
     assert detail.json()["status"] == "published"
 
 
-def test_unpublish_hides_from_parent(client: TestClient, db_session: Session) -> None:
-    _link_parent(client, 1, 10)
-    assert (
-        client.patch("/api/report-cards/1/publish", headers=_auth(TEACHER4)).status_code
-        == 200
-    )
-    assert (
-        client.patch("/api/report-cards/1/unpublish", headers=_auth(ADMIN)).status_code
-        == 200
-    )
-    assert client.get("/api/report-cards/1", headers=_auth(PARENT10)).status_code == 403
+def test_teacher_publish_legacy_returns_410(
+    client: TestClient, db_session: Session
+) -> None:
+    _compile(client, TEACHER4, 1)
+    response = client.patch("/api/report-cards/1/publish", headers=_auth(TEACHER4))
+    assert response.status_code == 410, response.text
 
 
-def test_publish_forbidden_for_student(client: TestClient, db_session: Session) -> None:
-    assert (
-        client.patch("/api/report-cards/1/publish", headers=_auth(STUDENT6)).status_code
-        == 403
-    )
+def test_teacher_publish_post_403(client: TestClient, db_session: Session) -> None:
+    _compile(client, TEACHER4, 1)
+    response = _publish(client, TEACHER4, 1)
+    assert response.status_code == 403, response.text
 
 
-def test_unpublish_requires_admin(client: TestClient, db_session: Session) -> None:
-    assert (
-        client.patch("/api/report-cards/1/unpublish", headers=_auth(TEACHER4)).status_code
-        == 403
+def test_principal_publish_draft_409(client: TestClient, db_session: Session) -> None:
+    _compile(client, TEACHER4, 1)
+    response = _publish(client, PRINCIPAL, 1)
+    assert response.status_code == 409, response.text
+
+
+def test_legacy_unpublish_returns_410(client: TestClient, db_session: Session) -> None:
+    _compile(client, TEACHER4, 1)
+    _publish_workflow(client, 1)
+    response = client.patch("/api/report-cards/1/unpublish", headers=_auth(ADMIN))
+    assert response.status_code == 410, response.text
+
+
+def test_recompile_clears_finalize_metadata(
+    client: TestClient, db_session: Session
+) -> None:
+    _compile(client, TEACHER4, 1)
+    finalized = _finalize(client, TEACHER4, 1, gap_override_reason="override")
+    assert finalized.status_code == 200, finalized.text
+    assert finalized.json()["finalized_by"] == 4
+
+    recompiled = _compile(client, TEACHER4, 1)
+    assert recompiled.status_code == 201, recompiled.text
+    body = recompiled.json()
+    assert body["status"] == "draft"
+    assert body["finalized_by"] is None
+    assert body["finalized_at"] is None
+    assert body["gap_override_reason"] is None
+    assert body["published_by"] is None
+    assert body["published_at"] is None
+
+
+def test_missing_kurikulum_422(client: TestClient, db_session: Session) -> None:
+    school = db_session.get(School, 1)
+    assert school is not None
+    school.kurikulum_version = None
+    db_session.commit()
+
+    response = _compile(client, TEACHER4, 1)
+    assert response.status_code == 422, response.text
+    assert "kurikulum_version" in response.json()["detail"]
+
+
+def test_deadline_blocks_finalize(
+    client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    _compile(client, TEACHER4, 1)
+    monkeypatch.setattr(app_config, "GRADE_ENTRY_DEADLINE", date(2020, 1, 1))
+
+    response = _finalize(client, TEACHER4, 1)
+    assert response.status_code == 409, response.text
+    assert "deadline" in response.json()["detail"]
+
+
+def test_deadline_principal_override_succeeds(
+    client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    _compile(client, TEACHER4, 1)
+    monkeypatch.setattr(app_config, "GRADE_ENTRY_DEADLINE", date(2020, 1, 1))
+
+    response = _finalize(client, PRINCIPAL, 1, gap_override_reason="principal override")
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "finalized"
+
+
+def test_deadline_blocks_compile(
+    client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    monkeypatch.setattr(app_config, "GRADE_ENTRY_DEADLINE", date(2020, 1, 1))
+    response = _compile(client, TEACHER4, 1)
+    assert response.status_code == 409, response.text
+    assert "deadline" in response.json()["detail"]
+
+
+def test_deadline_principal_compile_override_succeeds(
+    client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    monkeypatch.setattr(app_config, "GRADE_ENTRY_DEADLINE", date(2020, 1, 1))
+    response = client.post(
+        "/api/report-cards/compile",
+        headers=_auth(PRINCIPAL),
+        json={
+            "student_id": 1,
+            "semester": "2026/2027-ganjil",
+            "override_reason": "principal override",
+        },
     )
+    assert response.status_code == 201, response.text
+    assert response.json()["status"] == "draft"
+
+
+def test_republish_superseded_409(client: TestClient, db_session: Session) -> None:
+    _compile(client, TEACHER4, 1)
+    _publish_workflow(client, 1)
+    corrected = client.post(
+        "/api/report-cards/1/correct", headers=_auth(PRINCIPAL), json={}
+    )
+    assert corrected.status_code == 201, corrected.text
+
+    response = client.post(
+        "/api/report-cards/1/correct", headers=_auth(PRINCIPAL), json={}
+    )
+    assert response.status_code == 409, response.text
+
+
+def test_correction_wali_only(client: TestClient, db_session: Session) -> None:
+    teacher5 = _token(5, 1, 1, "teacher")  # teaches class 1 but is not its wali
+    _compile(client, TEACHER4, 1)
+    _publish_workflow(client, 1)
+
+    response = client.post(
+        "/api/report-cards/1/correct", headers=_auth(teacher5), json={}
+    )
+    assert response.status_code == 403, response.text
 
 
 def test_cross_tenant_get_blocked(client: TestClient, db_session: Session) -> None:

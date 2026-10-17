@@ -20,6 +20,8 @@ class ReportCardCompile(BaseModel):
     student_id: int
     semester: SemesterStr
     kurikulum_version: str | None = None
+    # Principal/super-admin override for the configured grade-entry deadline.
+    override_reason: str | None = None
 
 
 class ReportCardCorrect(BaseModel):
@@ -63,6 +65,21 @@ class ReportCardOut(BaseModel):
     deadline: date | None = None
     gap_override_reason: str | None = None
     gaps: list[ReportCardGap] = Field(default_factory=list)
+
+
+class RaporStatusOut(BaseModel):
+    """Status-only rapor metadata for parents/students (never compiled data)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    student_id: int
+    semester: str
+    status: ReportCardStatus
+    version: int
+    deadline: date | None = None
+    finalized_at: datetime | None = None
+    published_at: datetime | None = None
 
 
 class ReportCardListResponse(BaseModel):

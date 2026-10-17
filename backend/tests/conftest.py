@@ -10,6 +10,8 @@ import tempfile
 os.environ.setdefault("SCHOOL_MS_AUTO_SEED", "0")
 os.environ.setdefault("JWT_SECRET", "test-secret")
 os.environ.setdefault("ENVIRONMENT", "test")
+# Keep the rapor grade-entry gate open during tests; deadline tests override it.
+os.environ.setdefault("GRADE_ENTRY_DEADLINE", "2099-12-31")
 
 # Point the app-level engine at a throwaway DB *before* importing the app so the
 # real ``backend/school_ms.db`` is never created or written during tests.
